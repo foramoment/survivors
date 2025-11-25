@@ -36,6 +36,57 @@ export class Projectile extends Entity {
     }
 }
 
+// Exploding projectile for rockets
+export class ExplodingProjectile extends Projectile {
+    explosionRadius: number;
+    explosionDamage: number;
+    onExplode: (x: number, y: number, radius: number, damage: number) => void = () => { };
+
+    constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number, emoji: string, explosionRadius: number, explosionDamage: number) {
+        super(x, y, velocity, duration, damage, pierce, emoji);
+        this.explosionRadius = explosionRadius;
+        this.explosionDamage = explosionDamage;
+    }
+
+    onHit() {
+        // Trigger explosion
+        this.onExplode(this.pos.x, this.pos.y, this.explosionRadius, this.explosionDamage);
+    }
+}
+
+// Bouncing projectile for chrono disc
+export class BouncingProjectile extends Projectile {
+    bouncesLeft: number;
+    maxBounceRange: number;
+    hitEnemies: Set<any> = new Set();
+    onBounce: (projectile: BouncingProjectile, enemies: any[]) => void = () => { };
+
+    constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, bounces: number, emoji: string, bounceRange: number = 300) {
+        super(x, y, velocity, duration, damage, 0, emoji); // Pierce = 0, we handle bouncing separately
+        this.bouncesLeft = bounces;
+        this.maxBounceRange = bounceRange;
+    }
+
+    canHit(enemy: any): boolean {
+        return !this.hitEnemies.has(enemy);
+    }
+
+    markHit(enemy: any) {
+        this.hitEnemies.add(enemy);
+    }
+
+    bounce(newTarget: Vector2) {
+        const dir = normalize({
+            x: newTarget.x - this.pos.x,
+            y: newTarget.y - this.pos.y
+        });
+        const speed = Math.sqrt(this.velocity.x ** 2 + this.velocity.y ** 2);
+        this.velocity = { x: dir.x * speed, y: dir.y * speed };
+        this.bouncesLeft--;
+    }
+}
+
+
 export abstract class ProjectileWeapon extends Weapon {
     abstract projectileEmoji: string;
     abstract pierce: number;

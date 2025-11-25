@@ -13,6 +13,10 @@ export class Player extends Entity {
 
     weapons: Weapon[] = [];
 
+    // Invulnerability system
+    invulnerabilityTimer: number = 0;
+    invulnerabilityDuration: number = 0.5;
+
     // Stats modifiers
     stats = {
         might: 1,
@@ -70,6 +74,11 @@ export class Player extends Entity {
             this.hp += this.stats.regen * dt;
             if (this.hp > this.maxHp) this.hp = this.maxHp;
         }
+
+        // Update invulnerability timer
+        if (this.invulnerabilityTimer > 0) {
+            this.invulnerabilityTimer -= dt;
+        }
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
@@ -82,11 +91,21 @@ export class Player extends Entity {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fill();
 
+        // Apply flashing effect if invulnerable
+        if (this.invulnerabilityTimer > 0) {
+            // Oscillate alpha between 0.3 and 1.0 using sine wave
+            const flashSpeed = 15; // How fast the flashing occurs
+            const alpha = 0.65 + 0.35 * Math.sin(this.invulnerabilityTimer * flashSpeed);
+            ctx.globalAlpha = alpha;
+        }
+
         // Body (Emoji)
         ctx.font = '30px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(this.classEmoji, 0, 0);
+
+        ctx.globalAlpha = 1.0; // Reset alpha
 
         // Draw Line to cursor if mouse down
         if (input.isMouseDown) {
@@ -108,8 +127,17 @@ export class Player extends Entity {
     }
 
     takeDamage(amount: number) {
+        // Check if player is currently invulnerable
+        if (this.invulnerabilityTimer > 0) {
+            return; // No damage taken
+        }
+
         const damage = Math.max(1, amount - this.stats.armor);
         this.hp -= damage;
+
+        // Activate invulnerability
+        this.invulnerabilityTimer = this.invulnerabilityDuration;
+
         if (this.hp <= 0) {
             this.isDead = true;
         }

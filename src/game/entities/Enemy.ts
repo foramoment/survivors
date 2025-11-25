@@ -3,18 +3,37 @@ import { type Vector2, normalize } from '../core/Utils';
 
 export class Enemy extends Entity {
     hp: number;
+    maxHp: number;
+    baseHp: number; // Store base HP for reference
     speed: number;
     damage: number;
     xpValue: number;
     emoji: string;
+    isElite: boolean = false;
+    eliteSizeMultiplier: number = 1;
+    eliteOutlineColor: string = '';
 
-    constructor(x: number, y: number, type: EnemyType) {
+    constructor(x: number, y: number, type: EnemyType, isElite: boolean = false) {
         super(x, y, 12);
+        this.baseHp = type.hp;
         this.hp = type.hp;
+        this.maxHp = type.hp;
         this.speed = type.speed;
         this.damage = type.damage;
         this.xpValue = type.xpValue;
         this.emoji = type.emoji;
+
+        // Elite enemy modifications
+        if (isElite) {
+            this.isElite = true;
+            this.hp *= 5;
+            this.maxHp *= 5;
+            this.eliteSizeMultiplier = 1.5;
+            this.radius *= this.eliteSizeMultiplier;
+            // Random elite outline color
+            const colors = ['#ff00ff', '#00ffff', '#ffff00', '#ff0000', '#00ff00'];
+            this.eliteOutlineColor = colors[Math.floor(Math.random() * colors.length)];
+        }
     }
 
     update(dt: number, playerPos?: Vector2) {
@@ -33,11 +52,24 @@ export class Enemy extends Entity {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
+        // Draw elite outline
+        if (this.isElite) {
+            ctx.strokeStyle = this.eliteOutlineColor;
+            ctx.lineWidth = 3;
+            ctx.shadowColor = this.eliteOutlineColor;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
         // Flip if moving left
         // We don't track velocity vector here but we can infer from player pos
         // For now simple draw
 
-        ctx.font = '24px Arial';
+        const fontSize = this.isElite ? 36 : 24;
+        ctx.font = `${fontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(this.emoji, 0, 0);

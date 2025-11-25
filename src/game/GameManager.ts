@@ -2,8 +2,8 @@ import { Player } from './entities/Player';
 import { Enemy } from './entities/Enemy';
 import { Entity } from './Entity';
 import { CLASSES, POWERUPS, ENEMIES, WEAPONS } from './data/GameData';
-import { checkCollision, type Vector2 } from './core/Utils';
-import { Projectile, Zone } from './weapons/WeaponTypes';
+import { checkCollision, type Vector2, distance } from './core/Utils';
+import { Projectile, Zone, ExplodingProjectile, BouncingProjectile } from './weapons/WeaponTypes';
 
 type GameState = 'MENU' | 'PLAYING' | 'LEVEL_UP' | 'GAME_OVER';
 
@@ -385,7 +385,10 @@ export class GameManager {
         if (this.gameTime > 120) type = ENEMIES[2];
         if (this.gameTime > 300) type = ENEMIES[3];
 
-        this.enemies.push(new Enemy(x, y, type));
+        // 1% chance to spawn elite enemy
+        const isElite = Math.random() < 0.01;
+
+        this.enemies.push(new Enemy(x, y, type, isElite));
     }
 
     spawnDamageNumber(pos: Vector2, amount: number) {

@@ -1,4 +1,4 @@
-import { ProjectileWeapon, ZoneWeapon } from './WeaponTypes';
+import { ProjectileWeapon, ZoneWeapon, ExplodingProjectile, Zone, BouncingProjectile } from './WeaponTypes';
 
 // 1. Void Ray
 export class VoidRayWeapon extends ProjectileWeapon {
@@ -100,8 +100,9 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
         super(owner);
         this.baseCooldown = 4;
         this.damage = 50;
-        this.speed = 100;
-        this.duration = 3;
+        this.speed = 50; // Changed from 100 to 50 (2x slower)
+        this.area = 600; // Max range
+        this.duration = 12; // 600 / 50 = 12 seconds max travel time
     }
 }
 
@@ -119,7 +120,40 @@ export class RocketSalvoWeapon extends ProjectileWeapon {
         this.damage = 30;
         this.speed = 300;
     }
+
+    // Override fire to create exploding projectiles
+    fire(target: any) {
+        const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
+        const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+        dir.x /= len;
+        dir.y /= len;
+
+        const speed = this.speed * (this.owner as any).stats.speed;
+        const velocity = { x: dir.x * speed, y: dir.y * speed };
+
+        const projectile = new ExplodingProjectile(
+            this.owner.pos.x,
+            this.owner.pos.y,
+            velocity,
+            this.duration * (this.owner as any).stats.duration,
+            this.damage * (this.owner as any).stats.might,
+            this.pierce,
+            this.projectileEmoji,
+            60, // Explosion radius
+            this.damage * 0.5 * (this.owner as any).stats.might // Explosion damage = 50% of direct hit
+        );
+
+        // Set explosion callback
+        projectile.onExplode = (x: number, y: number, radius: number, damage: number) => {
+            const zone = new Zone(x, y, radius, 0.3, damage, 0.1, '💥');
+            this.onSpawn(zone);
+        };
+
+        this.onSpawn(projectile);
+    }
 }
+
+
 
 // 8. Mind Blast (Zone)
 export class MindBlastWeapon extends ZoneWeapon {
@@ -138,22 +172,55 @@ export class MindBlastWeapon extends ZoneWeapon {
     }
 }
 
-// 9. Chrono Disc
+// 9. Chrono Disc - Bouncing disc that ricochets between enemies
 export class ChronoDiscWeapon extends ProjectileWeapon {
     name = "Chrono Disc";
     emoji = "💿";
-    description = "Boomerang disc.";
+    description = "Ricochet disc that bounces between enemies.";
     projectileEmoji = "💿";
-    pierce = 999;
+    pierce = 0; // Doesn't pierce, bounces instead
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 2;
-        this.damage = 20;
-        this.speed = 400;
-        this.duration = 2;
+        this.baseCooldown = 2.5;
+        this.damage = 8; // Low damage, but bounces multiple times
+        this.speed = 500;
+        this.duration = 5;
+    }
+
+    // Override fire to create bouncing projectiles
+    fire(target: any) {
+        const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
+        const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+        dir.x /= len;
+        dir.y /= len;
+
+        const speed = this.speed * (this.owner as any).stats.speed;
+        const velocity = { x: dir.x * speed, y: dir.y * speed };
+
+        // Bounces = 1 + level (starts at 1 bounce, +1 per level)
+        const bounces = 1 + (this.level - 1);
+
+        const projectile = new BouncingProjectile(
+            this.owner.pos.x,
+            this.owner.pos.y,
+            velocity,
+            this.duration * (this.owner as any).stats.duration,
+            this.damage * (this.owner as any).stats.might,
+            bounces,
+            this.projectileEmoji,
+            400 // Bounce range
+        );
+
+        this.onSpawn(projectile);
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.15; // Smaller damage increase
     }
 }
+
 
 // 10. Acid Spit
 export class AcidSpitWeapon extends ProjectileWeapon {
