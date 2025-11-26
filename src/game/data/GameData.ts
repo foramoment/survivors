@@ -1,7 +1,8 @@
 import {
     VoidRayWeapon, PlasmaKatanaWeapon, AutocannonWeapon, NanobotSwarmWeapon,
     SporeCloudWeapon, SingularityOrbWeapon, RocketSalvoWeapon, MindBlastWeapon,
-    ChronoDiscWeapon, AcidSpitWeapon, LightningChainWeapon, FlameWhipWeapon
+    ChronoDiscWeapon, AcidSpitWeapon, LightningChainWeapon, FlameWhipWeapon,
+    FrostNovaWeapon, ShadowDaggersWeapon
 } from '../weapons/Implementations';
 
 export const CLASSES = [
@@ -17,6 +18,8 @@ export const CLASSES = [
     { name: "Alien Symbiote", emoji: "👽", bonus: "Growth +20%", weaponId: 'acid_spit', hp: 95, stats: { growth: 1.2 } },
     { name: "Storm Mage", emoji: "⚡", bonus: "Lightning chains enemies", weaponId: 'lightning_chain', hp: 70, stats: { might: 1.15 } },
     { name: "Berserker", emoji: "🔥", bonus: "HP +50%, Armor -2", weaponId: 'flame_whip', hp: 150, stats: { armor: -2, might: 1.1 } },
+    { name: "Ice Mage", emoji: "🧊", bonus: "Area +15%, Cooldown -10%", weaponId: 'frost_nova', hp: 85, stats: { area: 1.15, cooldown: 0.9 } },
+    { name: "Shadow Assassin", emoji: "🥷", bonus: "Crit +15%, Move Speed +15%", weaponId: 'shadow_daggers', hp: 80, stats: { critChance: 0.2, moveSpeed: 1.15 } },
 ];
 
 export const POWERUPS = [
@@ -41,6 +44,8 @@ export const POWERUPS = [
     { name: "Phase Shift", description: "Move Speed +10%", type: "moveSpeed", value: 0.1, emoji: "👻" },
     { name: "Scavenger", description: "Luck +20%", type: "luck", value: 0.2, emoji: "🎲" },
     { name: "Rapid Tick", description: "Zone tick -0.1s", type: "tick", value: 0.1, emoji: "⏱️" },
+    { name: "Temporal Flux", description: "Duration +15%", type: "duration", value: 0.15, emoji: "⏰" },
+    { name: "Void Shield", description: "Armor +2", type: "armor", value: 2, emoji: "🌌" },
 ];
 
 export const WEAPONS = [
@@ -188,10 +193,34 @@ export const WEAPONS = [
             description: "Leaves burning trails"
         }
     },
+    {
+        id: 'frost_nova',
+        name: "Frost Nova",
+        emoji: "❄️",
+        description: "Freezing aura that slows enemies",
+        class: FrostNovaWeapon,
+        evolution: {
+            name: "Absolute Zero",
+            emoji: "🧊",
+            description: "Freezes enemies solid, massive damage"
+        }
+    },
+    {
+        id: 'shadow_daggers',
+        name: "Shadow Daggers",
+        emoji: "🗡️",
+        description: "Rapid piercing daggers",
+        class: ShadowDaggersWeapon,
+        evolution: {
+            name: "Void Blades",
+            emoji: "🌑",
+            description: "Daggers split into shadow clones"
+        }
+    },
 ];
 
 export const ENEMIES = [
-    { name: "Snake", hp: 10, speed: 100, damage: 5, xpValue: 1, emoji: "�" },
+    { name: "Snake", hp: 10, speed: 100, damage: 5, xpValue: 1, emoji: "🪱" },
     { name: "Lizard", hp: 20, speed: 80, damage: 8, xpValue: 2, emoji: "🦎" },
     { name: "Hedgehog", hp: 30, speed: 70, damage: 10, xpValue: 3, emoji: "🦔" },
     { name: "Alien", hp: 50, speed: 90, damage: 12, xpValue: 4, emoji: "👽" },

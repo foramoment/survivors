@@ -293,6 +293,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
         this.onSpawn(chain);
     }
 
+
     upgrade() {
         this.level++;
         this.damage *= 1.2;
@@ -314,6 +315,40 @@ export class FlameWhipWeapon extends ProjectileWeapon {
         this.damage = 20;
         this.speed = 600;
         this.duration = 0.3; // Short range
+    }
+}
+
+// 13. Frost Nova - Freezing zone weapon
+export class FrostNovaWeapon extends ZoneWeapon {
+    name = "Frost Nova";
+    emoji = "❄️";
+    description = "Freezing aura that slows enemies.";
+    zoneEmoji = "❄️";
+    interval = 0.8; // tick-based damage
+
+    constructor(owner: any) {
+        super(owner);
+        this.baseCooldown = 2.5;
+        this.duration = 3;
+        this.damage = 8;
+        this.area = 120;
+    }
+}
+
+// 14. Shadow Daggers - Fast piercing projectiles
+export class ShadowDaggersWeapon extends ProjectileWeapon {
+    name = "Shadow Daggers";
+    emoji = "🗡️";
+    description = "Rapid piercing daggers.";
+    projectileEmoji = "🗡️";
+    pierce = 3;
+
+    constructor(owner: any) {
+        super(owner);
+        this.baseCooldown = 0.5;
+        this.damage = 10;
+        this.speed = 700;
+        this.duration = 1.5;
     }
 }
 

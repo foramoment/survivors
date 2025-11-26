@@ -17,6 +17,10 @@ export class Player extends Entity {
     invulnerabilityTimer: number = 0;
     invulnerabilityDuration: number = 0.5;
 
+    // Weapon speed boost system
+    weaponSpeedBoost: number = 1;
+    weaponSpeedBoostTimer: number = 0;
+
     // Stats modifiers
     stats = {
         might: 1,
@@ -79,6 +83,14 @@ export class Player extends Entity {
         // Update invulnerability timer
         if (this.invulnerabilityTimer > 0) {
             this.invulnerabilityTimer -= dt;
+        }
+
+        // Update weapon speed boost timer
+        if (this.weaponSpeedBoostTimer > 0) {
+            this.weaponSpeedBoostTimer -= dt;
+            if (this.weaponSpeedBoostTimer <= 0) {
+                this.weaponSpeedBoost = 1;
+            }
         }
     }
 
@@ -155,19 +167,26 @@ export class Player extends Entity {
         this.level++;
         this.xp -= this.nextLevelXp;
 
-        // XP curve: Fast early game, then slows down significantly
-        // level 1→2 = 1, level 2→3 = 2, level 3→4 = 3, level 4→5 = 4, then 1.3x multiplier
+        // XP curve: Slower progression
+        // level 1→2 = 1, level 2→3 = 2, level 3→4 = 3, level 4→5 = 5, level 5→6 = 8, then 1.15x multiplier
         if (this.level === 2) {
             this.nextLevelXp = 2;
         } else if (this.level === 3) {
             this.nextLevelXp = 3;
         } else if (this.level === 4) {
-            this.nextLevelXp = 4;
+            this.nextLevelXp = 5;
+        } else if (this.level === 5) {
+            this.nextLevelXp = 8;
         } else {
-            // Steeper scaling after level 4 to prevent too frequent level-ups
-            this.nextLevelXp = Math.floor(this.nextLevelXp * 1.3);
+            // Slower scaling after level 5
+            this.nextLevelXp = Math.floor(this.nextLevelXp * 1.15);
         }
 
         this.onLevelUp();
+    }
+
+    activateWeaponSpeedBoost(duration: number = 10, multiplier: number = 10) {
+        this.weaponSpeedBoost = multiplier;
+        this.weaponSpeedBoostTimer = duration;
     }
 }

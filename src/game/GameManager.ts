@@ -172,6 +172,7 @@ export class GameManager {
         <div class="xp-bar-fill" id="xp-bar"></div>
       </div>
       <div class="stats" style="position:absolute; bottom: 10px; left: 10px;" id="level-display">LVL 1</div>
+      <div class="stats" style="position:absolute; top: 60px; left: 50%; transform: translateX(-50%); display: none; background: rgba(255, 215, 0, 0.3); padding: 10px 20px; border: 2px solid gold; border-radius: 10px; font-size: 20px; animation: pulse 0.5s infinite;" id="power-boost-indicator">⭐ POWER BOOST x10 ⭐</div>
     `;
         this.uiLayer.appendChild(hud);
     }
@@ -193,6 +194,17 @@ export class GameManager {
             const minutes = Math.floor(this.gameTime / 60).toString().padStart(2, '0');
             const seconds = Math.floor(this.gameTime % 60).toString().padStart(2, '0');
             timer.textContent = `${minutes}:${seconds}`;
+        }
+
+        // Power boost indicator
+        const powerBoostIndicator = document.getElementById('power-boost-indicator');
+        if (powerBoostIndicator) {
+            if (this.player.weaponSpeedBoostTimer > 0) {
+                powerBoostIndicator.style.display = 'block';
+                powerBoostIndicator.textContent = `⭐ POWER BOOST x10 (${Math.ceil(this.player.weaponSpeedBoostTimer)}s) ⭐`;
+            } else {
+                powerBoostIndicator.style.display = 'none';
+            }
         }
     }
 
@@ -420,7 +432,13 @@ export class GameManager {
 
             // Check collision with player
             if (checkCollision(crystal, this.player)) {
-                this.player.gainXp(crystal.value);
+                if (crystal.isPowerCrystal) {
+                    // Activate weapon speed boost
+                    this.player.activateWeaponSpeedBoost(10, 10);
+                } else {
+                    // Give XP
+                    this.player.gainXp(crystal.value);
+                }
                 this.xpCrystals.splice(i, 1);
             } else if (crystal.isDead) {
                 this.xpCrystals.splice(i, 1);
@@ -488,7 +506,22 @@ export class GameManager {
     }
 
     spawnXPCrystal(x: number, y: number, value: number) {
-        const crystal = new XPCrystal(x, y, value);
+        // 1% chance to spawn power crystal
+        if (Math.random() < 0.01) {
+            const crystal = new XPCrystal(x, y, 'power');
+            this.xpCrystals.push(crystal);
+            return;
+        }
+
+        // Determine crystal type based on value
+        let type: 'small' | 'medium' | 'large' = 'small';
+        if (value >= 5) {
+            type = 'large';
+        } else if (value >= 3) {
+            type = 'medium';
+        }
+
+        const crystal = new XPCrystal(x, y, type);
         this.xpCrystals.push(crystal);
     }
 
