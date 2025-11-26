@@ -67,14 +67,19 @@ export class Enemy extends Entity {
             ctx.fill();
         }
 
-        // Flip if moving left
-        // We don't track velocity vector here but we can infer from player pos
-        // For now simple draw
-
+        // Add white shadow/outline to all enemies for visibility
         const fontSize = this.isElite ? 36 : 24;
         ctx.font = `${fontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+
+        // Draw white outline
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+        ctx.shadowBlur = 8;
+        ctx.fillText(this.emoji, 0, 0);
+
+        // Reset shadow and draw emoji again for crisp appearance
+        ctx.shadowBlur = 0;
         ctx.fillText(this.emoji, 0, 0);
 
         ctx.restore();

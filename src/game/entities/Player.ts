@@ -155,15 +155,17 @@ export class Player extends Entity {
         this.level++;
         this.xp -= this.nextLevelXp;
 
-        // XP curve: level 1→2 = 1, level 2→3 = 2, level 3→4 = 3, level 4→5 = 5, then 1.15x multiplier
+        // XP curve: Fast early game, then slows down significantly
+        // level 1→2 = 1, level 2→3 = 2, level 3→4 = 3, level 4→5 = 4, then 1.3x multiplier
         if (this.level === 2) {
             this.nextLevelXp = 2;
         } else if (this.level === 3) {
             this.nextLevelXp = 3;
         } else if (this.level === 4) {
-            this.nextLevelXp = 5;
+            this.nextLevelXp = 4;
         } else {
-            this.nextLevelXp = Math.floor(this.nextLevelXp * 1.15);
+            // Steeper scaling after level 4 to prevent too frequent level-ups
+            this.nextLevelXp = Math.floor(this.nextLevelXp * 1.3);
         }
 
         this.onLevelUp();

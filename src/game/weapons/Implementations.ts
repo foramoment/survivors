@@ -261,7 +261,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
     constructor(owner: any) {
         super(owner);
         this.baseCooldown = 2.0;
-        this.damage = 15;
+        this.damage = 5; // Reduced from 15 (3x reduction)
         this.speed = 0; // Instant
         this.duration = 0.3;
     }
@@ -280,9 +280,10 @@ export class LightningChainWeapon extends ProjectileWeapon {
         // 3. Start chain logic
         // Bounces = 5 + weapon level
         const bounces = 5 + this.level;
+        const maxChainLength = 800; // Maximum total chain length
 
-        const chain = new ChainLightning(target.pos.x, target.pos.y, dmg, bounces);
-        chain.hitEnemies.add(target); // Don't bounce back to first target immediately
+        const chain = new ChainLightning(target.pos.x, target.pos.y, dmg, bounces, maxChainLength);
+        chain.hitEnemies.add(target); // Don't hit first target again
 
         chain.onHit = (t: any, d: number) => {
             t.takeDamage(d);

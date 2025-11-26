@@ -128,14 +128,19 @@ export class ChainLightning extends Projectile {
     segments: { start: Vector2, end: Vector2, alpha: number }[] = [];
     hitEnemies: Set<any> = new Set();
     range: number = 400;
+    maxChainLength: number;
+    totalChainLength: number = 0;
+    initialDamage: number;
 
     onHit: (target: any, damage: number) => void = () => { };
 
-    constructor(x: number, y: number, damage: number, bounces: number) {
+    constructor(x: number, y: number, damage: number, bounces: number, maxChainLength: number = 800) {
         super(x, y, { x: 0, y: 0 }, 10, damage, 0, '');
         this.canCollide = false;
         this.currentPos = { x, y };
         this.bounces = bounces;
+        this.maxChainLength = maxChainLength;
+        this.initialDamage = damage;
     }
 
     update(dt: number, enemies?: Entity[]) {
@@ -149,7 +154,7 @@ export class ChainLightning extends Projectile {
             let minDst = this.range;
 
             for (const enemy of enemies) {
-                if (this.hitEnemies.has(enemy)) continue;
+                if (this.hitEnemies.has(enemy)) continue; // Each enemy can only be hit once
 
                 const d = distance(this.currentPos, enemy.pos);
                 if (d < minDst) {
@@ -159,8 +164,24 @@ export class ChainLightning extends Projectile {
             }
 
             if (target) {
+                // Check if adding this chain would exceed max length
+                const chainSegmentLength = distance(this.currentPos, target.pos);
+                if (this.totalChainLength + chainSegmentLength > this.maxChainLength) {
+                    // Stop chaining - exceeded max length
+                    if (this.segments.length === 0) this.isDead = true;
+                    return;
+                }
+
+                this.totalChainLength += chainSegmentLength;
                 this.hitEnemies.add(target);
-                this.onHit(target, this.damage);
+
+                // Reduce damage by 30% per bounce
+                // bounceNumber represents how many bounces have already occurred (0 for first bounce, 1 for second, etc.)
+                const totalBounces = this.segments.length; // Number of bounces that have already happened
+                const damageMultiplier = Math.pow(0.7, totalBounces);
+                const currentDamage = this.initialDamage * damageMultiplier;
+
+                this.onHit(target, currentDamage);
 
                 this.segments.push({
                     start: { ...this.currentPos },

@@ -224,16 +224,27 @@ export class GameManager {
             allOptions.push({ type: 'powerup', data: p });
         });
 
-        // Add weapons
+        // Add weapons (excluding evolved weapons)
         WEAPONS.forEach(w => {
-            allOptions.push({ type: 'weapon', data: w });
+            const weaponLevel = this.weaponLevels.get(w.id) || 0;
+            const isEvolved = weaponLevel >= 6;
+            if (!isEvolved) {
+                allOptions.push({ type: 'weapon', data: w });
+            }
         });
 
-        // Pick random options
+        // Pick random unique options (no duplicates)
         const options = [];
-        for (let i = 0; i < upgradeCount; i++) {
-            const option = allOptions[Math.floor(Math.random() * allOptions.length)];
-            options.push(option);
+        const usedIndices = new Set<number>();
+
+        for (let i = 0; i < upgradeCount && usedIndices.size < allOptions.length; i++) {
+            let randomIndex;
+            do {
+                randomIndex = Math.floor(Math.random() * allOptions.length);
+            } while (usedIndices.has(randomIndex));
+
+            usedIndices.add(randomIndex);
+            options.push(allOptions[randomIndex]);
         }
 
         options.forEach(opt => {
