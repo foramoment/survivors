@@ -52,16 +52,19 @@ export class Enemy extends Entity {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        // Draw elite outline
+        // Draw elite glow (similar to XP crystals)
         if (this.isElite) {
-            ctx.strokeStyle = this.eliteOutlineColor;
-            ctx.lineWidth = 3;
-            ctx.shadowColor = this.eliteOutlineColor;
-            ctx.shadowBlur = 10;
+            const pulse = 0.8 + 0.2 * Math.sin(Date.now() / 200);
+            const glowSize = this.radius * pulse * 2;
+
+            // Outer glow
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, glowSize);
+            gradient.addColorStop(0, this.eliteOutlineColor + '99'); // 60% opacity
+            gradient.addColorStop(1, this.eliteOutlineColor + '00'); // transparent
+            ctx.fillStyle = gradient;
             ctx.beginPath();
-            ctx.arc(0, 0, this.radius + 5, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.shadowBlur = 0;
+            ctx.arc(0, 0, glowSize, 0, Math.PI * 2);
+            ctx.fill();
         }
 
         // Flip if moving left

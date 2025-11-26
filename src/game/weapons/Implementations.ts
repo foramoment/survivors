@@ -1,4 +1,4 @@
-import { ProjectileWeapon, ZoneWeapon, ExplodingProjectile, Zone, BouncingProjectile } from './WeaponTypes';
+import { ProjectileWeapon, ZoneWeapon, ExplodingProjectile, Zone, BouncingProjectile, ChainLightning, Beam } from './WeaponTypes';
 
 // 1. Void Ray
 export class VoidRayWeapon extends ProjectileWeapon {
@@ -12,7 +12,19 @@ export class VoidRayWeapon extends ProjectileWeapon {
         super(owner);
         this.baseCooldown = 1.5;
         this.damage = 15;
-        this.speed = 400;
+        this.speed = 0; // Instant
+    }
+
+    fire(target: any) {
+        // Instant damage
+        const dmg = this.damage * (this.owner as any).stats.might;
+        target.takeDamage(dmg);
+        this.onDamage(target.pos, dmg);
+
+        // Visual beam
+        // Glowing purple beam
+        const beam = new Beam(this.owner.pos, target.pos, 0.2, '#bd00ff', 4);
+        this.onSpawn(beam);
     }
 }
 
@@ -60,7 +72,7 @@ export class NanobotSwarmWeapon extends ZoneWeapon {
     emoji = "🦠";
     description = "Damaging aura around player.";
     zoneEmoji = "🌫️";
-    interval = 0.5;
+    interval = 1; // tick-based damage
 
     constructor(owner: any) {
         super(owner);
@@ -77,7 +89,7 @@ export class SporeCloudWeapon extends ZoneWeapon {
     emoji = "🍄";
     description = "Leaves damaging zones.";
     zoneEmoji = "🤢";
-    interval = 1;
+    interval = 1; // tick-based damage
 
     constructor(owner: any) {
         super(owner);
@@ -161,7 +173,7 @@ export class MindBlastWeapon extends ZoneWeapon {
     emoji = "🧠";
     description = "Explosion at enemy location.";
     zoneEmoji = "💥";
-    interval = 0.1; // Instant damage mostly
+    interval = 1; // tick-based damage
 
     constructor(owner: any) {
         super(owner);
@@ -183,7 +195,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
     constructor(owner: any) {
         super(owner);
         this.baseCooldown = 2.5;
-        this.damage = 8; // Low damage, but bounces multiple times
+        this.damage = 2.67; // Reduced by 3x from 8
         this.speed = 500;
         this.duration = 5;
     }
@@ -198,8 +210,8 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
         const speed = this.speed * (this.owner as any).stats.speed;
         const velocity = { x: dir.x * speed, y: dir.y * speed };
 
-        // Bounces = 3 + level (starts at 3 bounces, +1 per level)
-        const bounces = 3 + this.level;
+        // Bounces = 5 + level (starts at 6 bounces, +1 per level)
+        const bounces = 5 + this.level;
 
         const projectile = new BouncingProjectile(
             this.owner.pos.x,
@@ -250,14 +262,40 @@ export class LightningChainWeapon extends ProjectileWeapon {
         super(owner);
         this.baseCooldown = 2.0;
         this.damage = 15;
-        this.speed = 800; // Fast lightning
-        this.duration = 0.3; // Quick strike
+        this.speed = 0; // Instant
+        this.duration = 0.3;
+    }
+
+    fire(target: any) {
+        const dmg = this.damage * (this.owner as any).stats.might;
+
+        // 1. Hit first target immediately
+        target.takeDamage(dmg);
+        this.onDamage(target.pos, dmg);
+
+        // 2. Visual beam from player to first target
+        const beam = new Beam(this.owner.pos, target.pos, 0.1, '#ffff00', 2);
+        this.onSpawn(beam);
+
+        // 3. Start chain logic
+        // Bounces = 5 + weapon level
+        const bounces = 5 + this.level;
+
+        const chain = new ChainLightning(target.pos.x, target.pos.y, dmg, bounces);
+        chain.hitEnemies.add(target); // Don't bounce back to first target immediately
+
+        chain.onHit = (t: any, d: number) => {
+            t.takeDamage(d);
+            this.onDamage(t.pos, d);
+        };
+
+        this.onSpawn(chain);
     }
 
     upgrade() {
         this.level++;
         this.damage *= 1.2;
-        this.pierce += 1; // Each level adds one more chain
+        // Bounces increase automatically via level usage in fire()
     }
 }
 

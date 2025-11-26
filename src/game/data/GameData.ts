@@ -40,6 +40,7 @@ export const POWERUPS = [
     { name: "Overclock", description: "Speed +10%", type: "speed", value: 0.1, emoji: "⏩" },
     { name: "Phase Shift", description: "Move Speed +10%", type: "moveSpeed", value: 0.1, emoji: "👻" },
     { name: "Scavenger", description: "Luck +20%", type: "luck", value: 0.2, emoji: "🎲" },
+    { name: "Rapid Tick", description: "Zone tick -0.1s", type: "tick", value: 0.1, emoji: "⏱️" },
 ];
 
 export const WEAPONS = [
@@ -190,8 +191,10 @@ export const WEAPONS = [
 ];
 
 export const ENEMIES = [
-    { name: "Drone", hp: 10, speed: 100, damage: 5, xpValue: 1, emoji: "🛸" },
-    { name: "Alien", hp: 20, speed: 80, damage: 8, xpValue: 2, emoji: "👽" },
-    { name: "Mecha", hp: 50, speed: 60, damage: 15, xpValue: 5, emoji: "🤖" },
+    { name: "Snake", hp: 10, speed: 100, damage: 5, xpValue: 1, emoji: "�" },
+    { name: "Lizard", hp: 20, speed: 80, damage: 8, xpValue: 2, emoji: "🦎" },
+    { name: "Hedgehog", hp: 30, speed: 70, damage: 10, xpValue: 3, emoji: "🦔" },
+    { name: "Alien", hp: 50, speed: 90, damage: 12, xpValue: 4, emoji: "👽" },
+    { name: "Mecha", hp: 80, speed: 60, damage: 15, xpValue: 6, emoji: "🤖" },
     { name: "Boss", hp: 500, speed: 120, damage: 30, xpValue: 100, emoji: "👹" },
 ];

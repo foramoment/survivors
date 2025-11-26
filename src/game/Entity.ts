@@ -10,6 +10,6 @@ export abstract class Entity {
         this.radius = radius;
     }
 
-    abstract update(dt: number, playerPos?: Vector2): void;
+    abstract update(dt: number, data?: any): void;
     abstract draw(ctx: CanvasRenderingContext2D, camera: Vector2): void;
 }

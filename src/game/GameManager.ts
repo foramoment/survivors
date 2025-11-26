@@ -128,6 +128,7 @@ export class GameManager {
             const weapon: any = new weaponData.class(this.player);
             weapon.weaponId = weaponId;
             weapon.onSpawn = (entity: Entity) => this.spawnEntity(entity);
+            weapon.onDamage = (pos: Vector2, amount: number) => this.spawnDamageNumber(pos, amount);
             this.player.weapons.push(weapon);
             this.weaponLevels.set(weaponId, 1);
         }
@@ -309,8 +310,8 @@ export class GameManager {
         this.gameTime += dt;
         this.waveTimer += dt;
 
-        // Spawning Logic
-        if (this.enemies.length < 50 + this.gameTime / 10) {
+        // Spawning Logic - max 400 enemies on screen
+        if (this.enemies.length < Math.min(400, 30 + this.gameTime / 5)) {
             if (Math.random() < 0.05 + (this.gameTime / 1000)) {
                 this.spawnEnemy();
             }
@@ -322,7 +323,7 @@ export class GameManager {
 
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const p = this.projectiles[i];
-            p.update(dt);
+            p.update(dt, this.enemies);
             if (p.isDead) {
                 this.projectiles.splice(i, 1);
             }
@@ -330,6 +331,8 @@ export class GameManager {
 
         // Collisions
         for (const p of this.projectiles) {
+            if (p instanceof Projectile && !p.canCollide) continue;
+
             for (const e of this.enemies) {
                 if (checkCollision(p, e)) {
                     if (p instanceof BouncingProjectile) {
@@ -443,14 +446,25 @@ export class GameManager {
         const y = this.player.pos.y + Math.sin(angle) * dist;
 
         let type = ENEMIES[0];
-        if (this.gameTime > 60) type = ENEMIES[1];
-        if (this.gameTime > 120) type = ENEMIES[2];
-        if (this.gameTime > 300) type = ENEMIES[3];
+        if (this.gameTime > 30) type = ENEMIES[1];
+        if (this.gameTime > 60) type = ENEMIES[2];
+        if (this.gameTime > 120) type = ENEMIES[3];
+        if (this.gameTime > 180) type = ENEMIES[4];
+        if (this.gameTime > 300) type = ENEMIES[5];
 
         // 1% chance to spawn elite enemy
         const isElite = Math.random() < 0.01;
 
-        this.enemies.push(new Enemy(x, y, type, isElite));
+        // Create enemy and apply time-based scaling
+        const enemy = new Enemy(x, y, type, isElite);
+
+        // Enemies get stronger over time
+        const timeMultiplier = 1 + (this.gameTime / 300); // +1 multiplier every 5 minutes
+        enemy.maxHp = enemy.baseHp * Math.min(timeMultiplier, 3); // Cap at 3x HP
+        enemy.hp = enemy.maxHp;
+        enemy.damage *= Math.min(1 + (this.gameTime / 600), 2); // Cap at 2x damage
+
+        this.enemies.push(enemy);
     }
 
     spawnDamageNumber(pos: Vector2, amount: number) {

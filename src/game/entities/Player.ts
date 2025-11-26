@@ -33,7 +33,8 @@ export class Player extends Entity {
         armor: 0,
         regen: 0,
         critChance: 0.05,
-        critDamage: 1.5
+        critDamage: 1.5,
+        tick: 0 // Reduces zone weapon damage interval
     };
 
     className: string = "Survivor";

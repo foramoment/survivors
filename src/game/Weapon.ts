@@ -18,6 +18,7 @@ export abstract class Weapon {
     duration: number = 1;
 
     onSpawn: (entity: Entity) => void = () => { };
+    onDamage: (pos: Vector2, amount: number) => void = () => { };
 
     constructor(owner: Entity) {
         this.owner = owner;
