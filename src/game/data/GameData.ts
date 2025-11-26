@@ -1,20 +1,22 @@
 import {
     VoidRayWeapon, PlasmaKatanaWeapon, AutocannonWeapon, NanobotSwarmWeapon,
     SporeCloudWeapon, SingularityOrbWeapon, RocketSalvoWeapon, MindBlastWeapon,
-    ChronoDiscWeapon, AcidSpitWeapon
+    ChronoDiscWeapon, AcidSpitWeapon, LightningChainWeapon, FlameWhipWeapon
 } from '../weapons/Implementations';
 
 export const CLASSES = [
-    { name: "Void Walker", emoji: "🌑", bonus: "Speed +10%", weaponId: 'void_ray', stats: { moveSpeed: 1.1 } },
-    { name: "Cyber Samurai", emoji: "🤖", bonus: "Crit +10%", weaponId: 'plasma_katana', stats: { critChance: 0.15 } },
-    { name: "Heavy Gunner", emoji: "🦍", bonus: "Might +20%, Speed -10%", weaponId: 'autocannon', stats: { might: 1.2, moveSpeed: 0.9 } },
-    { name: "Technomancer", emoji: "🧙‍♂️", bonus: "Duration +20%", weaponId: 'nanobot_swarm', stats: { duration: 1.2 } },
-    { name: "Astro Biologist", emoji: "👨‍🔬", bonus: "Regen +1", weaponId: 'spore_cloud', stats: { regen: 1 } },
-    { name: "Quantum Physicist", emoji: "⚛️", bonus: "Cooldown -10%", weaponId: 'singularity_orb', stats: { cooldown: 0.9 } },
-    { name: "Exo Marine", emoji: "👮", bonus: "Armor +2", weaponId: 'rocket_salvo', stats: { armor: 2 } },
-    { name: "Psionicist", emoji: "🧠", bonus: "Area +20%", weaponId: 'mind_blast', stats: { area: 1.2 } },
-    { name: "Time Keeper", emoji: "⏳", bonus: "Proj Speed +20%", weaponId: 'chrono_disc', stats: { speed: 1.2 } },
-    { name: "Alien Symbiote", emoji: "👽", bonus: "Growth +20%", weaponId: 'acid_spit', stats: { growth: 1.2 } },
+    { name: "Void Walker", emoji: "🌑", bonus: "Speed +10%", weaponId: 'void_ray', hp: 90, stats: { moveSpeed: 1.1 } },
+    { name: "Cyber Samurai", emoji: "🤖", bonus: "Crit +10%", weaponId: 'plasma_katana', hp: 85, stats: { critChance: 0.15 } },
+    { name: "Heavy Gunner", emoji: "🦍", bonus: "Might +20%, Speed -10%", weaponId: 'autocannon', hp: 110, stats: { might: 1.2, moveSpeed: 0.9 } },
+    { name: "Technomancer", emoji: "🧙‍♂️", bonus: "Duration +20%", weaponId: 'nanobot_swarm', hp: 100, stats: { duration: 1.2 } },
+    { name: "Astro Biologist", emoji: "👨‍🔬", bonus: "Regen +1", weaponId: 'spore_cloud', hp: 95, stats: { regen: 1 } },
+    { name: "Quantum Physicist", emoji: "⚛️", bonus: "Cooldown -10%", weaponId: 'singularity_orb', hp: 80, stats: { cooldown: 0.9 } },
+    { name: "Exo Marine", emoji: "👮", bonus: "Armor +2", weaponId: 'rocket_salvo', hp: 130, stats: { armor: 2 } },
+    { name: "Psionicist", emoji: "🧠", bonus: "Area +20%", weaponId: 'mind_blast', hp: 75, stats: { area: 1.2 } },
+    { name: "Time Keeper", emoji: "⏳", bonus: "Proj Speed +20%", weaponId: 'chrono_disc', hp: 100, stats: { speed: 1.2 } },
+    { name: "Alien Symbiote", emoji: "👽", bonus: "Growth +20%", weaponId: 'acid_spit', hp: 95, stats: { growth: 1.2 } },
+    { name: "Storm Mage", emoji: "⚡", bonus: "Lightning chains enemies", weaponId: 'lightning_chain', hp: 70, stats: { might: 1.15 } },
+    { name: "Berserker", emoji: "🔥", bonus: "HP +50%, Armor -2", weaponId: 'flame_whip', hp: 150, stats: { armor: -2, might: 1.1 } },
 ];
 
 export const POWERUPS = [
@@ -32,8 +34,9 @@ export const POWERUPS = [
     { name: "Energy Shield", description: "Armor +1", type: "armor", value: 1, emoji: "🛡️" },
     { name: "Vampiric Link", description: "Growth +10%", type: "growth", value: 0.1, emoji: "🧛" },
     { name: "Static Field", description: "Duration +10%", type: "duration", value: 0.1, emoji: "⚡" },
-    { name: "Mirror Image", description: "Amount +1 (Not Impl)", type: "amount", value: 1, emoji: "👯" },
     { name: "Bounty Hunter", description: "Greed +20%", type: "greed", value: 0.2, emoji: "💰" },
+    { name: "Berserker Rage", description: "Crit Dmg +25%", type: "critDamage", value: 0.25, emoji: "😡" },
+    { name: "Barrier Field", description: "Max HP +10", type: "maxHp", value: 10, emoji: "🔮" },
     { name: "Overclock", description: "Speed +10%", type: "speed", value: 0.1, emoji: "⏩" },
     { name: "Phase Shift", description: "Move Speed +10%", type: "moveSpeed", value: 0.1, emoji: "👻" },
     { name: "Scavenger", description: "Luck +20%", type: "luck", value: 0.2, emoji: "🎲" },
@@ -158,6 +161,30 @@ export const WEAPONS = [
             name: "Toxic Deluge",
             emoji: "☢️",
             description: "Acid puddles on impact, lingering damage"
+        }
+    },
+    {
+        id: 'lightning_chain',
+        name: "Lightning Chain",
+        emoji: "⚡",
+        description: "Chains between enemies",
+        class: LightningChainWeapon,
+        evolution: {
+            name: "Thunderstorm",
+            emoji: "🌩️",
+            description: "Infinite chain lightning"
+        }
+    },
+    {
+        id: 'flame_whip',
+        name: "Flame Whip",
+        emoji: "🔥",
+        description: "Burning melee strikes",
+        class: FlameWhipWeapon,
+        evolution: {
+            name: "Inferno Lash",
+            emoji: "🌋",
+            description: "Leaves burning trails"
         }
     },
 ];

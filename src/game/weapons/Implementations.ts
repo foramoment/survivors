@@ -167,7 +167,7 @@ export class MindBlastWeapon extends ZoneWeapon {
         super(owner);
         this.baseCooldown = 3;
         this.duration = 0.5;
-        this.damage = 40;
+        this.damage = 10; // Reduced from 40 (4x reduction)
         this.area = 100;
     }
 }
@@ -198,8 +198,8 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
         const speed = this.speed * (this.owner as any).stats.speed;
         const velocity = { x: dir.x * speed, y: dir.y * speed };
 
-        // Bounces = 1 + level (starts at 1 bounce, +1 per level)
-        const bounces = 1 + (this.level - 1);
+        // Bounces = 3 + level (starts at 3 bounces, +1 per level)
+        const bounces = 3 + this.level;
 
         const projectile = new BouncingProjectile(
             this.owner.pos.x,
@@ -237,3 +237,44 @@ export class AcidSpitWeapon extends ProjectileWeapon {
         this.speed = 450;
     }
 }
+
+// 11. Lightning Chain - Chains between enemies
+export class LightningChainWeapon extends ProjectileWeapon {
+    name = "Lightning Chain";
+    emoji = "⚡";
+    description = "Lightning that chains between enemies.";
+    projectileEmoji = "⚡";
+    pierce = 3; // Number of chains per attack
+
+    constructor(owner: any) {
+        super(owner);
+        this.baseCooldown = 2.0;
+        this.damage = 15;
+        this.speed = 800; // Fast lightning
+        this.duration = 0.3; // Quick strike
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.2;
+        this.pierce += 1; // Each level adds one more chain
+    }
+}
+
+// 12. Flame Whip - Short range burning attacks
+export class FlameWhipWeapon extends ProjectileWeapon {
+    name = "Flame Whip";
+    emoji = "🔥";
+    description = "Burning melee strikes.";
+    projectileEmoji = "🔥";
+    pierce = 2;
+
+    constructor(owner: any) {
+        super(owner);
+        this.baseCooldown = 0.8;
+        this.damage = 20;
+        this.speed = 600;
+        this.duration = 0.3; // Short range
+    }
+}
+

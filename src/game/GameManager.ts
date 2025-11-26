@@ -1,9 +1,10 @@
 import { Player } from './entities/Player';
 import { Enemy } from './entities/Enemy';
+import { XPCrystal } from './entities/XPCrystal';
 import { Entity } from './Entity';
 import { CLASSES, POWERUPS, ENEMIES, WEAPONS } from './data/GameData';
 import { checkCollision, type Vector2, distance } from './core/Utils';
-import { Projectile, Zone, ExplodingProjectile, BouncingProjectile } from './weapons/WeaponTypes';
+import { Projectile, Zone, BouncingProjectile } from './weapons/WeaponTypes';
 
 type GameState = 'MENU' | 'PLAYING' | 'LEVEL_UP' | 'GAME_OVER';
 
@@ -16,6 +17,7 @@ export class GameManager {
     player: Player | null = null;
     enemies: Enemy[] = [];
     projectiles: (Projectile | Zone)[] = [];
+    xpCrystals: XPCrystal[] = [];
     damageNumbers: { x: number, y: number, text: string, life: number }[] = [];
 
     camera: Vector2 = { x: 0, y: 0 };
@@ -49,11 +51,17 @@ export class GameManager {
         grid.className = 'class-grid';
 
         CLASSES.forEach((cls, index) => {
+            const weaponData = WEAPONS.find(w => w.id === cls.weaponId);
+            const weaponName = weaponData ? weaponData.name : 'Unknown';
+            const weaponEmoji = weaponData ? weaponData.emoji : '❓';
+
             const card = document.createElement('div');
             card.className = 'class-card interactive';
             card.innerHTML = `
         <div class="class-icon">${cls.emoji}</div>
         <div class="class-name">${cls.name}</div>
+        <div class="class-bonus">❤️ ${cls.hp} HP</div>
+        <div class="class-bonus">${weaponEmoji} ${weaponName}</div>
         <div class="class-bonus">${cls.bonus}</div>
       `;
             card.onclick = () => this.startGame(index);
@@ -71,6 +79,11 @@ export class GameManager {
         // Apply Class Stats
         this.player.className = cls.name;
         this.player.classEmoji = cls.emoji;
+
+        // Set HP from class
+        this.player.hp = cls.hp;
+        this.player.maxHp = cls.hp;
+
         Object.assign(this.player.stats, cls.stats);
 
         this.player.onLevelUp = () => this.showLevelUp();
@@ -80,6 +93,7 @@ export class GameManager {
 
         this.enemies = [];
         this.projectiles = [];
+        this.xpCrystals = [];
         this.damageNumbers = [];
         this.gameTime = 0;
         this.state = 'PLAYING';
@@ -318,7 +332,38 @@ export class GameManager {
         for (const p of this.projectiles) {
             for (const e of this.enemies) {
                 if (checkCollision(p, e)) {
-                    if (p instanceof Projectile) {
+                    if (p instanceof BouncingProjectile) {
+                        // Handle bouncing projectile
+                        if (p.canHit(e)) {
+                            e.takeDamage(p.damage);
+                            this.spawnDamageNumber(e.pos, p.damage);
+                            p.markHit(e);
+
+                            // Try to bounce to another enemy
+                            if (p.bouncesLeft > 0) {
+                                let nearestEnemy: Enemy | null = null;
+                                let minDist = p.maxBounceRange;
+
+                                for (const target of this.enemies) {
+                                    if (p.canHit(target)) {
+                                        const d = distance(p.pos, target.pos);
+                                        if (d < minDist) {
+                                            minDist = d;
+                                            nearestEnemy = target;
+                                        }
+                                    }
+                                }
+
+                                if (nearestEnemy) {
+                                    p.bounce(nearestEnemy.pos);
+                                } else {
+                                    p.isDead = true; // No more targets
+                                }
+                            } else {
+                                p.isDead = true; // No bounces left
+                            }
+                        }
+                    } else if (p instanceof Projectile) {
                         e.takeDamage(p.damage);
                         this.spawnDamageNumber(e.pos, p.damage);
                         if (p.pierce !== undefined) {
@@ -346,8 +391,25 @@ export class GameManager {
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             if (this.enemies[i].isDead) {
-                this.player.gainXp(this.enemies[i].xpValue);
+                const enemy = this.enemies[i];
+                // Drop XP crystals instead of giving XP directly
+                const crystalValue = enemy.xpValue;
+                this.spawnXPCrystal(enemy.pos.x, enemy.pos.y, crystalValue);
                 this.enemies.splice(i, 1);
+            }
+        }
+
+        // Update XP crystals
+        for (let i = this.xpCrystals.length - 1; i >= 0; i--) {
+            const crystal = this.xpCrystals[i];
+            crystal.update(dt, this.player.pos, this.player.stats.magnet);
+
+            // Check collision with player
+            if (checkCollision(crystal, this.player)) {
+                this.player.gainXp(crystal.value);
+                this.xpCrystals.splice(i, 1);
+            } else if (crystal.isDead) {
+                this.xpCrystals.splice(i, 1);
             }
         }
 
@@ -400,6 +462,11 @@ export class GameManager {
         });
     }
 
+    spawnXPCrystal(x: number, y: number, value: number) {
+        const crystal = new XPCrystal(x, y, value);
+        this.xpCrystals.push(crystal);
+    }
+
     draw(ctx: CanvasRenderingContext2D) {
         if (this.state !== 'PLAYING' && this.state !== 'LEVEL_UP') return;
 
@@ -408,6 +475,9 @@ export class GameManager {
         this.projectiles.forEach(p => {
             if (p instanceof Zone) p.draw(ctx, this.camera);
         });
+
+        // Draw XP crystals
+        this.xpCrystals.forEach(c => c.draw(ctx, this.camera));
 
         this.enemies.forEach(e => e.draw(ctx, this.camera));
 

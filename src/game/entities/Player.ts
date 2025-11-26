@@ -9,7 +9,7 @@ export class Player extends Entity {
     maxHp: number = 100;
     xp: number = 0;
     level: number = 1;
-    nextLevelXp: number = 10;
+    nextLevelXp: number = 1; // First level requires 1 crystal
 
     weapons: Weapon[] = [];
 
@@ -153,7 +153,18 @@ export class Player extends Entity {
     levelUp() {
         this.level++;
         this.xp -= this.nextLevelXp;
-        this.nextLevelXp = Math.floor(this.nextLevelXp * 1.2);
+
+        // XP curve: level 1→2 = 1, level 2→3 = 2, level 3→4 = 3, level 4→5 = 5, then 1.15x multiplier
+        if (this.level === 2) {
+            this.nextLevelXp = 2;
+        } else if (this.level === 3) {
+            this.nextLevelXp = 3;
+        } else if (this.level === 4) {
+            this.nextLevelXp = 5;
+        } else {
+            this.nextLevelXp = Math.floor(this.nextLevelXp * 1.15);
+        }
+
         this.onLevelUp();
     }
 }
