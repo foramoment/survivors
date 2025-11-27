@@ -1,25 +1,25 @@
 import {
-    VoidRayWeapon, PlasmaKatanaWeapon, AutocannonWeapon, NanobotSwarmWeapon,
-    SporeCloudWeapon, SingularityOrbWeapon, RocketSalvoWeapon, MindBlastWeapon,
-    ChronoDiscWeapon, AcidSpitWeapon, LightningChainWeapon, FlameWhipWeapon,
-    FrostNovaWeapon, ShadowDaggersWeapon
+    VoidRayWeapon, PhantomSlashWeapon, DroneSupportWeapon, NanobotSwarmWeapon,
+    SporeCloudWeapon, SingularityOrbWeapon, OrbitalStrikeWeapon, MindBlastWeapon,
+    ChronoDiscWeapon, AcidPoolWeapon, LightningChainWeapon, SpinningEmberWeapon,
+    FrostNovaWeapon, FanOfKnivesWeapon
 } from '../weapons/Implementations';
 
 export const CLASSES = [
     { name: "Void Walker", emoji: "🌑", bonus: "Speed +10%", weaponId: 'void_ray', hp: 90, stats: { moveSpeed: 1.1 } },
-    { name: "Cyber Samurai", emoji: "🤖", bonus: "Crit +10%", weaponId: 'plasma_katana', hp: 85, stats: { critChance: 0.15 } },
-    { name: "Heavy Gunner", emoji: "🦍", bonus: "Might +20%, Speed -10%", weaponId: 'autocannon', hp: 110, stats: { might: 1.2, moveSpeed: 0.9 } },
+    { name: "Cyber Samurai", emoji: "🤖", bonus: "Crit +10%", weaponId: 'phantom_slash', hp: 85, stats: { critChance: 0.15 } },
+    { name: "Heavy Gunner", emoji: "🦍", bonus: "Might +20%, Speed -10%", weaponId: 'drone_support', hp: 110, stats: { might: 1.2, moveSpeed: 0.9 } },
     { name: "Technomancer", emoji: "🧙‍♂️", bonus: "Duration +20%", weaponId: 'nanobot_swarm', hp: 100, stats: { duration: 1.2 } },
     { name: "Astro Biologist", emoji: "👨‍🔬", bonus: "Regen +1", weaponId: 'spore_cloud', hp: 95, stats: { regen: 1 } },
     { name: "Quantum Physicist", emoji: "⚛️", bonus: "Cooldown -10%", weaponId: 'singularity_orb', hp: 80, stats: { cooldown: 0.9 } },
-    { name: "Exo Marine", emoji: "👮", bonus: "Armor +2", weaponId: 'rocket_salvo', hp: 130, stats: { armor: 2 } },
+    { name: "Exo Marine", emoji: "👮", bonus: "Armor +2", weaponId: 'orbital_strike', hp: 130, stats: { armor: 2 } },
     { name: "Psionicist", emoji: "🧠", bonus: "Area +20%", weaponId: 'mind_blast', hp: 75, stats: { area: 1.2 } },
     { name: "Time Keeper", emoji: "⏳", bonus: "Proj Speed +20%", weaponId: 'chrono_disc', hp: 100, stats: { speed: 1.2 } },
-    { name: "Alien Symbiote", emoji: "👽", bonus: "Growth +20%", weaponId: 'acid_spit', hp: 95, stats: { growth: 1.2 } },
+    { name: "Alien Symbiote", emoji: "👽", bonus: "Growth +20%", weaponId: 'acid_pool', hp: 95, stats: { growth: 1.2 } },
     { name: "Storm Mage", emoji: "⚡", bonus: "Lightning chains enemies", weaponId: 'lightning_chain', hp: 70, stats: { might: 1.15 } },
-    { name: "Berserker", emoji: "🔥", bonus: "HP +50%, Armor -2", weaponId: 'flame_whip', hp: 150, stats: { armor: -2, might: 1.1 } },
+    { name: "Berserker", emoji: "🔥", bonus: "HP +50%, Armor -2", weaponId: 'spinning_ember', hp: 150, stats: { armor: -2, might: 1.1 } },
     { name: "Ice Mage", emoji: "🧊", bonus: "Area +15%, Cooldown -10%", weaponId: 'frost_nova', hp: 85, stats: { area: 1.15, cooldown: 0.9 } },
-    { name: "Shadow Assassin", emoji: "🥷", bonus: "Crit +15%, Move Speed +15%", weaponId: 'shadow_daggers', hp: 80, stats: { critChance: 0.2, moveSpeed: 1.15 } },
+    { name: "Shadow Assassin", emoji: "🥷", bonus: "Crit +15%, Move Speed +15%", weaponId: 'fan_of_knives', hp: 80, stats: { critChance: 0.2, moveSpeed: 1.15 } },
 ];
 
 export const POWERUPS = [
@@ -62,11 +62,11 @@ export const WEAPONS = [
         }
     },
     {
-        id: 'plasma_katana',
-        name: "Plasma Katana",
+        id: 'phantom_slash',
+        name: "Phantom Slash",
         emoji: "⚔️",
-        description: "Slashes nearby enemies",
-        class: PlasmaKatanaWeapon,
+        description: "Instantly cuts random enemies",
+        class: PhantomSlashWeapon,
         evolution: {
             name: "Dimensional Blade",
             emoji: "🗡️",
@@ -74,11 +74,11 @@ export const WEAPONS = [
         }
     },
     {
-        id: 'autocannon',
-        name: "Autocannon",
-        emoji: "🤖",
-        description: "Rapid fire projectiles",
-        class: AutocannonWeapon,
+        id: 'drone_support',
+        name: "Drone Support",
+        emoji: "🛸",
+        description: "Deploys a drone that fights for you",
+        class: DroneSupportWeapon,
         evolution: {
             name: "Gatling Storm",
             emoji: "⚙️",
@@ -122,11 +122,11 @@ export const WEAPONS = [
         }
     },
     {
-        id: 'rocket_salvo',
-        name: "Rocket Salvo",
-        emoji: "🚀",
-        description: "Fires missiles",
-        class: RocketSalvoWeapon,
+        id: 'orbital_strike',
+        name: "Orbital Strike",
+        emoji: "🛰️",
+        description: "Calls down random explosions",
+        class: OrbitalStrikeWeapon,
         evolution: {
             name: "Nuclear Barrage",
             emoji: "☢️",
@@ -158,11 +158,11 @@ export const WEAPONS = [
         }
     },
     {
-        id: 'acid_spit',
-        name: "Acid Spit",
+        id: 'acid_pool',
+        name: "Acid Pool",
         emoji: "🧪",
-        description: "Corrosive projectile",
-        class: AcidSpitWeapon,
+        description: "Throws acid flasks",
+        class: AcidPoolWeapon,
         evolution: {
             name: "Toxic Deluge",
             emoji: "☢️",
@@ -182,11 +182,11 @@ export const WEAPONS = [
         }
     },
     {
-        id: 'flame_whip',
-        name: "Flame Whip",
+        id: 'spinning_ember',
+        name: "Spinning Ember",
         emoji: "🔥",
-        description: "Burning melee strikes",
-        class: FlameWhipWeapon,
+        description: "Fireballs that orbit you",
+        class: SpinningEmberWeapon,
         evolution: {
             name: "Inferno Lash",
             emoji: "🌋",
@@ -206,11 +206,11 @@ export const WEAPONS = [
         }
     },
     {
-        id: 'shadow_daggers',
-        name: "Shadow Daggers",
+        id: 'fan_of_knives',
+        name: "Fan of Knives",
         emoji: "🗡️",
-        description: "Rapid piercing daggers",
-        class: ShadowDaggersWeapon,
+        description: "Fires a spread of knives",
+        class: FanOfKnivesWeapon,
         evolution: {
             name: "Void Blades",
             emoji: "🌑",

@@ -1,4 +1,7 @@
-import { ProjectileWeapon, ZoneWeapon, ExplodingProjectile, Zone, BouncingProjectile, ChainLightning, Beam } from './WeaponTypes';
+import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning, Beam, OrbitingProjectile, LobbedProjectile, DelayedExplosionZone, DroneEntity, Projectile } from './WeaponTypes';
+import { distance, type Vector2 } from '../core/Utils';
+import { Weapon } from '../Weapon';
+import { Entity } from '../Entity';
 
 // 1. Void Ray
 export class VoidRayWeapon extends ProjectileWeapon {
@@ -28,42 +31,118 @@ export class VoidRayWeapon extends ProjectileWeapon {
     }
 }
 
-// 2. Plasma Katana (Implemented as Zone for simplicity or short range projectile)
-// Let's make it a short range projectile that moves with player? 
-// Or just a Zone that appears in front.
-// For simplicity, let's make it a Projectile that goes towards mouse or nearest?
-// "Slashes in front of player"
-export class PlasmaKatanaWeapon extends ProjectileWeapon {
-    name = "Plasma Katana";
+// 2. Phantom Slash (replaces Plasma Katana)
+export class PhantomSlashWeapon extends Weapon {
+    name = "Phantom Slash";
     emoji = "⚔️";
-    description = "Slashes nearest enemy.";
-    projectileEmoji = "⚡";
-    pierce = 999;
+    description = "Instantly cuts random enemies.";
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 1.2;
-        this.damage = 25;
-        this.speed = 500;
-        this.duration = 0.2; // Short range
-        this.area = 150; // Detection range
+        this.baseCooldown = 1.5;
+        this.damage = 30;
+        this.area = 250;
     }
+
+    update(dt: number, enemies: Entity[]) {
+        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        if (this.cooldown <= 0) {
+            // Find random targets in range
+            const targets = enemies.filter(e => distance(this.owner.pos, e.pos) < this.area * (this.owner as any).stats.area);
+
+            if (targets.length > 0) {
+                // Hit up to 3 + level targets
+                const count = 3 + this.level;
+                for (let i = 0; i < count; i++) {
+                    if (targets.length === 0) break;
+                    const idx = Math.floor(Math.random() * targets.length);
+                    const target = targets[idx];
+                    targets.splice(idx, 1); // Remove to avoid hitting same twice
+
+                    const dmg = this.damage * (this.owner as any).stats.might;
+                    (target as any).takeDamage(dmg);
+                    this.onDamage(target.pos, dmg);
+
+                    // Visual slash
+                    const slash = new Zone(target.pos.x, target.pos.y, 40, 0.2, 0, 1, '⚔️');
+                    this.onSpawn(slash);
+                }
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            }
+        }
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.2;
+    }
+
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
-// 3. Autocannon
-export class AutocannonWeapon extends ProjectileWeapon {
-    name = "Autocannon";
-    emoji = "🤖";
-    description = "Rapid fire projectiles.";
-    projectileEmoji = "🔸";
-    pierce = 0;
+// 3. Drone Support (replaces Autocannon)
+export class DroneSupportWeapon extends Weapon {
+    name = "Drone Support";
+    emoji = "🛸";
+    description = "Deploys a drone that fights for you.";
+    drone: DroneEntity | null = null;
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 0.3;
+        this.baseCooldown = 0.4; // Firing rate of drone
         this.damage = 8;
-        this.speed = 600;
     }
+
+    update(dt: number, enemies: Entity[]) {
+        // Ensure drone exists
+        if (!this.drone || this.drone.isDead) {
+            this.drone = new DroneEntity(this.owner);
+            this.onSpawn(this.drone);
+        }
+
+        // Firing logic
+        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        if (this.cooldown <= 0) {
+            // Find target near drone
+            let target: any = null;
+            let minDst = 300; // Drone range
+
+            for (const enemy of enemies) {
+                const d = distance(this.drone.pos, enemy.pos);
+                if (d < minDst) {
+                    minDst = d;
+                    target = enemy;
+                }
+            }
+
+            if (target) {
+                // Fire projectile from drone
+                const dir = { x: target.pos.x - this.drone.pos.x, y: target.pos.y - this.drone.pos.y };
+                const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+                const velocity = { x: (dir.x / len) * 600, y: (dir.y / len) * 600 };
+
+                const proj = new Projectile(
+                    this.drone.pos.x,
+                    this.drone.pos.y,
+                    velocity,
+                    1.5,
+                    this.damage * (this.owner as any).stats.might,
+                    0,
+                    '🔹'
+                );
+                this.onSpawn(proj);
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            }
+        }
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.2;
+        this.baseCooldown *= 0.9;
+    }
+
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
 // 4. Nanobot Swarm (Zone)
@@ -118,51 +197,51 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
     }
 }
 
-// 7. Rocket Salvo
-export class RocketSalvoWeapon extends ProjectileWeapon {
-    name = "Rocket Salvo";
-    emoji = "🚀";
-    description = "Fires missiles.";
-    projectileEmoji = "🚀";
-    pierce = 0;
+// 7. Orbital Strike (replaces Rocket Salvo)
+export class OrbitalStrikeWeapon extends Weapon {
+    name = "Orbital Strike";
+    emoji = "🛰️";
+    description = "Calls down random explosions.";
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 2.5;
-        this.damage = 30;
-        this.speed = 300;
+        this.baseCooldown = 2.0;
+        this.damage = 40;
+        this.area = 100; // Explosion radius
     }
 
-    // Override fire to create exploding projectiles
-    fire(target: any) {
-        const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
-        const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
-        dir.x /= len;
-        dir.y /= len;
+    update(dt: number, _enemies: Entity[]) {
+        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        if (this.cooldown <= 0) {
+            // Spawn 1 + level/2 strikes
+            const count = 1 + Math.floor(this.level / 2);
 
-        const speed = this.speed * (this.owner as any).stats.speed;
-        const velocity = { x: dir.x * speed, y: dir.y * speed };
+            for (let i = 0; i < count; i++) {
+                // Random position on screen (approx +/- 500 from player)
+                const offsetX = (Math.random() - 0.5) * 1000;
+                const offsetY = (Math.random() - 0.5) * 800;
 
-        const projectile = new ExplodingProjectile(
-            this.owner.pos.x,
-            this.owner.pos.y,
-            velocity,
-            this.duration * (this.owner as any).stats.duration,
-            this.damage * (this.owner as any).stats.might,
-            this.pierce,
-            this.projectileEmoji,
-            60, // Explosion radius
-            this.damage * 0.5 * (this.owner as any).stats.might // Explosion damage = 50% of direct hit
-        );
+                const zone = new DelayedExplosionZone(
+                    this.owner.pos.x + offsetX,
+                    this.owner.pos.y + offsetY,
+                    this.area * (this.owner as any).stats.area,
+                    1.0, // 1 second delay
+                    this.damage * (this.owner as any).stats.might,
+                    '💥'
+                );
+                this.onSpawn(zone);
+            }
 
-        // Set explosion callback
-        projectile.onExplode = (x: number, y: number, radius: number, damage: number) => {
-            const zone = new Zone(x, y, radius, 0.3, damage, 0.1, '💥');
-            this.onSpawn(zone);
-        };
-
-        this.onSpawn(projectile);
+            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+        }
     }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.2;
+    }
+
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
 
@@ -234,20 +313,68 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
 }
 
 
-// 10. Acid Spit
-export class AcidSpitWeapon extends ProjectileWeapon {
-    name = "Acid Spit";
+// 10. Acid Pool (replaces Acid Spit)
+export class AcidPoolWeapon extends Weapon {
+    name = "Acid Pool";
     emoji = "🧪";
-    description = "Corrosive projectile.";
-    projectileEmoji = "🟢";
-    pierce = 0;
+    description = "Throws acid flasks that create puddles.";
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 1.0;
-        this.damage = 12;
-        this.speed = 450;
+        this.baseCooldown = 2.0;
+        this.damage = 10;
+        this.area = 80;
     }
+
+    update(dt: number, enemies: Entity[]) {
+        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        if (this.cooldown <= 0) {
+            // Find target
+            let target: any = null;
+            let minDst = Infinity;
+
+            for (const enemy of enemies) {
+                const dst = distance(this.owner.pos, enemy.pos);
+                if (dst < 500 && dst < minDst) {
+                    minDst = dst;
+                    target = enemy;
+                }
+            }
+
+            if (target) {
+                const lob = new LobbedProjectile(
+                    this.owner.pos.x,
+                    this.owner.pos.y,
+                    target.pos,
+                    0.8, // flight time
+                    '🧪'
+                );
+
+                lob.onLand = (x, y) => {
+                    const zone = new Zone(
+                        x, y,
+                        this.area * (this.owner as any).stats.area,
+                        3.0 * (this.owner as any).stats.duration,
+                        this.damage * (this.owner as any).stats.might,
+                        0.5, // tick interval
+                        '🤢'
+                    );
+                    this.onSpawn(zone);
+                };
+
+                this.onSpawn(lob);
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            }
+        }
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.2;
+        this.area *= 1.1;
+    }
+
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
 // 11. Lightning Chain - Chains between enemies
@@ -301,21 +428,54 @@ export class LightningChainWeapon extends ProjectileWeapon {
     }
 }
 
-// 12. Flame Whip - Short range burning attacks
-export class FlameWhipWeapon extends ProjectileWeapon {
-    name = "Flame Whip";
+// 12. Spinning Ember (replaces Flame Whip)
+export class SpinningEmberWeapon extends Weapon {
+    name = "Spinning Ember";
     emoji = "🔥";
-    description = "Burning melee strikes.";
-    projectileEmoji = "🔥";
-    pierce = 2;
+    description = "Fireballs that orbit you.";
+    projectiles: OrbitingProjectile[] = [];
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 0.8;
-        this.damage = 20;
-        this.speed = 600;
-        this.duration = 0.3; // Short range
+        this.baseCooldown = 3.0;
+        this.damage = 15;
     }
+
+    update(dt: number, _enemies: Entity[]) {
+        // Check if projectiles are dead
+        this.projectiles = this.projectiles.filter(p => !p.isDead);
+
+        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        if (this.cooldown <= 0) {
+            // Spawn set of projectiles
+            const count = 2 + this.level;
+            const duration = 4 * (this.owner as any).stats.duration;
+
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 / count) * i;
+                const proj = new OrbitingProjectile(
+                    this.owner,
+                    100, // distance
+                    3, // rotation speed
+                    duration,
+                    this.damage * (this.owner as any).stats.might,
+                    '🔥'
+                );
+                proj.angle = angle; // Set initial angle
+                this.onSpawn(proj);
+                this.projectiles.push(proj);
+            }
+
+            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown + duration; // Cooldown starts after duration? Or overlap? Let's make it wait.
+        }
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.2;
+    }
+
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
 // 13. Frost Nova - Freezing zone weapon
@@ -335,20 +495,51 @@ export class FrostNovaWeapon extends ZoneWeapon {
     }
 }
 
-// 14. Shadow Daggers - Fast piercing projectiles
-export class ShadowDaggersWeapon extends ProjectileWeapon {
-    name = "Shadow Daggers";
+// 14. Fan of Knives (replaces Shadow Daggers)
+export class FanOfKnivesWeapon extends ProjectileWeapon {
+    name = "Fan of Knives";
     emoji = "🗡️";
-    description = "Rapid piercing daggers.";
+    description = "Fires a spread of knives.";
     projectileEmoji = "🗡️";
-    pierce = 3;
+    pierce = 2;
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 0.5;
-        this.damage = 10;
+        this.baseCooldown = 1.5;
+        this.damage = 12;
         this.speed = 700;
         this.duration = 1.5;
+    }
+
+    fire(target: any) {
+        // Fire multiple projectiles in a cone
+        const count = 3 + Math.floor(this.level / 2);
+        const spread = Math.PI / 4; // 45 degrees spread
+
+        const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
+        const baseAngle = Math.atan2(dir.y, dir.x);
+
+        for (let i = 0; i < count; i++) {
+            // Map i to -spread/2 to +spread/2
+            const offset = count > 1 ? -spread / 2 + (spread / (count - 1)) * i : 0;
+            const angle = baseAngle + offset;
+
+            const velocity = {
+                x: Math.cos(angle) * this.speed * (this.owner as any).stats.speed,
+                y: Math.sin(angle) * this.speed * (this.owner as any).stats.speed
+            };
+
+            const proj = new Projectile(
+                this.owner.pos.x,
+                this.owner.pos.y,
+                velocity,
+                this.duration * (this.owner as any).stats.duration,
+                this.damage * (this.owner as any).stats.might,
+                this.pierce,
+                this.projectileEmoji
+            );
+            this.onSpawn(proj);
+        }
     }
 }
 

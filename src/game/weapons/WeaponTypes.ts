@@ -37,21 +37,6 @@ export class Projectile extends Entity {
     }
 }
 
-export class ExplodingProjectile extends Projectile {
-    explosionRadius: number;
-    explosionDamage: number;
-    onExplode: (x: number, y: number, radius: number, damage: number) => void = () => { };
-
-    constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number, emoji: string, explosionRadius: number, explosionDamage: number) {
-        super(x, y, velocity, duration, damage, pierce, emoji);
-        this.explosionRadius = explosionRadius;
-        this.explosionDamage = explosionDamage;
-    }
-
-    onHit() {
-        this.onExplode(this.pos.x, this.pos.y, this.explosionRadius, this.explosionDamage);
-    }
-}
 
 export class BouncingProjectile extends Projectile {
     bouncesLeft: number;
@@ -239,6 +224,7 @@ export abstract class ProjectileWeapon extends Weapon {
                 if (dst < this.area * (this.owner as any).stats.area && dst < minDst) {
                     minDst = dst;
                     target = enemy;
+
                 }
             }
 
@@ -358,4 +344,163 @@ export abstract class ZoneWeapon extends Weapon {
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
+}
+
+export class OrbitingProjectile extends Projectile {
+    angle: number = 0;
+    distance: number;
+    speed: number;
+    owner: any;
+
+    constructor(owner: any, distance: number, speed: number, duration: number, damage: number, emoji: string) {
+        super(owner.pos.x, owner.pos.y, { x: 0, y: 0 }, duration, damage, 999, emoji); // High pierce
+        this.owner = owner;
+        this.distance = distance;
+        this.speed = speed;
+        this.canCollide = true;
+    }
+
+    update(dt: number, _enemies?: Entity[]) {
+        this.angle += this.speed * dt;
+        this.pos.x = this.owner.pos.x + Math.cos(this.angle) * this.distance;
+        this.pos.y = this.owner.pos.y + Math.sin(this.angle) * this.distance;
+
+        this.duration -= dt;
+        if (this.duration <= 0) this.isDead = true;
+    }
+}
+
+export class LobbedProjectile extends Projectile {
+    targetPos: Vector2;
+    startPos: Vector2;
+    totalDuration: number;
+    height: number = 50;
+    onLand: (x: number, y: number) => void = () => { };
+
+    constructor(x: number, y: number, target: Vector2, duration: number, emoji: string) {
+        super(x, y, { x: 0, y: 0 }, duration, 0, 0, emoji);
+        this.startPos = { x, y };
+        this.targetPos = { ...target };
+        this.totalDuration = duration;
+        this.canCollide = false; // Don't hit things while flying
+    }
+
+    update(dt: number, _enemies?: Entity[]) {
+        this.duration -= dt;
+        const t = 1 - (this.duration / this.totalDuration);
+
+        if (t >= 1) {
+            this.isDead = true;
+            this.onLand(this.targetPos.x, this.targetPos.y);
+            return;
+        }
+
+        // Linear interpolation for position
+        this.pos.x = this.startPos.x + (this.targetPos.x - this.startPos.x) * t;
+        this.pos.y = this.startPos.y + (this.targetPos.y - this.startPos.y) * t;
+
+        // Parabolic arc for visual height (y-offset)
+        // 4 * h * t * (1-t) gives a parabola starting at 0, peaking at h at t=0.5, and ending at 0 at t=1
+        const yOffset = 4 * this.height * t * (1 - t);
+        this.pos.y -= yOffset;
+    }
+}
+
+export class DelayedExplosionZone extends Entity {
+    delay: number;
+    radius: number;
+    damage: number;
+    emoji: string;
+    exploded: boolean = false;
+
+    constructor(x: number, y: number, radius: number, delay: number, damage: number, emoji: string) {
+        super(x, y, radius);
+        this.delay = delay;
+        this.radius = radius;
+        this.damage = damage;
+        this.emoji = emoji;
+    }
+
+    update(dt: number, enemies?: Entity[]) {
+        if (this.exploded) {
+            this.isDead = true;
+            return;
+        }
+
+        this.delay -= dt;
+        if (this.delay <= 0) {
+            this.explode(enemies);
+            this.exploded = true;
+        }
+    }
+
+    explode(enemies?: Entity[]) {
+        if (!enemies) return;
+
+        // Deal damage to all enemies in range
+        for (const enemy of enemies) {
+            if (distance(this.pos, enemy.pos) <= this.radius) {
+                (enemy as any).takeDamage(this.damage);
+            }
+        }
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+
+        // Draw warning indicator
+        if (this.delay > 0) {
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 0, 0, ${0.2 + (1 - this.delay) * 0.3})`; // Pulse red
+            ctx.fill();
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        } else {
+            // Explosion visual
+            ctx.font = `${this.radius}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.emoji, 0, 0);
+        }
+
+        ctx.restore();
+    }
+}
+
+export class DroneEntity extends Entity {
+    owner: any;
+    offset: Vector2 = { x: 50, y: -50 };
+    canCollide: boolean = false;
+
+    constructor(owner: any) {
+        super(owner.pos.x, owner.pos.y, 10);
+        this.owner = owner;
+        this.canCollide = false;
+    }
+
+    update(dt: number, _enemies?: Entity[]) {
+        // Follow owner with smooth lerp
+        const targetX = this.owner.pos.x + this.offset.x;
+        const targetY = this.owner.pos.y + this.offset.y;
+
+        this.pos.x += (targetX - this.pos.x) * 5 * dt;
+        this.pos.y += (targetY - this.pos.y) * 5 * dt;
+
+        // Bobbing motion
+        this.offset.y = -50 + Math.sin(Date.now() / 500) * 10;
+        this.offset.x = 50 + Math.cos(Date.now() / 700) * 10;
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+        ctx.font = '30px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🛸', 0, 0);
+        ctx.restore();
+    }
 }
