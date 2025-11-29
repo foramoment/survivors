@@ -36,7 +36,12 @@ export class Enemy extends Entity {
         }
     }
 
+    speedMultiplier: number = 1;
+
     update(dt: number, playerPos?: Vector2) {
+        // Reset modifiers
+        this.speedMultiplier = 1;
+
         if (!playerPos) return;
 
         const dir = normalize({
@@ -44,8 +49,9 @@ export class Enemy extends Entity {
             y: playerPos.y - this.pos.y
         });
 
-        this.pos.x += dir.x * this.speed * dt;
-        this.pos.y += dir.y * this.speed * dt;
+        const currentSpeed = this.speed * this.speedMultiplier;
+        this.pos.x += dir.x * currentSpeed * dt;
+        this.pos.y += dir.y * currentSpeed * dt;
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {

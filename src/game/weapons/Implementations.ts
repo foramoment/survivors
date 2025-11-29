@@ -1,4 +1,4 @@
-import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning, Beam, OrbitingProjectile, LobbedProjectile, DelayedExplosionZone, DroneEntity, Projectile } from './WeaponTypes';
+import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning, Beam, OrbitingProjectile, LobbedProjectile, DelayedExplosionZone, Projectile } from './WeaponTypes';
 import { distance, type Vector2 } from '../core/Utils';
 import { Weapon } from '../Weapon';
 import { Entity } from '../Entity';
@@ -81,68 +81,49 @@ export class PhantomSlashWeapon extends Weapon {
 }
 
 // 3. Drone Support (replaces Autocannon)
-export class DroneSupportWeapon extends Weapon {
+export class DroneSupportWeapon extends ProjectileWeapon {
     name = "Drone Support";
     emoji = "🛸";
-    description = "Deploys a drone that fights for you.";
-    drone: DroneEntity | null = null;
+    description = "Automated defense drone system.";
+    projectileEmoji = "🔹";
+    pierce = 1;
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 0.4; // Firing rate of drone
-        this.damage = 8;
+        this.baseCooldown = 0.5;
+        this.damage = 10;
+        this.speed = 600;
+        this.duration = 2;
     }
 
-    update(dt: number, enemies: Entity[]) {
-        // Ensure drone exists
-        if (!this.drone || this.drone.isDead) {
-            this.drone = new DroneEntity(this.owner);
-            this.onSpawn(this.drone);
-        }
+    // Override fire to shoot from an offset
+    fire(target: any) {
+        // Simulate drone position (orbiting or fixed offset)
+        const time = Date.now() / 1000;
+        const offset = {
+            x: Math.cos(time) * 50,
+            y: Math.sin(time) * 50 - 50
+        };
+        const dronePos = {
+            x: this.owner.pos.x + offset.x,
+            y: this.owner.pos.y + offset.y
+        };
 
-        // Firing logic
-        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
-        if (this.cooldown <= 0) {
-            // Find target near drone
-            let target: any = null;
-            let minDst = 300; // Drone range
+        const dir = { x: target.pos.x - dronePos.x, y: target.pos.y - dronePos.y };
+        const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+        const velocity = { x: (dir.x / len) * this.speed, y: (dir.y / len) * this.speed };
 
-            for (const enemy of enemies) {
-                const d = distance(this.drone.pos, enemy.pos);
-                if (d < minDst) {
-                    minDst = d;
-                    target = enemy;
-                }
-            }
-
-            if (target) {
-                // Fire projectile from drone
-                const dir = { x: target.pos.x - this.drone.pos.x, y: target.pos.y - this.drone.pos.y };
-                const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
-                const velocity = { x: (dir.x / len) * 600, y: (dir.y / len) * 600 };
-
-                const proj = new Projectile(
-                    this.drone.pos.x,
-                    this.drone.pos.y,
-                    velocity,
-                    1.5,
-                    this.damage * (this.owner as any).stats.might,
-                    0,
-                    '🔹'
-                );
-                this.onSpawn(proj);
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
-            }
-        }
+        const proj = new Projectile(
+            dronePos.x,
+            dronePos.y,
+            velocity,
+            this.duration,
+            this.damage * (this.owner as any).stats.might,
+            this.pierce,
+            this.projectileEmoji
+        );
+        this.onSpawn(proj);
     }
-
-    upgrade() {
-        this.level++;
-        this.damage *= 1.2;
-        this.baseCooldown *= 0.9;
-    }
-
-    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
 // 4. Nanobot Swarm (Zone)
@@ -250,16 +231,16 @@ export class OrbitalStrikeWeapon extends Weapon {
 export class MindBlastWeapon extends ZoneWeapon {
     name = "Mind Blast";
     emoji = "🧠";
-    description = "Explosion at enemy location.";
-    zoneEmoji = "💥";
-    interval = 1; // tick-based damage
+    description = "Psionic storm at enemy location.";
+    zoneEmoji = "🌀";
+    interval = 0.2; // Fast ticks
 
     constructor(owner: any) {
         super(owner);
         this.baseCooldown = 3;
-        this.duration = 0.5;
-        this.damage = 10; // Reduced from 40 (4x reduction)
-        this.area = 100;
+        this.duration = 1.5; // Lasts longer
+        this.damage = 5; // Lower damage per tick, but many ticks
+        this.area = 120;
     }
 }
 
@@ -388,7 +369,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
     constructor(owner: any) {
         super(owner);
         this.baseCooldown = 2.0;
-        this.damage = 5; // Reduced from 15 (3x reduction)
+        this.damage = 8; // Increased from 5
         this.speed = 0; // Instant
         this.duration = 0.3;
     }
@@ -479,20 +460,60 @@ export class SpinningEmberWeapon extends Weapon {
 }
 
 // 13. Frost Nova - Freezing zone weapon
-export class FrostNovaWeapon extends ZoneWeapon {
+export class FrostNovaWeapon extends Weapon {
     name = "Frost Nova";
     emoji = "❄️";
-    description = "Freezing aura that slows enemies.";
-    zoneEmoji = "❄️";
-    interval = 0.8; // tick-based damage
+    description = "Throws freezing grenades.";
 
     constructor(owner: any) {
         super(owner);
         this.baseCooldown = 2.5;
-        this.duration = 3;
         this.damage = 8;
         this.area = 120;
     }
+
+    update(dt: number, _enemies: Entity[]) {
+        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        if (this.cooldown <= 0) {
+            // Throw at random position near player
+            const range = 400;
+            const offsetX = (Math.random() - 0.5) * 2 * range;
+            const offsetY = (Math.random() - 0.5) * 2 * range;
+            const target = { x: this.owner.pos.x + offsetX, y: this.owner.pos.y + offsetY };
+
+            const lob = new LobbedProjectile(
+                this.owner.pos.x,
+                this.owner.pos.y,
+                target,
+                0.6,
+                '❄️'
+            );
+
+            lob.onLand = (x, y) => {
+                const zone = new Zone(
+                    x, y,
+                    this.area * (this.owner as any).stats.area,
+                    3.0 * (this.owner as any).stats.duration,
+                    this.damage * (this.owner as any).stats.might,
+                    0.5,
+                    '❄️',
+                    0.5 // 50% slow
+                );
+                this.onSpawn(zone);
+            };
+
+            this.onSpawn(lob);
+            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+        }
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.2;
+        this.area *= 1.1;
+    }
+
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
 // 14. Fan of Knives (replaces Shadow Daggers)

@@ -128,61 +128,60 @@ export class ChainLightning extends Projectile {
         this.initialDamage = damage;
     }
 
+    hasChained: boolean = false;
+
     update(dt: number, enemies?: Entity[]) {
         this.segments.forEach(s => s.alpha -= dt * 5);
         this.segments = this.segments.filter(s => s.alpha > 0);
 
-        this.timer -= dt;
+        if (!this.hasChained && enemies) {
+            this.hasChained = true;
 
-        if (this.timer <= 0 && this.bounces > 0 && enemies) {
-            let target: any = null;
-            let minDst = this.range;
+            // Instant chain logic
+            let currentBounces = this.bounces;
 
-            for (const enemy of enemies) {
-                if (this.hitEnemies.has(enemy)) continue; // Each enemy can only be hit once
+            while (currentBounces > 0) {
+                let target: any = null;
+                let minDst = this.range;
 
-                const d = distance(this.currentPos, enemy.pos);
-                if (d < minDst) {
-                    minDst = d;
-                    target = enemy;
-                }
-            }
+                for (const enemy of enemies) {
+                    if (this.hitEnemies.has(enemy)) continue;
 
-            if (target) {
-                // Check if adding this chain would exceed max length
-                const chainSegmentLength = distance(this.currentPos, target.pos);
-                if (this.totalChainLength + chainSegmentLength > this.maxChainLength) {
-                    // Stop chaining - exceeded max length
-                    if (this.segments.length === 0) this.isDead = true;
-                    return;
+                    const d = distance(this.currentPos, enemy.pos);
+                    if (d < minDst) {
+                        minDst = d;
+                        target = enemy;
+                    }
                 }
 
-                this.totalChainLength += chainSegmentLength;
-                this.hitEnemies.add(target);
+                if (target) {
+                    const chainSegmentLength = distance(this.currentPos, target.pos);
+                    if (this.totalChainLength + chainSegmentLength > this.maxChainLength) break;
 
-                // Reduce damage by 30% per bounce
-                // bounceNumber represents how many bounces have already occurred (0 for first bounce, 1 for second, etc.)
-                const totalBounces = this.segments.length; // Number of bounces that have already happened
-                const damageMultiplier = Math.pow(0.7, totalBounces);
-                const currentDamage = this.initialDamage * damageMultiplier;
+                    this.totalChainLength += chainSegmentLength;
+                    this.hitEnemies.add(target);
 
-                this.onHit(target, currentDamage);
+                    const totalBounces = this.segments.length;
+                    const damageMultiplier = Math.pow(0.85, totalBounces); // Less reduction (was 0.7)
+                    const currentDamage = this.initialDamage * damageMultiplier;
 
-                this.segments.push({
-                    start: { ...this.currentPos },
-                    end: { ...target.pos },
-                    alpha: 1.0
-                });
+                    this.onHit(target, currentDamage);
 
-                this.currentPos = { ...target.pos };
-                this.bounces--;
-                this.timer = this.interval;
-            } else {
-                if (this.segments.length === 0) this.isDead = true;
+                    this.segments.push({
+                        start: { ...this.currentPos },
+                        end: { ...target.pos },
+                        alpha: 1.0
+                    });
+
+                    this.currentPos = { ...target.pos };
+                    currentBounces--;
+                } else {
+                    break;
+                }
             }
         }
 
-        if (this.bounces <= 0 && this.segments.length === 0) {
+        if (this.hasChained && this.segments.length === 0) {
             this.isDead = true;
         }
     }
@@ -271,13 +270,15 @@ export class Zone extends Entity {
     interval: number;
     timer: number = 0;
     emoji: string;
+    slowEffect: number = 0;
 
-    constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number, emoji: string) {
+    constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number, emoji: string, slowEffect: number = 0) {
         super(x, y, radius);
         this.duration = duration;
         this.damage = damage;
         this.interval = interval;
         this.emoji = emoji;
+        this.slowEffect = slowEffect;
     }
 
     update(dt: number) {
@@ -287,6 +288,12 @@ export class Zone extends Entity {
         this.timer += dt;
     }
 
+    onOverlap(enemy: any) {
+        if (this.slowEffect > 0) {
+            enemy.speedMultiplier = Math.max(0.1, 1 - this.slowEffect);
+        }
+    }
+
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
@@ -294,7 +301,11 @@ export class Zone extends Entity {
         ctx.globalAlpha = 0.3;
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#00ffff';
+        if (this.slowEffect > 0) {
+            ctx.fillStyle = '#0088ff'; // Blue for slow
+        } else {
+            ctx.fillStyle = '#00ffff';
+        }
         ctx.fill();
 
         ctx.globalAlpha = 1;
@@ -451,19 +462,46 @@ export class DelayedExplosionZone extends Entity {
 
         // Draw warning indicator
         if (this.delay > 0) {
+            // Incoming strike animation
+            const progress = 1 - this.delay; // 0 to 1 (assuming delay starts at 1)
+
+            // Target reticle
             ctx.beginPath();
             ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 0, 0, ${0.2 + (1 - this.delay) * 0.3})`; // Pulse red
-            ctx.fill();
-            ctx.strokeStyle = 'red';
+            ctx.strokeStyle = `rgba(255, 0, 0, 0.5)`;
             ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
             ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Filling circle
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * progress, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 50, 0, 0.3)`;
+            ctx.fill();
+
+            // Incoming missile line
+            const height = 500 * (1 - progress);
+            ctx.beginPath();
+            ctx.moveTo(0, -height - 50);
+            ctx.lineTo(0, 0);
+            ctx.strokeStyle = 'orange';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
         } else {
             // Explosion visual
             ctx.font = `${this.radius}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(this.emoji, 0, 0);
+
+            // Shockwave
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 5;
+            ctx.stroke();
         }
 
         ctx.restore();

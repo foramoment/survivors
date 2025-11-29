@@ -397,6 +397,7 @@ export class GameManager {
                             if (p.pierce < 0) p.isDead = true;
                         }
                     } else if (p instanceof Zone) {
+                        p.onOverlap(e);
                         if (p.timer >= p.interval) {
                             e.takeDamage(p.damage);
                             this.spawnDamageNumber(e.pos, p.damage);
