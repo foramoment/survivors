@@ -30,6 +30,8 @@ export class GameManager {
     // Track weapon levels: weaponId -> level
     weaponLevels: Map<string, number> = new Map();
 
+    devMode: boolean = false;
+
     constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
         this.canvas = canvas;
         this.ctx = ctx;
@@ -46,6 +48,34 @@ export class GameManager {
         const title = document.createElement('h1');
         title.textContent = 'COSMOS SURVIVORS';
         screen.appendChild(title);
+
+        // Dev Mode Checkbox
+        const devModeContainer = document.createElement('div');
+        devModeContainer.className = 'dev-mode-container interactive';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = 'dev-mode-checkbox';
+        checkbox.className = 'dev-mode-checkbox';
+        checkbox.checked = this.devMode;
+
+        const label = document.createElement('label');
+        label.htmlFor = 'dev-mode-checkbox';
+        label.className = 'dev-mode-label';
+        label.textContent = '🛠️ Developer Mode (Weapons Only, 6 Options)';
+
+        // Toggle handler
+        const toggle = () => {
+            this.devMode = !this.devMode;
+            checkbox.checked = this.devMode;
+        };
+
+        checkbox.onclick = toggle;
+        label.onclick = toggle;
+
+        devModeContainer.appendChild(checkbox);
+        devModeContainer.appendChild(label);
+        screen.appendChild(devModeContainer);
 
         const grid = document.createElement('div');
         grid.className = 'class-grid';
@@ -219,22 +249,25 @@ export class GameManager {
 
         // 10% chance for lucky level-up
         const isLucky = Math.random() < 0.1;
-        const upgradeCount = isLucky ? 6 : 3;
+        const upgradeCount = this.devMode ? 6 : (isLucky ? 6 : 3);
 
         const screen = document.createElement('div');
         screen.className = 'screen level-up-screen';
-        screen.innerHTML = `<h2>${isLucky ? '✨ LUCKY LEVEL UP! ✨' : 'LEVEL UP!'}</h2>`;
+        screen.innerHTML = `<h2>${this.devMode ? '🛠️ DEVELOPER MODE 🛠️' : (isLucky ? '✨ LUCKY LEVEL UP! ✨' : 'LEVEL UP!')}</h2>`;
 
         const grid = document.createElement('div');
-        grid.className = isLucky ? 'upgrade-grid-6' : 'upgrade-grid';
+        grid.className = (isLucky || this.devMode) ? 'upgrade-grid-6' : 'upgrade-grid';
 
         // Create pool of all options
         const allOptions: any[] = [];
 
         // Add powerups
-        POWERUPS.forEach(p => {
-            allOptions.push({ type: 'powerup', data: p });
-        });
+        // Add powerups
+        if (!this.devMode) {
+            POWERUPS.forEach(p => {
+                allOptions.push({ type: 'powerup', data: p });
+            });
+        }
 
         // Add weapons (excluding evolved weapons)
         WEAPONS.forEach(w => {

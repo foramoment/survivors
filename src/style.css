@@ -123,6 +123,79 @@ h1 {
   color: #aaa;
 }
 
+/* Developer Mode Checkbox */
+.dev-mode-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 30px;
+  padding: 15px 25px;
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.dev-mode-container:hover {
+  background: rgba(0, 255, 255, 0.1);
+  border-color: rgba(0, 255, 255, 0.5);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+}
+
+.dev-mode-checkbox {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #00ffff;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.dev-mode-checkbox:hover {
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.dev-mode-checkbox:checked {
+  background: linear-gradient(135deg, #00ffff, #00cccc);
+  border-color: #00ffff;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.dev-mode-checkbox:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #000;
+  font-size: 16px;
+  font-weight: bold;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+}
+
+.dev-mode-label {
+  color: #00ffff;
+  font-size: 1.1em;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.dev-mode-container:hover .dev-mode-label {
+  text-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
+}
+
+
 .hud {
   position: absolute;
   top: 0;
