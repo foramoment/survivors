@@ -18,7 +18,7 @@ export class GameManager {
     enemies: Enemy[] = [];
     projectiles: (Projectile | Zone)[] = [];
     xpCrystals: XPCrystal[] = [];
-    damageNumbers: { x: number, y: number, text: string, life: number }[] = [];
+    damageNumbers: { x: number, y: number, text: string, life: number, isCrit?: boolean }[] = [];
 
     camera: Vector2 = { x: 0, y: 0 };
 
@@ -128,7 +128,7 @@ export class GameManager {
             const weapon: any = new weaponData.class(this.player);
             weapon.weaponId = weaponId;
             weapon.onSpawn = (entity: Entity) => this.spawnEntity(entity);
-            weapon.onDamage = (pos: Vector2, amount: number) => this.spawnDamageNumber(pos, amount);
+            weapon.onDamage = (pos: Vector2, amount: number, isCrit: boolean) => this.spawnDamageNumber(pos, amount, isCrit);
             this.player.weapons.push(weapon);
             this.weaponLevels.set(weaponId, 1);
         }
@@ -507,12 +507,13 @@ export class GameManager {
         this.enemies.push(enemy);
     }
 
-    spawnDamageNumber(pos: Vector2, amount: number) {
+    spawnDamageNumber(pos: Vector2, amount: number, isCrit: boolean = false) {
         this.damageNumbers.push({
             x: pos.x,
             y: pos.y,
-            text: Math.floor(amount).toString(),
-            life: 0.5
+            text: Math.floor(amount).toString() + (isCrit ? '!' : ''),
+            life: 0.5,
+            isCrit: isCrit
         });
     }
 
@@ -561,10 +562,25 @@ export class GameManager {
         ctx.font = '20px Arial';
         ctx.fillStyle = 'white';
         ctx.textAlign = 'center';
-        this.damageNumbers.forEach((dn, i) => {
+        this.damageNumbers.forEach((dn: any, i) => {
             const screenX = dn.x - this.camera.x;
             const screenY = dn.y - this.camera.y - (0.5 - dn.life) * 50;
+
+            ctx.save();
+            if (dn.isCrit) {
+                ctx.fillStyle = '#ffff00'; // Yellow
+                ctx.font = 'bold 30px Arial';
+                ctx.shadowColor = 'orange';
+                ctx.shadowBlur = 5;
+            } else {
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Arial';
+                ctx.shadowBlur = 0;
+            }
+
             ctx.fillText(dn.text, screenX, screenY);
+            ctx.restore();
+
             dn.life -= 0.016;
             if (dn.life <= 0) this.damageNumbers.splice(i, 1);
         });

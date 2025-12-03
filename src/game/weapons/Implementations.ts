@@ -1,34 +1,62 @@
-import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning, Beam, OrbitingProjectile, LobbedProjectile, DelayedExplosionZone, Projectile, Nanobot, MindBlastZone } from './WeaponTypes';
+import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning, Beam, OrbitingProjectile, LobbedProjectile, DelayedExplosionZone, Projectile, Nanobot, MindBlastZone, VoidRayBeam } from './WeaponTypes';
 import { distance, type Vector2 } from '../core/Utils';
 import { Weapon } from '../Weapon';
 import { Entity } from '../Entity';
 
 // 1. Void Ray
-export class VoidRayWeapon extends ProjectileWeapon {
+export class VoidRayWeapon extends Weapon {
     name = "Void Ray";
     emoji = "🔫";
-    description = "Fires a beam at nearest enemy.";
-    projectileEmoji = "🟣";
-    pierce = 1;
+    description = "Fires a powerful charging beam.";
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 1.5;
-        this.damage = 15;
-        this.speed = 0; // Instant
+        this.baseCooldown = 2.0;
+        this.damage = 25; // Buffed from 15
+        this.area = 1; // Width multiplier
     }
 
-    fire(target: any) {
-        // Instant damage
-        const { damage } = (this.owner as any).getDamage(this.damage);
-        target.takeDamage(damage);
-        this.onDamage(target.pos, damage);
+    update(dt: number, enemies: Entity[]) {
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
+        if (this.cooldown <= 0) {
+            // Find nearest enemy
+            let target: Entity | null = null;
+            let minDst = Infinity;
 
-        // Visual beam
-        // Glowing purple beam
-        const beam = new Beam(this.owner.pos, target.pos, 0.2, '#bd00ff', 4);
-        this.onSpawn(beam);
+            for (const enemy of enemies) {
+                const dst = distance(this.owner.pos, enemy.pos);
+                if (dst < 600 && dst < minDst) { // Range check
+                    minDst = dst;
+                    target = enemy;
+                }
+            }
+
+            if (target) {
+                const isEvolved = this.level >= 6;
+                const damage = (this.owner as any).getDamage(this.damage).damage * (isEvolved ? 2 : 1);
+
+                const beam = new VoidRayBeam(
+                    this.owner,
+                    target,
+                    damage,
+                    isEvolved,
+                    (pos, amount) => this.onDamage(pos, amount)
+                );
+                this.onSpawn(beam);
+
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            }
+        }
     }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.2;
+    }
+
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
 // 2. Phantom Slash (replaces Plasma Katana)
@@ -82,47 +110,87 @@ export class PhantomSlashWeapon extends Weapon {
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
-// 3. Drone Support (replaces Autocannon)
-import { Drone } from '../entities/Drone';
-
-export class DroneSupportWeapon extends Weapon {
-    name = "Drone Support";
-    emoji = "🛸";
-    description = "Automated defense drone system.";
-
-    drones: Drone[] = [];
+// 3. Plasma Cannon (replaces Drone Support)
+export class PlasmaCannonWeapon extends ProjectileWeapon {
+    name = "Plasma Cannon";
+    emoji = "🔋";
+    description = "Fires massive explosive plasma rounds.";
+    projectileEmoji = "🟢";
+    pierce = 999; // Explodes on impact
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 0; // Managed by drones
+        this.baseCooldown = 2.5;
+        this.damage = 40;
+        this.speed = 300; // Slow moving
+        this.area = 150; // Explosion radius
+        this.duration = 3;
     }
 
-    update(dt: number, enemies: Entity[]) {
-        // Manage drones
-        const targetCount = this.level >= 6 ? 3 : 1; // Evolution: 3 drones
-        const isEvolved = this.level >= 6;
+    fire(target: any) {
+        const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
+        const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+        dir.x /= len;
+        dir.y /= len;
 
-        if (this.drones.length < targetCount) {
-            const drone = new Drone(this.owner, isEvolved, this.drones.length, targetCount);
-            drone.onSpawnProjectile = (p) => this.onSpawn(p);
-            this.drones.push(drone);
-        }
+        const speed = this.speed * (this.owner as any).stats.speed;
+        const velocity = { x: dir.x * speed, y: dir.y * speed };
 
-        // Update drones
-        this.drones.forEach(d => {
-            d.totalDrones = targetCount; // Update total count for formation
-            d.isEvolved = isEvolved;
-            d.update(dt, enemies);
-        });
+        const { damage, isCrit } = (this.owner as any).getDamage(this.damage);
+
+        // Custom projectile that explodes
+        const proj = new Projectile(
+            this.owner.pos.x,
+            this.owner.pos.y,
+            velocity,
+            this.duration,
+            damage,
+            0, // 0 pierce means it dies on first hit
+            this.projectileEmoji
+        );
+
+        // Hacky way to add explosion logic since Projectile doesn't support onDeath callback easily without extending
+        // But we can use BouncingProjectile or just extend Projectile inline or use a new class.
+        // Let's use a simple trick: we'll use a Zone when it hits.
+        // Actually, let's make a new class in WeaponTypes if we want proper explosion, 
+        // OR just use LobbedProjectile logic but for straight shot?
+        // Let's just use a Projectile and rely on the fact that when it dies (hits), we can't easily spawn an explosion unless we handle it in GameManager.
+        // GameManager handles collisions.
+        // Let's make it a BouncingProjectile with 0 bounces, and use onBounce to explode?
+        // Yes, BouncingProjectile has onBounce.
+
+        const plasma = new BouncingProjectile(
+            this.owner.pos.x,
+            this.owner.pos.y,
+            velocity,
+            this.duration,
+            damage,
+            0,
+            this.projectileEmoji
+        );
+
+        plasma.onBounce = (p, enemies) => {
+            // Explode!
+            const zone = new DelayedExplosionZone(
+                p.pos.x,
+                p.pos.y,
+                this.area * (this.owner as any).stats.area,
+                0, // Instant
+                damage, // Explosion damage
+                '💥',
+                (pos, amt) => this.onDamage(pos, amt)
+            );
+            this.onSpawn(zone);
+            p.isDead = true;
+        };
+
+        this.onSpawn(plasma);
     }
 
     upgrade() {
         this.level++;
-        // Drones update themselves based on level/evolution status in update()
-    }
-
-    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        this.drones.forEach(d => d.draw(ctx, camera));
+        this.damage *= 1.2;
+        this.area *= 1.1;
     }
 }
 
@@ -135,9 +203,9 @@ export class NanobotSwarmWeapon extends Weapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 0.2; // Spawn rate
-        this.damage = 5;
-        this.duration = 4;
+        this.baseCooldown = 0.5; // Increased from 0.2 (slower spawn)
+        this.damage = 8; // Increased from 5
+        this.duration = 5; // Increased from 4
     }
 
     update(dt: number, _enemies: Entity[]) {
@@ -233,43 +301,44 @@ export class OrbitalStrikeWeapon extends Weapon {
         this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
             // Check for evolution
-            const isEvolved = this.level >= 6; // Assuming level 6 is evolved state based on GameManager logic (it sets level to 6)
+            const isEvolved = this.level >= 6;
 
             if (isEvolved) {
                 // Atomic Bomb Logic
-                // Huge area, huge damage, slow fall
                 const zone = new DelayedExplosionZone(
-                    this.owner.pos.x,
-                    this.owner.pos.y, // Target player position (or random?) - let's do random near player but huge
-                    400, // Huge radius
-                    3.0, // Slow fall
-                    (this.owner as any).getDamage(this.damage * 5).damage, // Massive damage
+                    this.owner.pos.x + (Math.random() - 0.5) * 400,
+                    this.owner.pos.y + (Math.random() - 0.5) * 300,
+                    500, // Huge radius
+                    4.0, // Very slow fall
+                    (this.owner as any).getDamage(this.damage * 10).damage, // Massive damage
                     '☢️',
                     (pos, amount) => {
-                        // Shockwave effect - spawn mini explosions
-                        for (let i = 0; i < 5; i++) {
+                        // Shockwave effect
+                        for (let i = 0; i < 8; i++) {
                             const angle = Math.random() * Math.PI * 2;
-                            const dist = 100 + Math.random() * 200;
+                            const dist = 150 + Math.random() * 300;
                             const miniZone = new DelayedExplosionZone(
                                 pos.x + Math.cos(angle) * dist,
                                 pos.y + Math.sin(angle) * dist,
-                                60,
+                                80,
                                 0.5,
-                                amount * 0.2,
+                                amount * 0.1,
                                 '💥',
                                 (p, a) => this.onDamage(p, a)
                             );
                             this.onSpawn(miniZone);
                         }
                         this.onDamage(pos, amount);
-                    }
+                    },
+                    true // isAtomic
                 );
                 this.onSpawn(zone);
 
                 // Very long cooldown for nuke
-                this.cooldown = this.baseCooldown * 4 * (this.owner as any).stats.cooldown;
+                this.cooldown = this.baseCooldown * 5 * (this.owner as any).stats.cooldown;
             } else {
                 // Standard Logic
+                // Level up increases zone count AND area AND damage, but also slightly increases cooldown to balance
                 const count = 1 + Math.floor(this.level / 2);
 
                 for (let i = 0; i < count; i++) {
@@ -279,7 +348,7 @@ export class OrbitalStrikeWeapon extends Weapon {
                     const zone = new DelayedExplosionZone(
                         this.owner.pos.x + offsetX,
                         this.owner.pos.y + offsetY,
-                        this.area * (this.owner as any).stats.area,
+                        this.area * (this.owner as any).stats.area * (1 + this.level * 0.1), // Area grows with level
                         1.0,
                         (this.owner as any).getDamage(this.damage).damage,
                         '💥',
@@ -287,7 +356,8 @@ export class OrbitalStrikeWeapon extends Weapon {
                     );
                     this.onSpawn(zone);
                 }
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+                // Cooldown increases slightly with level to prevent spamming too many zones
+                this.cooldown = this.baseCooldown * (1 + this.level * 0.05) * (this.owner as any).stats.cooldown;
             }
         }
     }
@@ -326,12 +396,15 @@ export class MindBlastWeapon extends Weapon {
 
             if (targets.length > 0) {
                 const target = targets[Math.floor(Math.random() * targets.length)];
+                const isEvolved = this.level >= 6;
 
                 const zone = new MindBlastZone(
                     target.pos.x,
                     target.pos.y,
                     this.area * (this.owner as any).stats.area,
-                    (this.owner as any).getDamage(this.damage).damage
+                    (this.owner as any).getDamage(this.damage).damage,
+                    (pos, amount) => this.onDamage(pos, amount),
+                    isEvolved ? 2.0 : 0 // 2s stun if evolved
                 );
                 this.onSpawn(zone);
 
@@ -602,6 +675,7 @@ export class FrostNovaWeapon extends Weapon {
             );
 
             lob.onLand = (x, y) => {
+                const isEvolved = this.level >= 6;
                 const zone = new Zone(
                     x, y,
                     this.area * (this.owner as any).stats.area,
@@ -609,7 +683,7 @@ export class FrostNovaWeapon extends Weapon {
                     (this.owner as any).getDamage(this.damage).damage,
                     0.5,
                     '❄️',
-                    0.5 // 50% slow
+                    isEvolved ? 0.9 : 0.5 // 90% slow if evolved
                 );
                 this.onSpawn(zone);
             };

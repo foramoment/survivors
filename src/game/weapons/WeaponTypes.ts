@@ -93,7 +93,7 @@ export class Beam extends Projectile {
         ctx.lineTo(this.end.x, this.end.y);
 
         ctx.strokeStyle = this.color;
-        ctx.lineWidth = this.width * (this.duration * 5);
+        ctx.lineWidth = this.width * (this.duration * 5); // Fade out width
         ctx.lineCap = 'round';
 
         ctx.shadowColor = this.color;
@@ -101,6 +101,125 @@ export class Beam extends Projectile {
 
         ctx.stroke();
         ctx.shadowBlur = 0;
+        ctx.restore();
+    }
+}
+
+export class VoidRayBeam extends Entity {
+    owner: any;
+    target: any;
+    canCollide: boolean = false;
+    stage: 'charge' | 'fire' | 'fade' = 'charge';
+    timer: number = 0;
+    chargeTime: number = 0.5;
+    fireTime: number = 0.2;
+    fadeTime: number = 0.3;
+    width: number = 0;
+    maxWidth: number = 20;
+    color: string = '#bd00ff';
+    isEvolved: boolean = false;
+    damageDealt: boolean = false;
+    damage: number;
+    onDamage: (pos: Vector2, amount: number) => void;
+
+    constructor(owner: any, target: any, damage: number, isEvolved: boolean, onDamage: (pos: Vector2, amount: number) => void) {
+        super(owner.pos.x, owner.pos.y, 0);
+        this.owner = owner;
+        this.target = target;
+        this.damage = damage;
+        this.isEvolved = isEvolved;
+        this.onDamage = onDamage;
+        this.canCollide = false;
+        if (isEvolved) {
+            this.maxWidth = 50;
+            this.color = '#ff00ff';
+        }
+    }
+
+    update(dt: number) {
+        this.timer += dt;
+
+        if (this.stage === 'charge') {
+            if (this.timer >= this.chargeTime) {
+                this.stage = 'fire';
+                this.timer = 0;
+                // Deal damage at start of fire
+                if (this.target && !this.target.isDead) {
+                    this.target.takeDamage(this.damage);
+                    this.onDamage(this.target.pos, this.damage);
+
+                    if (this.isEvolved) {
+                        // Explosion at target
+                        // We can spawn a zone or just visual here, but let's keep it simple
+                    }
+                }
+            }
+        } else if (this.stage === 'fire') {
+            if (this.timer >= this.fireTime) {
+                this.stage = 'fade';
+                this.timer = 0;
+            }
+        } else if (this.stage === 'fade') {
+            if (this.timer >= this.fadeTime) {
+                this.isDead = true;
+            }
+        }
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        if (!this.target || (this.target.isDead && this.stage === 'charge')) {
+            // If target dies during charge, maybe just fade out or stay at last pos?
+            // For simplicity, keep drawing to last known pos
+        }
+
+        const start = this.owner.pos;
+        const end = this.target ? this.target.pos : { x: start.x + 100, y: start.y }; // Fallback
+
+        ctx.save();
+        ctx.translate(-camera.x, -camera.y);
+
+        if (this.stage === 'charge') {
+            // Charging line
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.strokeStyle = `rgba(189, 0, 255, ${this.timer / this.chargeTime})`;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+
+            // Charge gathering at player
+            ctx.beginPath();
+            ctx.arc(start.x, start.y, 10 + Math.random() * 5, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+
+        } else if (this.stage === 'fire' || this.stage === 'fade') {
+            let width = this.maxWidth;
+            let alpha = 1;
+
+            if (this.stage === 'fade') {
+                alpha = 1 - (this.timer / this.fadeTime);
+                width *= alpha;
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            ctx.shadowColor = this.color;
+            ctx.shadowBlur = 20;
+            ctx.globalAlpha = alpha;
+            ctx.stroke();
+
+            // Core
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = width * 0.3;
+            ctx.stroke();
+        }
+
         ctx.restore();
     }
 }
@@ -427,13 +546,15 @@ export class DelayedExplosionZone extends Zone {
     delay: number;
     exploded: boolean = false;
     onDamageCallback?: (pos: Vector2, amount: number) => void;
+    isAtomic: boolean = false;
 
-    constructor(x: number, y: number, radius: number, delay: number, damage: number, emoji: string, onDamage?: (pos: Vector2, amount: number) => void) {
+    constructor(x: number, y: number, radius: number, delay: number, damage: number, emoji: string, onDamage?: (pos: Vector2, amount: number) => void, isAtomic: boolean = false) {
         // extend Zone: duration, damage, interval, emoji
         // Set interval to Infinity so GameManager doesn't apply tick damage
         super(x, y, radius, delay + 1, damage, Number.MAX_VALUE, emoji);
         this.delay = delay;
         this.onDamageCallback = onDamage;
+        this.isAtomic = isAtomic;
     }
 
     update(dt: number, enemies?: Entity[]) {
@@ -515,6 +636,14 @@ export class DelayedExplosionZone extends Zone {
             ctx.arc(0, 0, this.radius * 0.8, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(255, 255, 200, 0.5)';
             ctx.fill();
+
+            if (this.isAtomic) {
+                // Mushroom cloud effect (simplified)
+                ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
+                ctx.beginPath();
+                ctx.arc(0, -this.radius * 0.5, this.radius * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
         ctx.restore();
@@ -588,10 +717,14 @@ export class Nanobot extends Projectile {
 export class MindBlastZone extends Zone {
     stage: 'warning' | 'charge' | 'blast' = 'warning';
     stageTimer: number = 0;
+    onDamageCallback?: (pos: Vector2, amount: number) => void;
+    stunDuration: number = 0;
 
-    constructor(x: number, y: number, radius: number, damage: number) {
+    constructor(x: number, y: number, radius: number, damage: number, onDamage?: (pos: Vector2, amount: number) => void, stunDuration: number = 0) {
         super(x, y, radius, 2.0, damage, 999, '🧠'); // 2s total duration
         this.interval = 999; // Manual damage handling
+        this.onDamageCallback = onDamage;
+        this.stunDuration = stunDuration;
     }
 
     update(dt: number, enemies?: Entity[]) {
@@ -606,6 +739,13 @@ export class MindBlastZone extends Zone {
                 enemies.forEach(e => {
                     if (distance(this.pos, e.pos) <= this.radius) {
                         (e as any).takeDamage(this.damage);
+                        if (this.onDamageCallback) this.onDamageCallback(e.pos, this.damage);
+
+                        if (this.stunDuration > 0) {
+                            // Apply stun (freeze movement)
+                            // We set a stun timer on the enemy (assuming we add it to Enemy class or just hack it)
+                            (e as any).stunTimer = this.stunDuration;
+                        }
                     }
                 });
             }
@@ -658,3 +798,4 @@ export class MindBlastZone extends Zone {
         ctx.restore();
     }
 }
+

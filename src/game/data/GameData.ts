@@ -1,5 +1,5 @@
 import {
-    VoidRayWeapon, PhantomSlashWeapon, DroneSupportWeapon, NanobotSwarmWeapon,
+    VoidRayWeapon, PhantomSlashWeapon, PlasmaCannonWeapon, NanobotSwarmWeapon,
     SporeCloudWeapon, SingularityOrbWeapon, OrbitalStrikeWeapon, MindBlastWeapon,
     ChronoDiscWeapon, AcidPoolWeapon, LightningChainWeapon, SpinningEmberWeapon,
     FrostNovaWeapon, FanOfKnivesWeapon
@@ -8,7 +8,7 @@ import {
 export const CLASSES = [
     { name: "Void Walker", emoji: "🌑", bonus: "Speed +10%", weaponId: 'void_ray', hp: 90, stats: { moveSpeed: 1.1 } },
     { name: "Cyber Samurai", emoji: "🤖", bonus: "Crit +10%", weaponId: 'phantom_slash', hp: 85, stats: { critChance: 0.15 } },
-    { name: "Heavy Gunner", emoji: "🦍", bonus: "Might +20%, Speed -10%", weaponId: 'drone_support', hp: 110, stats: { might: 1.2, moveSpeed: 0.9 } },
+    { name: "Heavy Gunner", emoji: "🦍", bonus: "Might +20%, Speed -10%", weaponId: 'plasma_cannon', hp: 110, stats: { might: 1.2, moveSpeed: 0.9 } },
     { name: "Technomancer", emoji: "🧙‍♂️", bonus: "Duration +20%", weaponId: 'nanobot_swarm', hp: 100, stats: { duration: 1.2 } },
     { name: "Astro Biologist", emoji: "👨‍🔬", bonus: "Regen +1", weaponId: 'spore_cloud', hp: 95, stats: { regen: 1 } },
     { name: "Quantum Physicist", emoji: "⚛️", bonus: "Cooldown -10%", weaponId: 'singularity_orb', hp: 80, stats: { cooldown: 0.9 } },
@@ -74,15 +74,17 @@ export const WEAPONS = [
         }
     },
     {
-        id: 'drone_support',
-        name: "Drone Support",
-        emoji: "🛸",
-        description: "Deploys a drone that fights for you",
-        class: DroneSupportWeapon,
+        // The user asked to "Replace weapon Drone Support".
+        // Let's change ID to 'plasma_cannon'.
+        id: 'plasma_cannon',
+        name: "Plasma Cannon",
+        emoji: "🔋",
+        description: "Fires massive explosive plasma rounds",
+        class: PlasmaCannonWeapon,
         evolution: {
-            name: "Assault Swarm",
-            emoji: "🛸",
-            description: "Deploys 3 drones that fire rapidly"
+            name: "Fusion Core",
+            emoji: "⚛️",
+            description: "Plasma rounds create black holes on impact"
         }
     },
     {

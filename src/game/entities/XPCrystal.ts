@@ -11,9 +11,9 @@ export interface CrystalTypeData {
 
 export const CRYSTAL_TYPES: Record<CrystalType, CrystalTypeData> = {
     blue: { emoji: '💎', value: 1, color: 'rgba(100, 200, 255, 0.6)' },
-    green: { emoji: '💚', value: 5, color: 'rgba(100, 255, 100, 0.6)' },
-    red: { emoji: '❤️', value: 20, color: 'rgba(255, 100, 100, 0.6)' },
-    purple: { emoji: '💜', value: 100, color: 'rgba(200, 100, 255, 0.6)' },
+    green: { emoji: '💠', value: 5, color: 'rgba(100, 255, 100, 0.6)' },
+    red: { emoji: '🔷', value: 20, color: 'rgba(255, 100, 100, 0.6)' },
+    purple: { emoji: '🔷', value: 100, color: 'rgba(200, 100, 255, 0.6)' },
     power: { emoji: '⭐', value: 0, color: 'rgba(255, 215, 0, 0.8)' } // Special power crystal
 };
 
