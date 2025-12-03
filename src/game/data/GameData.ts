@@ -80,9 +80,9 @@ export const WEAPONS = [
         description: "Deploys a drone that fights for you",
         class: DroneSupportWeapon,
         evolution: {
-            name: "Gatling Storm",
-            emoji: "⚙️",
-            description: "Fires multiple bullets per shot"
+            name: "Assault Swarm",
+            emoji: "🛸",
+            description: "Deploys 3 drones that fire rapidly"
         }
     },
     {
@@ -225,5 +225,7 @@ export const ENEMIES = [
     { name: "Hedgehog", hp: 30, speed: 70, damage: 10, xpValue: 3, emoji: "🦔" },
     { name: "Alien", hp: 50, speed: 90, damage: 12, xpValue: 4, emoji: "👽" },
     { name: "Mecha", hp: 80, speed: 60, damage: 15, xpValue: 6, emoji: "🤖" },
+    { name: "Golem", hp: 200, speed: 40, damage: 25, xpValue: 15, emoji: "🗿" },
+    { name: "Spectre", hp: 60, speed: 110, damage: 20, xpValue: 8, emoji: "👻" },
     { name: "Boss", hp: 500, speed: 120, damage: 30, xpValue: 100, emoji: "👹" },
 ];

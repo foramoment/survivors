@@ -38,7 +38,8 @@ export class Player extends Entity {
         regen: 0,
         critChance: 0.05,
         critDamage: 1.5,
-        tick: 0 // Reduces zone weapon damage interval
+        tick: 0, // Reduces zone weapon damage interval
+        timeSpeed: 1 // Global time multiplier for weapon cooldowns
     };
 
     className: string = "Survivor";
@@ -188,5 +189,14 @@ export class Player extends Entity {
     activateWeaponSpeedBoost(duration: number = 10, multiplier: number = 10) {
         this.weaponSpeedBoost = multiplier;
         this.weaponSpeedBoostTimer = duration;
+    }
+
+    getDamage(baseDamage: number): { damage: number, isCrit: boolean } {
+        const isCrit = Math.random() < this.stats.critChance;
+        const multiplier = this.stats.might * (isCrit ? this.stats.critDamage : 1);
+        return {
+            damage: baseDamage * multiplier,
+            isCrit: isCrit
+        };
     }
 }

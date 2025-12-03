@@ -20,9 +20,9 @@ export class VoidRayWeapon extends ProjectileWeapon {
 
     fire(target: any) {
         // Instant damage
-        const dmg = this.damage * (this.owner as any).stats.might;
-        target.takeDamage(dmg);
-        this.onDamage(target.pos, dmg);
+        const { damage } = (this.owner as any).getDamage(this.damage);
+        target.takeDamage(damage);
+        this.onDamage(target.pos, damage);
 
         // Visual beam
         // Glowing purple beam
@@ -45,7 +45,9 @@ export class PhantomSlashWeapon extends Weapon {
     }
 
     update(dt: number, enemies: Entity[]) {
-        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
             // Find random targets in range
             const targets = enemies.filter(e => distance(this.owner.pos, e.pos) < this.area * (this.owner as any).stats.area);
@@ -59,9 +61,9 @@ export class PhantomSlashWeapon extends Weapon {
                     const target = targets[idx];
                     targets.splice(idx, 1); // Remove to avoid hitting same twice
 
-                    const dmg = this.damage * (this.owner as any).stats.might;
-                    (target as any).takeDamage(dmg);
-                    this.onDamage(target.pos, dmg);
+                    const { damage } = (this.owner as any).getDamage(this.damage);
+                    (target as any).takeDamage(damage);
+                    this.onDamage(target.pos, damage);
 
                     // Visual slash
                     const slash = new Zone(target.pos.x, target.pos.y, 40, 0.2, 0, 1, '⚔️');
@@ -81,48 +83,46 @@ export class PhantomSlashWeapon extends Weapon {
 }
 
 // 3. Drone Support (replaces Autocannon)
-export class DroneSupportWeapon extends ProjectileWeapon {
+import { Drone } from '../entities/Drone';
+
+export class DroneSupportWeapon extends Weapon {
     name = "Drone Support";
     emoji = "🛸";
     description = "Automated defense drone system.";
-    projectileEmoji = "🔹";
-    pierce = 1;
+
+    drones: Drone[] = [];
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 0.5;
-        this.damage = 10;
-        this.speed = 600;
-        this.duration = 2;
+        this.baseCooldown = 0; // Managed by drones
     }
 
-    // Override fire to shoot from an offset
-    fire(target: any) {
-        // Simulate drone position (orbiting or fixed offset)
-        const time = Date.now() / 1000;
-        const offset = {
-            x: Math.cos(time) * 50,
-            y: Math.sin(time) * 50 - 50
-        };
-        const dronePos = {
-            x: this.owner.pos.x + offset.x,
-            y: this.owner.pos.y + offset.y
-        };
+    update(dt: number, enemies: Entity[]) {
+        // Manage drones
+        const targetCount = this.level >= 6 ? 3 : 1; // Evolution: 3 drones
+        const isEvolved = this.level >= 6;
 
-        const dir = { x: target.pos.x - dronePos.x, y: target.pos.y - dronePos.y };
-        const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
-        const velocity = { x: (dir.x / len) * this.speed, y: (dir.y / len) * this.speed };
+        if (this.drones.length < targetCount) {
+            const drone = new Drone(this.owner, isEvolved, this.drones.length, targetCount);
+            drone.onSpawnProjectile = (p) => this.onSpawn(p);
+            this.drones.push(drone);
+        }
 
-        const proj = new Projectile(
-            dronePos.x,
-            dronePos.y,
-            velocity,
-            this.duration,
-            this.damage * (this.owner as any).stats.might,
-            this.pierce,
-            this.projectileEmoji
-        );
-        this.onSpawn(proj);
+        // Update drones
+        this.drones.forEach(d => {
+            d.totalDrones = targetCount; // Update total count for formation
+            d.isEvolved = isEvolved;
+            d.update(dt, enemies);
+        });
+    }
+
+    upgrade() {
+        this.level++;
+        // Drones update themselves based on level/evolution status in update()
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        this.drones.forEach(d => d.draw(ctx, camera));
     }
 }
 
@@ -192,7 +192,9 @@ export class OrbitalStrikeWeapon extends Weapon {
     }
 
     update(dt: number, _enemies: Entity[]) {
-        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
             // Spawn 1 + level/2 strikes
             const count = 1 + Math.floor(this.level / 2);
@@ -207,7 +209,7 @@ export class OrbitalStrikeWeapon extends Weapon {
                     this.owner.pos.y + offsetY,
                     this.area * (this.owner as any).stats.area,
                     1.0, // 1 second delay
-                    this.damage * (this.owner as any).stats.might,
+                    (this.owner as any).getDamage(this.damage).damage,
                     '💥'
                 );
                 this.onSpawn(zone);
@@ -278,7 +280,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
             this.owner.pos.y,
             velocity,
             this.duration * (this.owner as any).stats.duration,
-            this.damage * (this.owner as any).stats.might,
+            (this.owner as any).getDamage(this.damage).damage,
             bounces,
             this.projectileEmoji,
             400 // Bounce range
@@ -308,7 +310,9 @@ export class AcidPoolWeapon extends Weapon {
     }
 
     update(dt: number, enemies: Entity[]) {
-        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
             // Find target
             let target: any = null;
@@ -336,7 +340,7 @@ export class AcidPoolWeapon extends Weapon {
                         x, y,
                         this.area * (this.owner as any).stats.area,
                         3.0 * (this.owner as any).stats.duration,
-                        this.damage * (this.owner as any).stats.might,
+                        (this.owner as any).getDamage(this.damage).damage,
                         0.5, // tick interval
                         '🤢'
                     );
@@ -375,11 +379,11 @@ export class LightningChainWeapon extends ProjectileWeapon {
     }
 
     fire(target: any) {
-        const dmg = this.damage * (this.owner as any).stats.might;
+        const { damage } = (this.owner as any).getDamage(this.damage);
 
         // 1. Hit first target immediately
-        target.takeDamage(dmg);
-        this.onDamage(target.pos, dmg);
+        target.takeDamage(damage);
+        this.onDamage(target.pos, damage);
 
         // 2. Visual beam from player to first target
         const beam = new Beam(this.owner.pos, target.pos, 0.1, '#ffff00', 2);
@@ -390,7 +394,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
         const bounces = 5 + this.level;
         const maxChainLength = 800; // Maximum total chain length
 
-        const chain = new ChainLightning(target.pos.x, target.pos.y, dmg, bounces, maxChainLength);
+        const chain = new ChainLightning(target.pos.x, target.pos.y, damage, bounces, maxChainLength);
         chain.hitEnemies.add(target); // Don't hit first target again
 
         chain.onHit = (t: any, d: number) => {
@@ -426,7 +430,9 @@ export class SpinningEmberWeapon extends Weapon {
         // Check if projectiles are dead
         this.projectiles = this.projectiles.filter(p => !p.isDead);
 
-        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
             // Spawn set of projectiles
             const count = 2 + this.level;
@@ -439,7 +445,7 @@ export class SpinningEmberWeapon extends Weapon {
                     100, // distance
                     3, // rotation speed
                     duration,
-                    this.damage * (this.owner as any).stats.might,
+                    (this.owner as any).getDamage(this.damage).damage,
                     '🔥'
                 );
                 proj.angle = angle; // Set initial angle
@@ -473,7 +479,9 @@ export class FrostNovaWeapon extends Weapon {
     }
 
     update(dt: number, _enemies: Entity[]) {
-        this.cooldown -= dt * ((this.owner as any).weaponSpeedBoost || 1);
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
             // Throw at random position near player
             const range = 400;
@@ -494,7 +502,7 @@ export class FrostNovaWeapon extends Weapon {
                     x, y,
                     this.area * (this.owner as any).stats.area,
                     3.0 * (this.owner as any).stats.duration,
-                    this.damage * (this.owner as any).stats.might,
+                    (this.owner as any).getDamage(this.damage).damage,
                     0.5,
                     '❄️',
                     0.5 // 50% slow
@@ -555,7 +563,7 @@ export class FanOfKnivesWeapon extends ProjectileWeapon {
                 this.owner.pos.y,
                 velocity,
                 this.duration * (this.owner as any).stats.duration,
-                this.damage * (this.owner as any).stats.might,
+                (this.owner as any).getDamage(this.damage).damage,
                 this.pierce,
                 this.projectileEmoji
             );

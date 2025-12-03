@@ -480,7 +480,13 @@ export class GameManager {
         if (this.gameTime > 60) type = ENEMIES[2];
         if (this.gameTime > 120) type = ENEMIES[3];
         if (this.gameTime > 180) type = ENEMIES[4];
-        if (this.gameTime > 300) type = ENEMIES[5];
+        if (this.gameTime > 30) type = ENEMIES[1];
+        if (this.gameTime > 60) type = ENEMIES[2];
+        if (this.gameTime > 120) type = ENEMIES[3];
+        if (this.gameTime > 180) type = ENEMIES[4];
+        if (this.gameTime > 240) type = ENEMIES[5]; // Golem
+        if (this.gameTime > 300) type = ENEMIES[6]; // Spectre
+        if (this.gameTime > 360) type = ENEMIES[7]; // Boss
 
         // 1% chance to spawn elite enemy
         const isElite = Math.random() < 0.01;
@@ -515,11 +521,13 @@ export class GameManager {
         }
 
         // Determine crystal type based on value
-        let type: 'small' | 'medium' | 'large' = 'small';
-        if (value >= 5) {
-            type = 'large';
-        } else if (value >= 3) {
-            type = 'medium';
+        let type: 'blue' | 'green' | 'red' | 'purple' = 'blue';
+        if (value >= 50) {
+            type = 'purple';
+        } else if (value >= 20) {
+            type = 'red';
+        } else if (value >= 5) {
+            type = 'green';
         }
 
         const crystal = new XPCrystal(x, y, type);

@@ -1,7 +1,7 @@
 import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
 
-export type CrystalType = 'small' | 'medium' | 'large' | 'power';
+export type CrystalType = 'blue' | 'green' | 'red' | 'purple' | 'power';
 
 export interface CrystalTypeData {
     emoji: string;
@@ -10,9 +10,10 @@ export interface CrystalTypeData {
 }
 
 export const CRYSTAL_TYPES: Record<CrystalType, CrystalTypeData> = {
-    small: { emoji: '💎', value: 1, color: 'rgba(100, 200, 255, 0.6)' },
-    medium: { emoji: '💠', value: 2, color: 'rgba(150, 100, 255, 0.6)' },
-    large: { emoji: '🔷', value: 5, color: 'rgba(255, 150, 100, 0.6)' },
+    blue: { emoji: '💎', value: 1, color: 'rgba(100, 200, 255, 0.6)' },
+    green: { emoji: '💚', value: 5, color: 'rgba(100, 255, 100, 0.6)' },
+    red: { emoji: '❤️', value: 20, color: 'rgba(255, 100, 100, 0.6)' },
+    purple: { emoji: '💜', value: 100, color: 'rgba(200, 100, 255, 0.6)' },
     power: { emoji: '⭐', value: 0, color: 'rgba(255, 215, 0, 0.8)' } // Special power crystal
 };
 
@@ -23,7 +24,7 @@ export class XPCrystal extends Entity {
     type: CrystalType;
     isPowerCrystal: boolean = false;
 
-    constructor(x: number, y: number, type: CrystalType = 'small') {
+    constructor(x: number, y: number, type: CrystalType = 'blue') {
         super(x, y, 8);
         this.type = type;
         this.value = CRYSTAL_TYPES[type].value;

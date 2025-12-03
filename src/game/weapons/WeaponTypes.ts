@@ -213,7 +213,8 @@ export abstract class ProjectileWeapon extends Weapon {
 
     update(dt: number, enemies: Entity[]) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
             let target: Entity | null = null;
             let minDst = Infinity;
@@ -243,12 +244,14 @@ export abstract class ProjectileWeapon extends Weapon {
         const speed = this.speed * (this.owner as any).stats.speed;
         const velocity = { x: dir.x * speed, y: dir.y * speed };
 
+        const { damage, isCrit } = (this.owner as any).getDamage(this.damage);
+
         const proj = new Projectile(
             this.owner.pos.x,
             this.owner.pos.y,
             velocity,
             this.duration * (this.owner as any).stats.duration,
-            this.damage * (this.owner as any).stats.might,
+            damage,
             this.pierce,
             this.projectileEmoji
         );
@@ -324,7 +327,8 @@ export abstract class ZoneWeapon extends Weapon {
 
     update(dt: number, _enemies: Entity[]) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
             this.spawnZone();
             this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
@@ -336,12 +340,14 @@ export abstract class ZoneWeapon extends Weapon {
         const baseInterval = Math.max(0.1, this.interval - (this.owner as any).stats.tick);
         const boostedInterval = baseInterval / speedBoost;
 
+        const { damage, isCrit } = (this.owner as any).getDamage(this.damage);
+
         const zone = new Zone(
             this.owner.pos.x,
             this.owner.pos.y,
             this.area * (this.owner as any).stats.area,
             this.duration * (this.owner as any).stats.duration,
-            this.damage * (this.owner as any).stats.might,
+            damage,
             Math.max(0.01, boostedInterval), // Minimum 0.01s interval
             this.zoneEmoji
         );
@@ -417,19 +423,15 @@ export class LobbedProjectile extends Projectile {
     }
 }
 
-export class DelayedExplosionZone extends Entity {
+export class DelayedExplosionZone extends Zone {
     delay: number;
-    radius: number;
-    damage: number;
-    emoji: string;
     exploded: boolean = false;
 
     constructor(x: number, y: number, radius: number, delay: number, damage: number, emoji: string) {
-        super(x, y, radius);
+        // extend Zone: duration, damage, interval, emoji
+        // Set interval to Infinity so GameManager doesn't apply tick damage
+        super(x, y, radius, delay + 1, damage, Number.MAX_VALUE, emoji);
         this.delay = delay;
-        this.radius = radius;
-        this.damage = damage;
-        this.emoji = emoji;
     }
 
     update(dt: number, enemies?: Entity[]) {
@@ -491,7 +493,7 @@ export class DelayedExplosionZone extends Entity {
 
         } else {
             // Explosion visual
-            ctx.font = `${this.radius}px Arial`;
+            ctx.font = `${this.radius * 1.5}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(this.emoji, 0, 0);
@@ -499,9 +501,15 @@ export class DelayedExplosionZone extends Entity {
             // Shockwave
             ctx.beginPath();
             ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = 5;
+            ctx.strokeStyle = 'rgba(255, 200, 50, 0.8)';
+            ctx.lineWidth = 10;
             ctx.stroke();
+
+            // Inner flash
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 0.8, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 200, 0.5)';
+            ctx.fill();
         }
 
         ctx.restore();
