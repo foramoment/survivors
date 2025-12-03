@@ -39,8 +39,8 @@ export class Enemy extends Entity {
     speedMultiplier: number = 1;
 
     update(dt: number, playerPos?: Vector2) {
-        // Reset modifiers
-        this.speedMultiplier = 1;
+        // Reset modifiers - Handled in GameManager
+        // this.speedMultiplier = 1;
 
         if (!playerPos) return;
 

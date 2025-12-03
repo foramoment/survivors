@@ -426,12 +426,14 @@ export class LobbedProjectile extends Projectile {
 export class DelayedExplosionZone extends Zone {
     delay: number;
     exploded: boolean = false;
+    onDamageCallback?: (pos: Vector2, amount: number) => void;
 
-    constructor(x: number, y: number, radius: number, delay: number, damage: number, emoji: string) {
+    constructor(x: number, y: number, radius: number, delay: number, damage: number, emoji: string, onDamage?: (pos: Vector2, amount: number) => void) {
         // extend Zone: duration, damage, interval, emoji
         // Set interval to Infinity so GameManager doesn't apply tick damage
         super(x, y, radius, delay + 1, damage, Number.MAX_VALUE, emoji);
         this.delay = delay;
+        this.onDamageCallback = onDamage;
     }
 
     update(dt: number, enemies?: Entity[]) {
@@ -454,6 +456,9 @@ export class DelayedExplosionZone extends Zone {
         for (const enemy of enemies) {
             if (distance(this.pos, enemy.pos) <= this.radius) {
                 (enemy as any).takeDamage(this.damage);
+                if (this.onDamageCallback) {
+                    this.onDamageCallback(enemy.pos, this.damage);
+                }
             }
         }
     }
@@ -547,6 +552,109 @@ export class DroneEntity extends Entity {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🛸', 0, 0);
+        ctx.restore();
+    }
+}
+
+export class Nanobot extends Projectile {
+    owner: any;
+    angle: number;
+    distance: number;
+    rotationSpeed: number;
+
+    constructor(owner: any, distance: number, angle: number, duration: number, damage: number) {
+        super(owner.pos.x, owner.pos.y, { x: 0, y: 0 }, duration, damage, 999, '🦠');
+        this.owner = owner;
+        this.distance = distance;
+        this.angle = angle;
+        this.rotationSpeed = 2; // radians per second
+        this.canCollide = true;
+    }
+
+    update(dt: number, _enemies?: Entity[]) {
+        this.angle += this.rotationSpeed * dt;
+
+        // Swirling motion: radius expands and contracts slightly
+        const currentDist = this.distance + Math.sin(Date.now() / 200) * 20;
+
+        this.pos.x = this.owner.pos.x + Math.cos(this.angle) * currentDist;
+        this.pos.y = this.owner.pos.y + Math.sin(this.angle) * currentDist;
+
+        this.duration -= dt;
+        if (this.duration <= 0) this.isDead = true;
+    }
+}
+
+export class MindBlastZone extends Zone {
+    stage: 'warning' | 'charge' | 'blast' = 'warning';
+    stageTimer: number = 0;
+
+    constructor(x: number, y: number, radius: number, damage: number) {
+        super(x, y, radius, 2.0, damage, 999, '🧠'); // 2s total duration
+        this.interval = 999; // Manual damage handling
+    }
+
+    update(dt: number, enemies?: Entity[]) {
+        this.stageTimer += dt;
+
+        if (this.stage === 'warning' && this.stageTimer > 0.5) {
+            this.stage = 'charge';
+        } else if (this.stage === 'charge' && this.stageTimer > 1.0) {
+            this.stage = 'blast';
+            // Deal damage once at blast start
+            if (enemies) {
+                enemies.forEach(e => {
+                    if (distance(this.pos, e.pos) <= this.radius) {
+                        (e as any).takeDamage(this.damage);
+                    }
+                });
+            }
+        } else if (this.stage === 'blast' && this.stageTimer > 1.5) {
+            this.isDead = true;
+        }
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+
+        if (this.stage === 'warning') {
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 0, 255, 0.5)`;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+        } else if (this.stage === 'charge') {
+            // Charging effect - gathering energy
+            const progress = (this.stageTimer - 0.5) / 0.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * progress, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(200, 0, 255, 0.3)`;
+            ctx.fill();
+
+            // Random lightning sparks inside
+            for (let i = 0; i < 3; i++) {
+                const ang = Math.random() * Math.PI * 2;
+                const r = Math.random() * this.radius;
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(Math.cos(ang) * r, Math.sin(ang) * r, 2, 2);
+            }
+        } else if (this.stage === 'blast') {
+            // Blast visual
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(150, 0, 255, 0.6)`;
+            ctx.fill();
+
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 5;
+            ctx.stroke();
+
+            ctx.font = `${this.radius}px Arial`;
+            ctx.fillText('💥', 0, 0);
+        }
+
         ctx.restore();
     }
 }

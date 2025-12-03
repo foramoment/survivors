@@ -342,7 +342,11 @@ export class GameManager {
 
         this.player.update(dt);
         this.player.weapons.forEach(w => w.update(dt, this.enemies));
-        this.enemies.forEach(e => e.update(dt, this.player!.pos));
+
+        // Reset enemy stats before updates/collisions
+        this.enemies.forEach(e => {
+            e.speedMultiplier = 1;
+        });
 
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const p = this.projectiles[i];
@@ -409,6 +413,9 @@ export class GameManager {
                 p.timer = 0;
             }
         }
+
+        // Update enemies (Move) AFTER collisions have potentially applied slows
+        this.enemies.forEach(e => e.update(dt, this.player!.pos));
 
         for (const e of this.enemies) {
             if (checkCollision(e, this.player)) {
@@ -480,10 +487,6 @@ export class GameManager {
         if (this.gameTime > 60) type = ENEMIES[2];
         if (this.gameTime > 120) type = ENEMIES[3];
         if (this.gameTime > 180) type = ENEMIES[4];
-        if (this.gameTime > 30) type = ENEMIES[1];
-        if (this.gameTime > 60) type = ENEMIES[2];
-        if (this.gameTime > 120) type = ENEMIES[3];
-        if (this.gameTime > 180) type = ENEMIES[4];
         if (this.gameTime > 240) type = ENEMIES[5]; // Golem
         if (this.gameTime > 300) type = ENEMIES[6]; // Spectre
         if (this.gameTime > 360) type = ENEMIES[7]; // Boss
@@ -498,7 +501,8 @@ export class GameManager {
         const timeMultiplier = 1 + (this.gameTime / 300); // +1 multiplier every 5 minutes
         enemy.maxHp = enemy.baseHp * Math.min(timeMultiplier, 3); // Cap at 3x HP
         enemy.hp = enemy.maxHp;
-        enemy.damage *= Math.min(1 + (this.gameTime / 600), 2); // Cap at 2x damage
+        // Remove cap on damage or make it much higher
+        enemy.damage *= (1 + (this.gameTime / 300)); // Uncapped damage scaling
 
         this.enemies.push(enemy);
     }
@@ -513,8 +517,8 @@ export class GameManager {
     }
 
     spawnXPCrystal(x: number, y: number, value: number) {
-        // 1% chance to spawn power crystal
-        if (Math.random() < 0.01) {
+        // 0.1% chance to spawn power crystal (Star) - Reduced from 1%
+        if (Math.random() < 0.001) {
             const crystal = new XPCrystal(x, y, 'power');
             this.xpCrystals.push(crystal);
             return;

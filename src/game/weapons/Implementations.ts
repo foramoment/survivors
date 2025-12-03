@@ -1,4 +1,4 @@
-import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning, Beam, OrbitingProjectile, LobbedProjectile, DelayedExplosionZone, Projectile } from './WeaponTypes';
+import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning, Beam, OrbitingProjectile, LobbedProjectile, DelayedExplosionZone, Projectile, Nanobot, MindBlastZone } from './WeaponTypes';
 import { distance, type Vector2 } from '../core/Utils';
 import { Weapon } from '../Weapon';
 import { Entity } from '../Entity';
@@ -126,21 +126,57 @@ export class DroneSupportWeapon extends Weapon {
     }
 }
 
-// 4. Nanobot Swarm (Zone)
-export class NanobotSwarmWeapon extends ZoneWeapon {
+// 4. Nanobot Swarm (Reworked)
+export class NanobotSwarmWeapon extends Weapon {
     name = "Nanobot Swarm";
     emoji = "🦠";
-    description = "Damaging aura around player.";
-    zoneEmoji = "🌫️";
-    interval = 1; // tick-based damage
+    description = "Swarm of nanobots that devour enemies.";
+    projectiles: Nanobot[] = [];
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 3;
-        this.duration = 2;
+        this.baseCooldown = 0.2; // Spawn rate
         this.damage = 5;
-        this.area = 80;
+        this.duration = 4;
     }
+
+    update(dt: number, _enemies: Entity[]) {
+        // Clean up dead projectiles
+        this.projectiles = this.projectiles.filter(p => !p.isDead);
+
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
+
+        if (this.cooldown <= 0) {
+            // Spawn a nanobot
+            const count = 1 + Math.floor(this.level / 3);
+
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 50 + Math.random() * 100 * (this.owner as any).stats.area;
+
+                const bot = new Nanobot(
+                    this.owner,
+                    dist,
+                    angle,
+                    this.duration * (this.owner as any).stats.duration,
+                    (this.owner as any).getDamage(this.damage).damage
+                );
+                this.onSpawn(bot);
+                this.projectiles.push(bot);
+            }
+
+            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+        }
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.2;
+    }
+
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
 // 5. Spore Cloud (Zone)
@@ -196,26 +232,63 @@ export class OrbitalStrikeWeapon extends Weapon {
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
-            // Spawn 1 + level/2 strikes
-            const count = 1 + Math.floor(this.level / 2);
+            // Check for evolution
+            const isEvolved = this.level >= 6; // Assuming level 6 is evolved state based on GameManager logic (it sets level to 6)
 
-            for (let i = 0; i < count; i++) {
-                // Random position on screen (approx +/- 500 from player)
-                const offsetX = (Math.random() - 0.5) * 1000;
-                const offsetY = (Math.random() - 0.5) * 800;
-
+            if (isEvolved) {
+                // Atomic Bomb Logic
+                // Huge area, huge damage, slow fall
                 const zone = new DelayedExplosionZone(
-                    this.owner.pos.x + offsetX,
-                    this.owner.pos.y + offsetY,
-                    this.area * (this.owner as any).stats.area,
-                    1.0, // 1 second delay
-                    (this.owner as any).getDamage(this.damage).damage,
-                    '💥'
+                    this.owner.pos.x,
+                    this.owner.pos.y, // Target player position (or random?) - let's do random near player but huge
+                    400, // Huge radius
+                    3.0, // Slow fall
+                    (this.owner as any).getDamage(this.damage * 5).damage, // Massive damage
+                    '☢️',
+                    (pos, amount) => {
+                        // Shockwave effect - spawn mini explosions
+                        for (let i = 0; i < 5; i++) {
+                            const angle = Math.random() * Math.PI * 2;
+                            const dist = 100 + Math.random() * 200;
+                            const miniZone = new DelayedExplosionZone(
+                                pos.x + Math.cos(angle) * dist,
+                                pos.y + Math.sin(angle) * dist,
+                                60,
+                                0.5,
+                                amount * 0.2,
+                                '💥',
+                                (p, a) => this.onDamage(p, a)
+                            );
+                            this.onSpawn(miniZone);
+                        }
+                        this.onDamage(pos, amount);
+                    }
                 );
                 this.onSpawn(zone);
-            }
 
-            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+                // Very long cooldown for nuke
+                this.cooldown = this.baseCooldown * 4 * (this.owner as any).stats.cooldown;
+            } else {
+                // Standard Logic
+                const count = 1 + Math.floor(this.level / 2);
+
+                for (let i = 0; i < count; i++) {
+                    const offsetX = (Math.random() - 0.5) * 1000;
+                    const offsetY = (Math.random() - 0.5) * 800;
+
+                    const zone = new DelayedExplosionZone(
+                        this.owner.pos.x + offsetX,
+                        this.owner.pos.y + offsetY,
+                        this.area * (this.owner as any).stats.area,
+                        1.0,
+                        (this.owner as any).getDamage(this.damage).damage,
+                        '💥',
+                        (pos, amount) => this.onDamage(pos, amount)
+                    );
+                    this.onSpawn(zone);
+                }
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            }
         }
     }
 
@@ -229,21 +302,50 @@ export class OrbitalStrikeWeapon extends Weapon {
 
 
 
-// 8. Mind Blast (Zone)
-export class MindBlastWeapon extends ZoneWeapon {
+// 8. Mind Blast (Reworked)
+export class MindBlastWeapon extends Weapon {
     name = "Mind Blast";
     emoji = "🧠";
     description = "Psionic storm at enemy location.";
-    zoneEmoji = "🌀";
-    interval = 0.2; // Fast ticks
 
     constructor(owner: any) {
         super(owner);
         this.baseCooldown = 3;
-        this.duration = 1.5; // Lasts longer
-        this.damage = 5; // Lower damage per tick, but many ticks
+        this.damage = 20;
         this.area = 120;
     }
+
+    update(dt: number, enemies: Entity[]) {
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
+
+        if (this.cooldown <= 0) {
+            // Find random target
+            const targets = enemies.filter(e => distance(this.owner.pos, e.pos) < 600);
+
+            if (targets.length > 0) {
+                const target = targets[Math.floor(Math.random() * targets.length)];
+
+                const zone = new MindBlastZone(
+                    target.pos.x,
+                    target.pos.y,
+                    this.area * (this.owner as any).stats.area,
+                    (this.owner as any).getDamage(this.damage).damage
+                );
+                this.onSpawn(zone);
+
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            }
+        }
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= 1.2;
+    }
+
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
 // 9. Chrono Disc - Bouncing disc that ricochets between enemies
@@ -391,8 +493,10 @@ export class LightningChainWeapon extends ProjectileWeapon {
 
         // 3. Start chain logic
         // Bounces = 5 + weapon level
-        const bounces = 5 + this.level;
-        const maxChainLength = 800; // Maximum total chain length
+        // If evolved (level >= 6), infinite bounces
+        const isEvolved = this.level >= 6;
+        const bounces = isEvolved ? 999 : 5 + this.level;
+        const maxChainLength = isEvolved ? 10000 : 800; // Practically infinite for evolved
 
         const chain = new ChainLightning(target.pos.x, target.pos.y, damage, bounces, maxChainLength);
         chain.hitEnemies.add(target); // Don't hit first target again

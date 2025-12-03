@@ -34,7 +34,7 @@ export const POWERUPS = [
     // Creative
     { name: "Gravity Well", description: "Pull range +20%", type: "magnet", value: 20, emoji: "🧲" },
     { name: "Chain Reaction", description: "Area +10%", type: "area", value: 0.1, emoji: "💣" },
-    { name: "Energy Shield", description: "Armor +1", type: "armor", value: 1, emoji: "🛡️" },
+    // { name: "Energy Shield", description: "Armor +1", type: "armor", value: 1, emoji: "🛡️" }, // Duplicate
     { name: "Vampiric Link", description: "Growth +10%", type: "growth", value: 0.1, emoji: "🧛" },
     { name: "Static Field", description: "Duration +10%", type: "duration", value: 0.1, emoji: "⚡" },
     { name: "Bounty Hunter", description: "Greed +20%", type: "greed", value: 0.2, emoji: "💰" },
