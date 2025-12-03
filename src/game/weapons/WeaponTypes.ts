@@ -363,7 +363,7 @@ export abstract class ProjectileWeapon extends Weapon {
         const speed = this.speed * (this.owner as any).stats.speed;
         const velocity = { x: dir.x * speed, y: dir.y * speed };
 
-        const { damage, isCrit } = (this.owner as any).getDamage(this.damage);
+        const { damage } = (this.owner as any).getDamage(this.damage);
 
         const proj = new Projectile(
             this.owner.pos.x,
@@ -459,7 +459,7 @@ export abstract class ZoneWeapon extends Weapon {
         const baseInterval = Math.max(0.1, this.interval - (this.owner as any).stats.tick);
         const boostedInterval = baseInterval / speedBoost;
 
-        const { damage, isCrit } = (this.owner as any).getDamage(this.damage);
+        const { damage } = (this.owner as any).getDamage(this.damage);
 
         const zone = new Zone(
             this.owner.pos.x,

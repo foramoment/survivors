@@ -1,11 +1,15 @@
 import { type Vector2 } from './Utils';
+import { Joystick } from '../ui/Joystick';
 
 export class Input {
     keys: { [key: string]: boolean } = {};
     mousePos: Vector2 = { x: 0, y: 0 };
     isMouseDown: boolean = false;
+    joystick: Joystick;
 
     constructor() {
+        this.joystick = new Joystick();
+
         window.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
         });
@@ -30,6 +34,14 @@ export class Input {
         if (this.keys['KeyS'] || this.keys['ArrowDown']) axis.y += 1;
         if (this.keys['KeyA'] || this.keys['ArrowLeft']) axis.x -= 1;
         if (this.keys['KeyD'] || this.keys['ArrowRight']) axis.x += 1;
+
+        // Combine with joystick input
+        const joyVector = this.joystick.getVector();
+        if (joyVector.x !== 0 || joyVector.y !== 0) {
+            axis.x = joyVector.x;
+            axis.y = joyVector.y;
+        }
+
         return axis;
     }
 }
