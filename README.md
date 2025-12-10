@@ -15,6 +15,8 @@ A **Vampire Survivors-like** roguelike game built with TypeScript and Vite. Batt
 - **XP Crystals** — Different sizes and values from defeated enemies
 - **Mobile Support** — Touch controls with virtual joystick for Android
 
+> 📖 **For developers**: See [GAME_MECHANICS.md](GAME_MECHANICS.md) for detailed documentation on weapon systems, formulas, and how to modify game behavior.
+
 ## 🛠️ Tech Stack
 
 | Technology         | Purpose                                     |
