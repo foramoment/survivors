@@ -136,10 +136,10 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         const speed = this.speed * (this.owner as any).stats.speed;
         const velocity = { x: dir.x * speed, y: dir.y * speed };
 
-        const { damage, isCrit } = (this.owner as any).getDamage(this.damage);
+        const { damage } = (this.owner as any).getDamage(this.damage);
 
         // Custom projectile that explodes
-        const proj = new Projectile(
+        new Projectile(
             this.owner.pos.x,
             this.owner.pos.y,
             velocity,
@@ -169,7 +169,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
             this.projectileEmoji
         );
 
-        plasma.onBounce = (p, enemies) => {
+        plasma.onBounce = (p) => {
             // Explode!
             const zone = new DelayedExplosionZone(
                 p.pos.x,

@@ -347,3 +347,194 @@ h1 {
     opacity: 0;
   }
 }
+
+/* Joystick Styles */
+#joystick-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  z-index: 5;
+  /* Above canvas but below UI */
+}
+
+.joystick-base {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  display: none;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+}
+
+.joystick-stick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 255, 255, 0.5);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+/* Disable text selection globally for better touch experience */
+* {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Mobile Responsive Styles */
+@media screen and (max-height: 700px),
+screen and (max-width: 900px) {
+
+  /* Smaller title */
+  h1 {
+    font-size: 2em;
+    margin-bottom: 10px;
+  }
+
+  /* Class Selection Grid */
+  .class-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    padding: 10px;
+    max-width: 100%;
+  }
+
+  .class-card {
+    padding: 8px;
+    gap: 5px;
+  }
+
+  .class-icon {
+    font-size: 2em;
+  }
+
+  .class-name {
+    font-size: 0.9em;
+  }
+
+  .class-bonus {
+    font-size: 0.7em;
+  }
+
+  /* Developer Mode Checkbox */
+  .dev-mode-container {
+    padding: 8px 15px;
+    margin-bottom: 15px;
+  }
+
+  .dev-mode-label {
+    font-size: 0.9em;
+  }
+
+  /* Level Up Screen */
+  .upgrade-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    max-width: 100%;
+  }
+
+  .upgrade-grid-6 {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 8px;
+    max-width: 100%;
+  }
+
+  .upgrade-card {
+    width: auto;
+    padding: 10px;
+    min-height: auto;
+  }
+
+  .upgrade-card h3 {
+    font-size: 0.9em;
+    margin: 5px 0;
+  }
+
+  .upgrade-card p {
+    font-size: 0.75em;
+    margin: 5px 0;
+  }
+
+  .upgrade-card>div[style*="font-size: 3em"] {
+    font-size: 2em !important;
+  }
+
+  .level-indicator {
+    font-size: 0.75em;
+  }
+
+  /* HUD adjustments */
+  .hud {
+    padding: 10px;
+  }
+
+  .bar-container {
+    width: 200px;
+    height: 15px;
+  }
+
+  .stats {
+    font-size: 0.8em;
+  }
+
+  .screen h2 {
+    font-size: 1.5em;
+  }
+}
+
+/* Extra small screens (portrait phones) */
+@media screen and (max-height: 500px) {
+  h1 {
+    font-size: 1.5em;
+    margin-bottom: 5px;
+  }
+
+  .class-grid {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .class-card {
+    padding: 5px;
+  }
+
+  .class-icon {
+    font-size: 1.5em;
+  }
+
+  .class-name {
+    font-size: 0.8em;
+  }
+
+  .class-bonus {
+    font-size: 0.65em;
+  }
+
+  .upgrade-card {
+    padding: 8px;
+  }
+
+  .upgrade-card h3 {
+    font-size: 0.8em;
+  }
+
+  .upgrade-card p {
+    font-size: 0.7em;
+  }
+
+  .screen h2 {
+    font-size: 1.2em;
+  }
+}

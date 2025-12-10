@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cosmos Survivors</string>
+    <string name="title_activity_main">Cosmos Survivors</string>
+    <string name="package_name">com.cosmos.survivors</string>
+    <string name="custom_url_scheme">com.cosmos.survivors</string>
+</resources>
