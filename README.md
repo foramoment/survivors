@@ -135,7 +135,7 @@ export const WEAPON_STATS: Record<string, WeaponConfig> = {
 
 ## 📜 License
 
-This project is private and not licensed for public distribution.
+This project is licensed under the **MIT License** — you're free to use, modify, and distribute it however you like! Just keep the copyright notice. See [LICENSE](LICENSE) for details.
 
 ---
 
