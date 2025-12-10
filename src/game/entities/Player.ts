@@ -9,7 +9,7 @@ export class Player extends Entity {
     maxHp: number = 100;
     xp: number = 0;
     level: number = 1;
-    nextLevelXp: number = 1; // First level requires 1 crystal
+    nextLevelXp: number = 1;
 
     weapons: Weapon[] = [];
 
@@ -21,12 +21,15 @@ export class Player extends Entity {
     weaponSpeedBoost: number = 1;
     weaponSpeedBoostTimer: number = 0;
 
+    // Knockback system
+    knockback: Vector2 = { x: 0, y: 0 };
+
     // Stats modifiers
     stats = {
         might: 1,
         area: 1,
         cooldown: 1,
-        speed: 1, // Projectile speed
+        speed: 1,
         duration: 1,
         amount: 0,
         moveSpeed: 1,
@@ -38,8 +41,8 @@ export class Player extends Entity {
         regen: 0,
         critChance: 0.05,
         critDamage: 1.5,
-        tick: 0, // Reduces zone weapon damage interval
-        timeSpeed: 1 // Global time multiplier for weapon cooldowns
+        tick: 0,
+        timeSpeed: 1
     };
 
     className: string = "Survivor";
@@ -49,6 +52,14 @@ export class Player extends Entity {
 
     constructor(x: number, y: number) {
         super(x, y, 15);
+    }
+
+    /**
+     * Apply knockback force to player
+     */
+    applyKnockback(dirX: number, dirY: number, force: number) {
+        this.knockback.x += dirX * force;
+        this.knockback.y += dirY * force;
     }
 
     update(dt: number) {
@@ -72,8 +83,24 @@ export class Player extends Entity {
             }
         }
 
-        this.pos.x += moveDir.x * this.speed * this.stats.moveSpeed * dt;
-        this.pos.y += moveDir.y * this.speed * this.stats.moveSpeed * dt;
+        // Apply movement
+        let moveX = moveDir.x * this.speed * this.stats.moveSpeed;
+        let moveY = moveDir.y * this.speed * this.stats.moveSpeed;
+
+        // Add knockback
+        moveX += this.knockback.x;
+        moveY += this.knockback.y;
+
+        this.pos.x += moveX * dt;
+        this.pos.y += moveY * dt;
+
+        // Decay knockback (friction)
+        const knockbackDecay = 0.85;
+        this.knockback.x *= knockbackDecay;
+        this.knockback.y *= knockbackDecay;
+
+        if (Math.abs(this.knockback.x) < 1) this.knockback.x = 0;
+        if (Math.abs(this.knockback.y) < 1) this.knockback.y = 0;
 
         // Regen
         if (this.stats.regen > 0 && this.hp < this.maxHp) {

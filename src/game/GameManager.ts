@@ -5,6 +5,7 @@ import { Entity } from './Entity';
 import { CLASSES, POWERUPS, ENEMIES, WEAPONS } from './data/GameData';
 import { checkCollision, type Vector2, distance } from './core/Utils';
 import { Projectile, Zone, BouncingProjectile } from './weapons/WeaponTypes';
+import { SpatialHashGrid } from './core/SpatialHash';
 
 type GameState = 'MENU' | 'PLAYING' | 'LEVEL_UP' | 'GAME_OVER';
 
@@ -31,6 +32,10 @@ export class GameManager {
     weaponLevels: Map<string, number> = new Map();
 
     devMode: boolean = false;
+
+    // Spatial hash grid for efficient enemy collision detection
+    // Cell size of 50 works well for enemy radius of ~12-18
+    enemyGrid: SpatialHashGrid<Enemy> = new SpatialHashGrid(50);
 
     constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
         this.canvas = canvas;
@@ -376,10 +381,27 @@ export class GameManager {
         this.player.update(dt);
         this.player.weapons.forEach(w => w.update(dt, this.enemies));
 
-        // Reset enemy stats before updates/collisions
+        // Reset enemy stats and forces before updates/collisions
         this.enemies.forEach(e => {
             e.speedMultiplier = 1;
+            e.resetForces();
         });
+
+        // === ENEMY SEPARATION USING SPATIAL HASH ===
+        // 1. Build spatial hash grid
+        this.enemyGrid.clear();
+        this.enemyGrid.insertAll(this.enemies);
+
+        // 2. Calculate separation forces for each enemy
+        for (const enemy of this.enemies) {
+            // Get nearby enemies from spatial grid (O(1) average case)
+            const nearby = this.enemyGrid.getNearby(enemy.pos, enemy.radius * 3);
+
+            for (const other of nearby) {
+                if (other === enemy) continue;
+                enemy.addSeparationFrom(other, 200); // Separation strength
+            }
+        }
 
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const p = this.projectiles[i];
@@ -450,9 +472,26 @@ export class GameManager {
         // Update enemies (Move) AFTER collisions have potentially applied slows
         this.enemies.forEach(e => e.update(dt, this.player!.pos));
 
+        // === PLAYER-ENEMY COLLISION WITH KNOCKBACK ===
         for (const e of this.enemies) {
             if (checkCollision(e, this.player)) {
+                // Deal damage to player
                 this.player.takeDamage(e.damage * dt);
+
+                // Calculate direction from enemy to player
+                const dx = this.player.pos.x - e.pos.x;
+                const dy = this.player.pos.y - e.pos.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist > 0.001) {
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+
+                    // Knockback force (player gets pushed away, enemy gets pushed back)
+                    const knockbackForce = 150;
+                    this.player.applyKnockback(nx, ny, knockbackForce);
+                    e.applyKnockback(-nx, -ny, knockbackForce * 0.5); // Enemy pushed back less
+                }
             }
         }
 

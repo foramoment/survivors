@@ -250,7 +250,7 @@ export const WEAPON_STATS: Record<string, {
         duration: 0.5,
     },
     phantom_slash: {
-        damage: 30,
+        damage: 15,
         damageScaling: 1.2,
         cooldown: 1.5,
         area: 250,
@@ -294,7 +294,7 @@ export const WEAPON_STATS: Record<string, {
         area: 600,
         areaScaling: 1.0,
         speed: 50,
-        duration: 12,
+        duration: 2.5, // Reduced from 12 (range: 50*2.5 = 125px instead of 600px)
         pierce: 999,
     },
     orbital_strike: {
