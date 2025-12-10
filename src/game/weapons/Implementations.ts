@@ -2,18 +2,33 @@ import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning,
 import { distance, type Vector2 } from '../core/Utils';
 import { Weapon } from '../Weapon';
 import { Entity } from '../Entity';
+import { WEAPON_STATS } from '../data/GameData';
+
+// Helper to get stats for a weapon
+function getStats(weaponId: string) {
+    const stats = WEAPON_STATS[weaponId];
+    if (!stats) {
+        console.warn(`No stats found for weapon: ${weaponId}`);
+        return {
+            damage: 10, damageScaling: 1.2, cooldown: 1.0,
+            area: 100, areaScaling: 1.0, speed: 300, duration: 1.0
+        };
+    }
+    return stats;
+}
 
 // 1. Void Ray
 export class VoidRayWeapon extends Weapon {
     name = "Void Ray";
     emoji = "🔫";
     description = "Fires a powerful charging beam.";
+    private stats = getStats('void_ray');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 2.0;
-        this.damage = 25; // Buffed from 15
-        this.area = 1; // Width multiplier
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number, enemies: Entity[]) {
@@ -21,13 +36,12 @@ export class VoidRayWeapon extends Weapon {
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
-            // Find nearest enemy
             let target: Entity | null = null;
             let minDst = Infinity;
 
             for (const enemy of enemies) {
                 const dst = distance(this.owner.pos, enemy.pos);
-                if (dst < 600 && dst < minDst) { // Range check
+                if (dst < 600 && dst < minDst) {
                     minDst = dst;
                     target = enemy;
                 }
@@ -53,23 +67,25 @@ export class VoidRayWeapon extends Weapon {
 
     upgrade() {
         this.level++;
-        this.damage *= 1.2;
+        this.damage *= this.stats.damageScaling;
+        this.area *= this.stats.areaScaling;
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
-// 2. Phantom Slash (replaces Plasma Katana)
+// 2. Phantom Slash
 export class PhantomSlashWeapon extends Weapon {
     name = "Phantom Slash";
     emoji = "⚔️";
     description = "Instantly cuts random enemies.";
+    private stats = getStats('phantom_slash');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 1.5;
-        this.damage = 30;
-        this.area = 250;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number, enemies: Entity[]) {
@@ -77,23 +93,20 @@ export class PhantomSlashWeapon extends Weapon {
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
-            // Find random targets in range
             const targets = enemies.filter(e => distance(this.owner.pos, e.pos) < this.area * (this.owner as any).stats.area);
 
             if (targets.length > 0) {
-                // Hit up to 3 + level targets
-                const count = 3 + this.level;
+                const count = (this.stats.count || 3) + Math.floor((this.level - 1) * (this.stats.countScaling || 1));
                 for (let i = 0; i < count; i++) {
                     if (targets.length === 0) break;
                     const idx = Math.floor(Math.random() * targets.length);
                     const target = targets[idx];
-                    targets.splice(idx, 1); // Remove to avoid hitting same twice
+                    targets.splice(idx, 1);
 
                     const { damage } = (this.owner as any).getDamage(this.damage);
                     (target as any).takeDamage(damage);
                     this.onDamage(target.pos, damage);
 
-                    // Visual slash
                     const slash = new Zone(target.pos.x, target.pos.y, 40, 0.2, 0, 1, '⚔️');
                     this.onSpawn(slash);
                 }
@@ -104,27 +117,29 @@ export class PhantomSlashWeapon extends Weapon {
 
     upgrade() {
         this.level++;
-        this.damage *= 1.2;
+        this.damage *= this.stats.damageScaling;
+        this.area *= this.stats.areaScaling;
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
-// 3. Plasma Cannon (replaces Drone Support)
+// 3. Plasma Cannon
 export class PlasmaCannonWeapon extends ProjectileWeapon {
     name = "Plasma Cannon";
     emoji = "🔋";
     description = "Fires massive explosive plasma rounds.";
     projectileEmoji = "🟢";
-    pierce = 999; // Explodes on impact
+    pierce = 999;
+    private stats = getStats('plasma_cannon');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 2.5;
-        this.damage = 40;
-        this.speed = 300; // Slow moving
-        this.area = 150; // Explosion radius
-        this.duration = 3;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.speed = this.stats.speed;
+        this.area = this.stats.area;
+        this.duration = this.stats.duration;
     }
 
     fire(target: any) {
@@ -138,26 +153,15 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
 
         const { damage } = (this.owner as any).getDamage(this.damage);
 
-        // Custom projectile that explodes
         new Projectile(
             this.owner.pos.x,
             this.owner.pos.y,
             velocity,
             this.duration,
             damage,
-            0, // 0 pierce means it dies on first hit
+            0,
             this.projectileEmoji
         );
-
-        // Hacky way to add explosion logic since Projectile doesn't support onDeath callback easily without extending
-        // But we can use BouncingProjectile or just extend Projectile inline or use a new class.
-        // Let's use a simple trick: we'll use a Zone when it hits.
-        // Actually, let's make a new class in WeaponTypes if we want proper explosion, 
-        // OR just use LobbedProjectile logic but for straight shot?
-        // Let's just use a Projectile and rely on the fact that when it dies (hits), we can't easily spawn an explosion unless we handle it in GameManager.
-        // GameManager handles collisions.
-        // Let's make it a BouncingProjectile with 0 bounces, and use onBounce to explode?
-        // Yes, BouncingProjectile has onBounce.
 
         const plasma = new BouncingProjectile(
             this.owner.pos.x,
@@ -170,13 +174,12 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         );
 
         plasma.onBounce = (p) => {
-            // Explode!
             const zone = new DelayedExplosionZone(
                 p.pos.x,
                 p.pos.y,
                 this.area * (this.owner as any).stats.area,
-                0, // Instant
-                damage, // Explosion damage
+                0,
+                damage,
                 '💥',
                 (pos, amt) => this.onDamage(pos, amt)
             );
@@ -189,27 +192,27 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
 
     upgrade() {
         this.level++;
-        this.damage *= 1.2;
-        this.area *= 1.1;
+        this.damage *= this.stats.damageScaling;
+        this.area *= this.stats.areaScaling;
     }
 }
 
-// 4. Nanobot Swarm (Reworked)
+// 4. Nanobot Swarm
 export class NanobotSwarmWeapon extends Weapon {
     name = "Nanobot Swarm";
     emoji = "🦠";
     description = "Swarm of nanobots that devour enemies.";
     projectiles: Nanobot[] = [];
+    private stats = getStats('nanobot_swarm');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 0.5; // Increased from 0.2 (slower spawn)
-        this.damage = 8; // Increased from 5
-        this.duration = 5; // Increased from 4
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.duration = this.stats.duration;
     }
 
     update(dt: number, _enemies: Entity[]) {
-        // Clean up dead projectiles
         this.projectiles = this.projectiles.filter(p => !p.isDead);
 
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
@@ -217,7 +220,6 @@ export class NanobotSwarmWeapon extends Weapon {
         this.cooldown -= dt * speedBoost * timeSpeed;
 
         if (this.cooldown <= 0) {
-            // Spawn a nanobot
             const count = 1 + Math.floor(this.level / 3);
 
             for (let i = 0; i < count; i++) {
@@ -241,26 +243,33 @@ export class NanobotSwarmWeapon extends Weapon {
 
     upgrade() {
         this.level++;
-        this.damage *= 1.2;
+        this.damage *= this.stats.damageScaling;
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
-// 5. Spore Cloud (Zone)
+// 5. Spore Cloud
 export class SporeCloudWeapon extends ZoneWeapon {
     name = "Spore Cloud";
     emoji = "🍄";
     description = "Leaves damaging zones.";
     zoneEmoji = "🤢";
-    interval = 1; // tick-based damage
+    interval = 1;
+    private stats = getStats('spore_cloud');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 2;
-        this.duration = 5;
-        this.damage = 10;
-        this.area = 50;
+        this.baseCooldown = this.stats.cooldown;
+        this.duration = this.stats.duration;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= this.stats.damageScaling;
+        this.area *= this.stats.areaScaling;
     }
 }
 
@@ -271,28 +280,36 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
     description = "Slow moving orb of destruction.";
     projectileEmoji = "⚫";
     pierce = 999;
+    private stats = getStats('singularity_orb');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 4;
-        this.damage = 50;
-        this.speed = 50; // Changed from 100 to 50 (2x slower)
-        this.area = 600; // Max range
-        this.duration = 12; // 600 / 50 = 12 seconds max travel time
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.speed = this.stats.speed;
+        this.area = this.stats.area;
+        this.duration = this.stats.duration;
+    }
+
+    upgrade() {
+        this.level++;
+        this.damage *= this.stats.damageScaling;
+        this.area *= this.stats.areaScaling;
     }
 }
 
-// 7. Orbital Strike (replaces Rocket Salvo)
+// 7. Orbital Strike
 export class OrbitalStrikeWeapon extends Weapon {
     name = "Orbital Strike";
     emoji = "🛰️";
     description = "Calls down random explosions.";
+    private stats = getStats('orbital_strike');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 2.0;
-        this.damage = 40;
-        this.area = 100; // Explosion radius
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number, _enemies: Entity[]) {
@@ -300,20 +317,17 @@ export class OrbitalStrikeWeapon extends Weapon {
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
-            // Check for evolution
             const isEvolved = this.level >= 6;
 
             if (isEvolved) {
-                // Atomic Bomb Logic
                 const zone = new DelayedExplosionZone(
                     this.owner.pos.x + (Math.random() - 0.5) * 400,
                     this.owner.pos.y + (Math.random() - 0.5) * 300,
-                    500, // Huge radius
-                    4.0, // Very slow fall
-                    (this.owner as any).getDamage(this.damage * 10).damage, // Massive damage
+                    500,
+                    4.0,
+                    (this.owner as any).getDamage(this.damage * 10).damage,
                     '☢️',
                     (pos, amount) => {
-                        // Shockwave effect
                         for (let i = 0; i < 8; i++) {
                             const angle = Math.random() * Math.PI * 2;
                             const dist = 150 + Math.random() * 300;
@@ -330,16 +344,12 @@ export class OrbitalStrikeWeapon extends Weapon {
                         }
                         this.onDamage(pos, amount);
                     },
-                    true // isAtomic
+                    true
                 );
                 this.onSpawn(zone);
-
-                // Very long cooldown for nuke
                 this.cooldown = this.baseCooldown * 5 * (this.owner as any).stats.cooldown;
             } else {
-                // Standard Logic
-                // Level up increases zone count AND area AND damage, but also slightly increases cooldown to balance
-                const count = 1 + Math.floor(this.level / 2);
+                const count = (this.stats.count || 1) + Math.floor((this.level - 1) * (this.stats.countScaling || 0.5));
 
                 for (let i = 0; i < count; i++) {
                     const offsetX = (Math.random() - 0.5) * 1000;
@@ -348,7 +358,7 @@ export class OrbitalStrikeWeapon extends Weapon {
                     const zone = new DelayedExplosionZone(
                         this.owner.pos.x + offsetX,
                         this.owner.pos.y + offsetY,
-                        this.area * (this.owner as any).stats.area * (1 + this.level * 0.1), // Area grows with level
+                        this.area * (this.owner as any).stats.area * (1 + this.level * 0.1),
                         1.0,
                         (this.owner as any).getDamage(this.damage).damage,
                         '💥',
@@ -356,7 +366,6 @@ export class OrbitalStrikeWeapon extends Weapon {
                     );
                     this.onSpawn(zone);
                 }
-                // Cooldown increases slightly with level to prevent spamming too many zones
                 this.cooldown = this.baseCooldown * (1 + this.level * 0.05) * (this.owner as any).stats.cooldown;
             }
         }
@@ -364,25 +373,25 @@ export class OrbitalStrikeWeapon extends Weapon {
 
     upgrade() {
         this.level++;
-        this.damage *= 1.2;
+        this.damage *= this.stats.damageScaling;
+        this.area *= this.stats.areaScaling;
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
-
-
-// 8. Mind Blast (Reworked)
+// 8. Mind Blast
 export class MindBlastWeapon extends Weapon {
     name = "Mind Blast";
     emoji = "🧠";
     description = "Psionic storm at enemy location.";
+    private stats = getStats('mind_blast');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 3;
-        this.damage = 20;
-        this.area = 120;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number, enemies: Entity[]) {
@@ -391,7 +400,6 @@ export class MindBlastWeapon extends Weapon {
         this.cooldown -= dt * speedBoost * timeSpeed;
 
         if (this.cooldown <= 0) {
-            // Find random target
             const targets = enemies.filter(e => distance(this.owner.pos, e.pos) < 600);
 
             if (targets.length > 0) {
@@ -404,7 +412,7 @@ export class MindBlastWeapon extends Weapon {
                     this.area * (this.owner as any).stats.area,
                     (this.owner as any).getDamage(this.damage).damage,
                     (pos, amount) => this.onDamage(pos, amount),
-                    isEvolved ? 2.0 : 0 // 2s stun if evolved
+                    isEvolved ? 2.0 : 0
                 );
                 this.onSpawn(zone);
 
@@ -415,29 +423,30 @@ export class MindBlastWeapon extends Weapon {
 
     upgrade() {
         this.level++;
-        this.damage *= 1.2;
+        this.damage *= this.stats.damageScaling;
+        this.area *= this.stats.areaScaling;
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
-// 9. Chrono Disc - Bouncing disc that ricochets between enemies
+// 9. Chrono Disc
 export class ChronoDiscWeapon extends ProjectileWeapon {
     name = "Chrono Disc";
     emoji = "💿";
     description = "Ricochet disc that bounces between enemies.";
     projectileEmoji = "💿";
-    pierce = 0; // Doesn't pierce, bounces instead
+    pierce = 0;
+    private stats = getStats('chrono_disc');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 2.5;
-        this.damage = 2.67; // Reduced by 3x from 8
-        this.speed = 500;
-        this.duration = 5;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.speed = this.stats.speed;
+        this.duration = this.stats.duration;
     }
 
-    // Override fire to create bouncing projectiles
     fire(target: any) {
         const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
         const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
@@ -447,8 +456,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
         const speed = this.speed * (this.owner as any).stats.speed;
         const velocity = { x: dir.x * speed, y: dir.y * speed };
 
-        // Bounces = 5 + level (starts at 6 bounces, +1 per level)
-        const bounces = 5 + this.level;
+        const bounces = (this.stats.pierce || 5) + this.level;
 
         const projectile = new BouncingProjectile(
             this.owner.pos.x,
@@ -458,7 +466,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
             (this.owner as any).getDamage(this.damage).damage,
             bounces,
             this.projectileEmoji,
-            400 // Bounce range
+            this.stats.area
         );
 
         this.onSpawn(projectile);
@@ -466,22 +474,22 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
 
     upgrade() {
         this.level++;
-        this.damage *= 1.15; // Smaller damage increase
+        this.damage *= this.stats.damageScaling;
     }
 }
 
-
-// 10. Acid Pool (replaces Acid Spit)
+// 10. Acid Pool
 export class AcidPoolWeapon extends Weapon {
     name = "Acid Pool";
     emoji = "🧪";
     description = "Throws acid flasks that create puddles.";
+    private stats = getStats('acid_pool');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 2.0;
-        this.damage = 10;
-        this.area = 80;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number, enemies: Entity[]) {
@@ -489,7 +497,6 @@ export class AcidPoolWeapon extends Weapon {
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
-            // Find target
             let target: any = null;
             let minDst = Infinity;
 
@@ -506,7 +513,7 @@ export class AcidPoolWeapon extends Weapon {
                     this.owner.pos.x,
                     this.owner.pos.y,
                     target.pos,
-                    0.8, // flight time
+                    0.8,
                     '🧪'
                 );
 
@@ -514,9 +521,9 @@ export class AcidPoolWeapon extends Weapon {
                     const zone = new Zone(
                         x, y,
                         this.area * (this.owner as any).stats.area,
-                        3.0 * (this.owner as any).stats.duration,
+                        this.stats.duration * (this.owner as any).stats.duration,
                         (this.owner as any).getDamage(this.damage).damage,
-                        0.5, // tick interval
+                        0.5,
                         '🤢'
                     );
                     this.onSpawn(zone);
@@ -530,49 +537,45 @@ export class AcidPoolWeapon extends Weapon {
 
     upgrade() {
         this.level++;
-        this.damage *= 1.2;
-        this.area *= 1.1;
+        this.damage *= this.stats.damageScaling;
+        this.area *= this.stats.areaScaling;
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
-// 11. Lightning Chain - Chains between enemies
+// 11. Lightning Chain
 export class LightningChainWeapon extends ProjectileWeapon {
     name = "Lightning Chain";
     emoji = "⚡";
     description = "Lightning that chains between enemies.";
     projectileEmoji = "⚡";
-    pierce = 3; // Number of chains per attack
+    pierce = 3;
+    private stats = getStats('lightning_chain');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 2.0;
-        this.damage = 8; // Increased from 5
-        this.speed = 0; // Instant
-        this.duration = 0.3;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.speed = 0;
+        this.duration = this.stats.duration;
     }
 
     fire(target: any) {
         const { damage } = (this.owner as any).getDamage(this.damage);
 
-        // 1. Hit first target immediately
         target.takeDamage(damage);
         this.onDamage(target.pos, damage);
 
-        // 2. Visual beam from player to first target
         const beam = new Beam(this.owner.pos, target.pos, 0.1, '#ffff00', 2);
         this.onSpawn(beam);
 
-        // 3. Start chain logic
-        // Bounces = 5 + weapon level
-        // If evolved (level >= 6), infinite bounces
         const isEvolved = this.level >= 6;
-        const bounces = isEvolved ? 999 : 5 + this.level;
-        const maxChainLength = isEvolved ? 10000 : 800; // Practically infinite for evolved
+        const bounces = isEvolved ? 999 : (this.stats.pierce || 5) + this.level;
+        const maxChainLength = isEvolved ? 10000 : this.stats.area;
 
         const chain = new ChainLightning(target.pos.x, target.pos.y, damage, bounces, maxChainLength);
-        chain.hitEnemies.add(target); // Don't hit first target again
+        chain.hitEnemies.add(target);
 
         chain.onHit = (t: any, d: number) => {
             t.takeDamage(d);
@@ -582,77 +585,75 @@ export class LightningChainWeapon extends ProjectileWeapon {
         this.onSpawn(chain);
     }
 
-
     upgrade() {
         this.level++;
-        this.damage *= 1.2;
-        // Bounces increase automatically via level usage in fire()
+        this.damage *= this.stats.damageScaling;
     }
 }
 
-// 12. Spinning Ember (replaces Flame Whip)
+// 12. Spinning Ember
 export class SpinningEmberWeapon extends Weapon {
     name = "Spinning Ember";
     emoji = "🔥";
     description = "Fireballs that orbit you.";
     projectiles: OrbitingProjectile[] = [];
+    private stats = getStats('spinning_ember');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 3.0;
-        this.damage = 15;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
     }
 
     update(dt: number, _enemies: Entity[]) {
-        // Check if projectiles are dead
         this.projectiles = this.projectiles.filter(p => !p.isDead);
 
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
-            // Spawn set of projectiles
-            const count = 2 + this.level;
-            const duration = 4 * (this.owner as any).stats.duration;
+            const count = (this.stats.count || 2) + Math.floor((this.level - 1) * (this.stats.countScaling || 1));
+            const duration = this.stats.duration * (this.owner as any).stats.duration;
 
             for (let i = 0; i < count; i++) {
                 const angle = (Math.PI * 2 / count) * i;
                 const proj = new OrbitingProjectile(
                     this.owner,
-                    100, // distance
-                    3, // rotation speed
+                    this.stats.area,
+                    this.stats.speed,
                     duration,
                     (this.owner as any).getDamage(this.damage).damage,
                     '🔥'
                 );
-                proj.angle = angle; // Set initial angle
+                proj.angle = angle;
                 this.onSpawn(proj);
                 this.projectiles.push(proj);
             }
 
-            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown + duration; // Cooldown starts after duration? Or overlap? Let's make it wait.
+            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown + duration;
         }
     }
 
     upgrade() {
         this.level++;
-        this.damage *= 1.2;
+        this.damage *= this.stats.damageScaling;
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
-// 13. Frost Nova - Freezing zone weapon
+// 13. Frost Nova
 export class FrostNovaWeapon extends Weapon {
     name = "Frost Nova";
     emoji = "❄️";
     description = "Throws freezing grenades.";
+    private stats = getStats('frost_nova');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 2.5;
-        this.damage = 8;
-        this.area = 120;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number, _enemies: Entity[]) {
@@ -660,7 +661,6 @@ export class FrostNovaWeapon extends Weapon {
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
-            // Throw at random position near player
             const range = 400;
             const offsetX = (Math.random() - 0.5) * 2 * range;
             const offsetY = (Math.random() - 0.5) * 2 * range;
@@ -679,11 +679,11 @@ export class FrostNovaWeapon extends Weapon {
                 const zone = new Zone(
                     x, y,
                     this.area * (this.owner as any).stats.area,
-                    3.0 * (this.owner as any).stats.duration,
+                    this.stats.duration * (this.owner as any).stats.duration,
                     (this.owner as any).getDamage(this.damage).damage,
                     0.5,
                     '❄️',
-                    isEvolved ? 0.9 : 0.5 // 90% slow if evolved
+                    isEvolved ? 0.9 : 0.5
                 );
                 this.onSpawn(zone);
             };
@@ -695,39 +695,39 @@ export class FrostNovaWeapon extends Weapon {
 
     upgrade() {
         this.level++;
-        this.damage *= 1.2;
-        this.area *= 1.1;
+        this.damage *= this.stats.damageScaling;
+        this.area *= this.stats.areaScaling;
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
-// 14. Fan of Knives (replaces Shadow Daggers)
+// 14. Fan of Knives
 export class FanOfKnivesWeapon extends ProjectileWeapon {
     name = "Fan of Knives";
     emoji = "🗡️";
     description = "Fires a spread of knives.";
     projectileEmoji = "🗡️";
     pierce = 2;
+    private stats = getStats('fan_of_knives');
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = 1.5;
-        this.damage = 12;
-        this.speed = 700;
-        this.duration = 1.5;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.speed = this.stats.speed;
+        this.duration = this.stats.duration;
+        this.pierce = this.stats.pierce || 2;
     }
 
     fire(target: any) {
-        // Fire multiple projectiles in a cone
-        const count = 3 + Math.floor(this.level / 2);
-        const spread = Math.PI / 4; // 45 degrees spread
+        const count = (this.stats.count || 3) + Math.floor((this.level - 1) * (this.stats.countScaling || 0.5));
+        const spread = Math.PI / 4;
 
         const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
         const baseAngle = Math.atan2(dir.y, dir.x);
 
         for (let i = 0; i < count; i++) {
-            // Map i to -spread/2 to +spread/2
             const offset = count > 1 ? -spread / 2 + (spread / (count - 1)) * i : 0;
             const angle = baseAngle + offset;
 
@@ -748,5 +748,9 @@ export class FanOfKnivesWeapon extends ProjectileWeapon {
             this.onSpawn(proj);
         }
     }
-}
 
+    upgrade() {
+        this.level++;
+        this.damage *= this.stats.damageScaling;
+    }
+}

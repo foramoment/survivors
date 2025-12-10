@@ -221,6 +221,165 @@ export const WEAPONS = [
     },
 ];
 
+// ============================================
+// WEAPON STATS CONFIG - Easy tuning in one place!
+// ============================================
+// Base stats are applied at level 1
+// Scaling is multiplied per level (e.g. damage *= damageScaling on upgrade)
+// ============================================
+export const WEAPON_STATS: Record<string, {
+    damage: number;
+    damageScaling: number;
+    cooldown: number;
+    area: number;
+    areaScaling: number;
+    speed: number;
+    duration: number;
+    // Optional extras
+    pierce?: number;
+    count?: number;
+    countScaling?: number;
+}> = {
+    void_ray: {
+        damage: 25,
+        damageScaling: 1.2,
+        cooldown: 2.0,
+        area: 1,
+        areaScaling: 1.0,
+        speed: 0,
+        duration: 0.5,
+    },
+    phantom_slash: {
+        damage: 30,
+        damageScaling: 1.2,
+        cooldown: 1.5,
+        area: 250,
+        areaScaling: 1.0,
+        speed: 0,
+        duration: 0.2,
+        count: 3,
+        countScaling: 1, // +1 per level
+    },
+    plasma_cannon: {
+        damage: 40,
+        damageScaling: 1.2,
+        cooldown: 2.5,
+        area: 150,
+        areaScaling: 1.1,
+        speed: 300,
+        duration: 3,
+    },
+    nanobot_swarm: {
+        damage: 0.8, // Nerfed from 8 (10x reduction)
+        damageScaling: 1.2,
+        cooldown: 0.5,
+        area: 1.0,
+        areaScaling: 1.0,
+        speed: 0,
+        duration: 5,
+    },
+    spore_cloud: {
+        damage: 10,
+        damageScaling: 1.2,
+        cooldown: 2,
+        area: 50,
+        areaScaling: 1.1,
+        speed: 0,
+        duration: 5,
+    },
+    singularity_orb: {
+        damage: 50,
+        damageScaling: 1.2,
+        cooldown: 4,
+        area: 600,
+        areaScaling: 1.0,
+        speed: 50,
+        duration: 12,
+        pierce: 999,
+    },
+    orbital_strike: {
+        damage: 40,
+        damageScaling: 1.2,
+        cooldown: 2.0,
+        area: 100,
+        areaScaling: 1.1,
+        speed: 0,
+        duration: 1.0,
+        count: 1,
+        countScaling: 0.5, // +0.5 per level (floored)
+    },
+    mind_blast: {
+        damage: 20,
+        damageScaling: 1.2,
+        cooldown: 3,
+        area: 120,
+        areaScaling: 1.0,
+        speed: 0,
+        duration: 0.5,
+    },
+    chrono_disc: {
+        damage: 2.67,
+        damageScaling: 1.15,
+        cooldown: 2.5,
+        area: 400,
+        areaScaling: 1.0,
+        speed: 500,
+        duration: 5,
+        pierce: 5, // bounces
+    },
+    acid_pool: {
+        damage: 10,
+        damageScaling: 1.2,
+        cooldown: 2.0,
+        area: 80,
+        areaScaling: 1.1,
+        speed: 0,
+        duration: 3.0,
+    },
+    lightning_chain: {
+        damage: 8,
+        damageScaling: 1.2,
+        cooldown: 2.0,
+        area: 800,
+        areaScaling: 1.0,
+        speed: 0,
+        duration: 0.3,
+        pierce: 5, // bounces (base)
+    },
+    spinning_ember: {
+        damage: 15,
+        damageScaling: 1.2,
+        cooldown: 3.0,
+        area: 100,
+        areaScaling: 1.0,
+        speed: 3, // rotation speed
+        duration: 4,
+        count: 2,
+        countScaling: 1, // +1 per level
+    },
+    frost_nova: {
+        damage: 8,
+        damageScaling: 1.2,
+        cooldown: 2.5,
+        area: 120,
+        areaScaling: 1.1,
+        speed: 0,
+        duration: 3.0,
+    },
+    fan_of_knives: {
+        damage: 12,
+        damageScaling: 1.2,
+        cooldown: 1.5,
+        area: 0,
+        areaScaling: 1.0,
+        speed: 700,
+        duration: 1.5,
+        pierce: 2,
+        count: 3,
+        countScaling: 0.5, // +0.5 per level (floored)
+    },
+};
+
 export const ENEMIES = [
     { name: "Snake", hp: 10, speed: 100, damage: 5, xpValue: 1, emoji: "🪱" },
     { name: "Lizard", hp: 20, speed: 80, damage: 8, xpValue: 2, emoji: "🦎" },
