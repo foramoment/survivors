@@ -1,6 +1,7 @@
 import { Weapon } from '../Weapon';
 import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
+import { particles } from '../core/ParticleSystem';
 
 export class Projectile extends Entity {
     velocity: Vector2;
@@ -105,10 +106,9 @@ export class Beam extends Projectile {
     }
 }
 
-export class VoidRayBeam extends Entity {
+export class VoidRayBeam extends Projectile {
     owner: any;
     target: any;
-    canCollide: boolean = false;
     stage: 'charge' | 'fire' | 'fade' = 'charge';
     timer: number = 0;
     chargeTime: number = 0.5;
@@ -119,25 +119,30 @@ export class VoidRayBeam extends Entity {
     color: string = '#bd00ff';
     isEvolved: boolean = false;
     damageDealt: boolean = false;
-    damage: number;
-    onDamage: (pos: Vector2, amount: number) => void;
+    onDamageCallback: (pos: Vector2, amount: number) => void;
+    targetLastPos: Vector2;
 
     constructor(owner: any, target: any, damage: number, isEvolved: boolean, onDamage: (pos: Vector2, amount: number) => void) {
-        super(owner.pos.x, owner.pos.y, 0);
+        super(owner.pos.x, owner.pos.y, { x: 0, y: 0 }, 2, damage, 0, '');
         this.owner = owner;
         this.target = target;
-        this.damage = damage;
-        this.isEvolved = isEvolved;
-        this.onDamage = onDamage;
+        this.onDamageCallback = onDamage;
         this.canCollide = false;
+        this.isEvolved = isEvolved;
+        this.targetLastPos = { x: target.pos.x, y: target.pos.y };
         if (isEvolved) {
             this.maxWidth = 50;
             this.color = '#ff00ff';
         }
     }
 
-    update(dt: number) {
+    update(dt: number, _enemies?: any[]) {
         this.timer += dt;
+
+        // Update target last known position
+        if (this.target && !this.target.isDead) {
+            this.targetLastPos = { x: this.target.pos.x, y: this.target.pos.y };
+        }
 
         if (this.stage === 'charge') {
             if (this.timer >= this.chargeTime) {
@@ -146,12 +151,8 @@ export class VoidRayBeam extends Entity {
                 // Deal damage at start of fire
                 if (this.target && !this.target.isDead) {
                     this.target.takeDamage(this.damage);
-                    this.onDamage(this.target.pos, this.damage);
-
-                    if (this.isEvolved) {
-                        // Explosion at target
-                        // We can spawn a zone or just visual here, but let's keep it simple
-                    }
+                    this.onDamageCallback(this.target.pos, this.damage);
+                    particles.emitHit(this.target.pos.x, this.target.pos.y, this.color);
                 }
             }
         } else if (this.stage === 'fire') {
@@ -167,13 +168,8 @@ export class VoidRayBeam extends Entity {
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        if (!this.target || (this.target.isDead && this.stage === 'charge')) {
-            // If target dies during charge, maybe just fade out or stay at last pos?
-            // For simplicity, keep drawing to last known pos
-        }
-
         const start = this.owner.pos;
-        const end = this.target ? this.target.pos : { x: start.x + 100, y: start.y }; // Fallback
+        const end = this.targetLastPos;
 
         ctx.save();
         ctx.translate(-camera.x, -camera.y);
@@ -187,11 +183,14 @@ export class VoidRayBeam extends Entity {
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
             ctx.stroke();
+            ctx.setLineDash([]); // Reset dash
 
             // Charge gathering at player
             ctx.beginPath();
             ctx.arc(start.x, start.y, 10 + Math.random() * 5, 0, Math.PI * 2);
             ctx.fillStyle = this.color;
+            ctx.shadowColor = this.color;
+            ctx.shadowBlur = 15;
             ctx.fill();
 
         } else if (this.stage === 'fire' || this.stage === 'fade') {
@@ -544,34 +543,68 @@ export class LobbedProjectile extends Projectile {
 
 export class DelayedExplosionZone extends Zone {
     delay: number;
+    initialDelay: number;
     exploded: boolean = false;
     onDamageCallback?: (pos: Vector2, amount: number) => void;
     isAtomic: boolean = false;
 
+    // Animation state
+    private beamWidth: number = 0;
+    private flashAlpha: number = 0;
+    private shockwaveRadius: number = 0;
+    private shockwaveAlpha: number = 0;
+    private particlesEmitted: boolean = false;
+
     constructor(x: number, y: number, radius: number, delay: number, damage: number, emoji: string, onDamage?: (pos: Vector2, amount: number) => void, isAtomic: boolean = false) {
         // extend Zone: duration, damage, interval, emoji
         // Set interval to Infinity so GameManager doesn't apply tick damage
-        super(x, y, radius, delay + 1, damage, Number.MAX_VALUE, emoji);
+        super(x, y, radius, delay + 0.8, damage, Number.MAX_VALUE, emoji);
         this.delay = delay;
+        this.initialDelay = delay;
         this.onDamageCallback = onDamage;
         this.isAtomic = isAtomic;
     }
 
     update(dt: number, enemies?: Entity[]) {
         if (this.exploded) {
-            this.isDead = true;
+            // Post-explosion animation
+            this.shockwaveRadius += dt * this.radius * 4;
+            this.shockwaveAlpha -= dt * 2;
+            this.flashAlpha -= dt * 4;
+
+            if (this.shockwaveAlpha <= 0 && this.flashAlpha <= 0) {
+                this.isDead = true;
+            }
             return;
         }
 
         this.delay -= dt;
+
+        // Beam animation during charge-up
+        const progress = 1 - (this.delay / this.initialDelay);
+        this.beamWidth = progress * (this.isAtomic ? 40 : 15);
+
         if (this.delay <= 0) {
             this.explode(enemies);
             this.exploded = true;
+            this.flashAlpha = 1;
+            this.shockwaveAlpha = 1;
+            this.shockwaveRadius = 0;
         }
     }
 
     explode(enemies?: Entity[]) {
         if (!enemies) return;
+
+        // Emit particles
+        if (!this.particlesEmitted) {
+            this.particlesEmitted = true;
+            if (this.isAtomic) {
+                particles.emitNuclear(this.pos.x, this.pos.y, this.radius);
+            } else {
+                particles.emitOrbitalStrike(this.pos.x, this.pos.y, this.radius);
+            }
+        }
 
         // Deal damage to all enemies in range
         for (const enemy of enemies) {
@@ -588,60 +621,209 @@ export class DelayedExplosionZone extends Zone {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        // Draw warning indicator
-        if (this.delay > 0) {
-            // Incoming strike animation
-            const progress = 1 - this.delay; // 0 to 1 (assuming delay starts at 1)
+        if (!this.exploded) {
+            const progress = 1 - (this.delay / this.initialDelay);
 
-            // Target reticle
+            // === TARGETING PHASE ===
+
+            // Outer target ring (rotating dashed)
+            ctx.save();
+            ctx.rotate(Date.now() / 500);
             ctx.beginPath();
             ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255, 0, 0, 0.5)`;
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = this.isAtomic ? `rgba(255, 200, 0, ${0.5 + Math.sin(Date.now() / 100) * 0.2})` : `rgba(255, 100, 0, ${0.4 + progress * 0.4})`;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([10, 10]);
             ctx.stroke();
-            ctx.setLineDash([]);
+            ctx.restore();
 
-            // Filling circle
+            // Inner targeting circle (filling up)
             ctx.beginPath();
             ctx.arc(0, 0, this.radius * progress, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 50, 0, 0.3)`;
+            const fillGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * progress);
+            if (this.isAtomic) {
+                fillGradient.addColorStop(0, `rgba(255, 255, 100, ${0.4 * progress})`);
+                fillGradient.addColorStop(0.5, `rgba(255, 150, 0, ${0.3 * progress})`);
+                fillGradient.addColorStop(1, `rgba(255, 50, 0, ${0.1 * progress})`);
+            } else {
+                fillGradient.addColorStop(0, `rgba(255, 100, 0, ${0.3 * progress})`);
+                fillGradient.addColorStop(1, `rgba(255, 50, 0, ${0.1 * progress})`);
+            }
+            ctx.fillStyle = fillGradient;
             ctx.fill();
 
-            // Incoming missile line
-            const height = 500 * (1 - progress);
+            // Crosshair lines
+            const crosshairLength = this.radius * 0.3;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 + progress * 0.4})`;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
             ctx.beginPath();
-            ctx.moveTo(0, -height - 50);
-            ctx.lineTo(0, 0);
-            ctx.strokeStyle = 'orange';
-            ctx.lineWidth = 4;
+            // Four crosshair segments
+            ctx.moveTo(-crosshairLength, 0); ctx.lineTo(-crosshairLength * 0.3, 0);
+            ctx.moveTo(crosshairLength * 0.3, 0); ctx.lineTo(crosshairLength, 0);
+            ctx.moveTo(0, -crosshairLength); ctx.lineTo(0, -crosshairLength * 0.3);
+            ctx.moveTo(0, crosshairLength * 0.3); ctx.lineTo(0, crosshairLength);
             ctx.stroke();
+
+            // Center dot
+            ctx.beginPath();
+            ctx.arc(0, 0, 4, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.8 + Math.sin(Date.now() / 50) * 0.2})`;
+            ctx.fill();
+
+            // === BEAM FROM SPACE ===
+            const beamHeight = 800;
+            const beamStartY = -beamHeight;
+
+            // Beam glow (outer)
+            const beamGlowWidth = this.beamWidth * 3;
+            if (beamGlowWidth > 0) {
+                const glowGradient = ctx.createLinearGradient(0, beamStartY, 0, 0);
+                if (this.isAtomic) {
+                    glowGradient.addColorStop(0, `rgba(255, 255, 100, 0)`);
+                    glowGradient.addColorStop(0.3, `rgba(255, 200, 0, ${0.2 * progress})`);
+                    glowGradient.addColorStop(1, `rgba(255, 150, 0, ${0.5 * progress})`);
+                } else {
+                    glowGradient.addColorStop(0, `rgba(255, 150, 50, 0)`);
+                    glowGradient.addColorStop(0.5, `rgba(255, 100, 0, ${0.15 * progress})`);
+                    glowGradient.addColorStop(1, `rgba(255, 80, 0, ${0.4 * progress})`);
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(-beamGlowWidth / 2, beamStartY);
+                ctx.lineTo(beamGlowWidth / 2, beamStartY);
+                ctx.lineTo(beamGlowWidth * 1.5, 0);
+                ctx.lineTo(-beamGlowWidth * 1.5, 0);
+                ctx.closePath();
+                ctx.fillStyle = glowGradient;
+                ctx.fill();
+            }
+
+            // Main beam (core)
+            if (this.beamWidth > 0) {
+                const coreGradient = ctx.createLinearGradient(0, beamStartY, 0, 0);
+                if (this.isAtomic) {
+                    coreGradient.addColorStop(0, `rgba(255, 255, 255, 0.1)`);
+                    coreGradient.addColorStop(0.5, `rgba(255, 255, 200, ${progress})`);
+                    coreGradient.addColorStop(1, `rgba(255, 255, 150, ${progress})`);
+                } else {
+                    coreGradient.addColorStop(0, `rgba(255, 200, 100, 0.1)`);
+                    coreGradient.addColorStop(0.7, `rgba(255, 150, 50, ${0.8 * progress})`);
+                    coreGradient.addColorStop(1, `rgba(255, 200, 100, ${progress})`);
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(-this.beamWidth / 4, beamStartY);
+                ctx.lineTo(this.beamWidth / 4, beamStartY);
+                ctx.lineTo(this.beamWidth, 0);
+                ctx.lineTo(-this.beamWidth, 0);
+                ctx.closePath();
+                ctx.fillStyle = coreGradient;
+                ctx.fill();
+
+                // Sparkle effect at impact point
+                if (progress > 0.5) {
+                    const sparkleAlpha = (progress - 0.5) * 2;
+                    ctx.shadowColor = this.isAtomic ? '#ffff00' : '#ff6600';
+                    ctx.shadowBlur = 30 * sparkleAlpha;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 10 + Math.random() * 5, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${sparkleAlpha})`;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            // Warning text for atomic
+            if (this.isAtomic && progress > 0.3) {
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = `rgba(255, 200, 0, ${Math.sin(Date.now() / 100) * 0.5 + 0.5})`;
+                ctx.fillText('☢️ NUCLEAR STRIKE INCOMING ☢️', 0, -this.radius - 30);
+            }
 
         } else {
-            // Explosion visual
-            ctx.font = `${this.radius * 1.5}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(this.emoji, 0, 0);
+            // === EXPLOSION PHASE ===
 
-            // Shockwave
-            ctx.beginPath();
-            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(255, 200, 50, 0.8)';
-            ctx.lineWidth = 10;
-            ctx.stroke();
-
-            // Inner flash
-            ctx.beginPath();
-            ctx.arc(0, 0, this.radius * 0.8, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255, 255, 200, 0.5)';
-            ctx.fill();
-
-            if (this.isAtomic) {
-                // Mushroom cloud effect (simplified)
-                ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
+            // White flash
+            if (this.flashAlpha > 0) {
                 ctx.beginPath();
-                ctx.arc(0, -this.radius * 0.5, this.radius * 0.6, 0, Math.PI * 2);
+                ctx.arc(0, 0, this.radius * 1.5, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.flashAlpha})`;
+                ctx.fill();
+            }
+
+            // Shockwave ring
+            if (this.shockwaveAlpha > 0) {
+                ctx.beginPath();
+                ctx.arc(0, 0, this.shockwaveRadius, 0, Math.PI * 2);
+
+                if (this.isAtomic) {
+                    ctx.strokeStyle = `rgba(255, 200, 0, ${this.shockwaveAlpha})`;
+                    ctx.lineWidth = 20;
+                } else {
+                    ctx.strokeStyle = `rgba(255, 100, 0, ${this.shockwaveAlpha})`;
+                    ctx.lineWidth = 10;
+                }
+
+                ctx.shadowColor = this.isAtomic ? '#ffcc00' : '#ff6600';
+                ctx.shadowBlur = 20;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // Inner explosion glow
+            if (this.flashAlpha > 0.3) {
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * (1 - this.flashAlpha * 0.3), 0, Math.PI * 2);
+                const explosionGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+                if (this.isAtomic) {
+                    explosionGradient.addColorStop(0, `rgba(255, 255, 200, ${this.flashAlpha})`);
+                    explosionGradient.addColorStop(0.3, `rgba(255, 200, 0, ${this.flashAlpha * 0.8})`);
+                    explosionGradient.addColorStop(0.6, `rgba(255, 100, 0, ${this.flashAlpha * 0.5})`);
+                    explosionGradient.addColorStop(1, `rgba(200, 50, 0, 0)`);
+                } else {
+                    explosionGradient.addColorStop(0, `rgba(255, 255, 200, ${this.flashAlpha})`);
+                    explosionGradient.addColorStop(0.5, `rgba(255, 150, 50, ${this.flashAlpha * 0.6})`);
+                    explosionGradient.addColorStop(1, `rgba(255, 80, 0, 0)`);
+                }
+                ctx.fillStyle = explosionGradient;
+                ctx.fill();
+            }
+
+            // Emoji overlay
+            if (this.flashAlpha > 0.5) {
+                ctx.font = `${this.radius * 1.5}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.globalAlpha = this.flashAlpha;
+                ctx.fillText(this.emoji, 0, 0);
+            }
+
+            // Atomic mushroom cloud effect
+            if (this.isAtomic && this.flashAlpha > 0.1) {
+                const cloudProgress = 1 - this.flashAlpha;
+                const stemHeight = this.radius * 0.8 * cloudProgress;
+                const capRadius = this.radius * 0.6 * cloudProgress;
+
+                // Stem
+                ctx.fillStyle = `rgba(200, 100, 0, ${this.flashAlpha * 0.7})`;
+                ctx.beginPath();
+                ctx.moveTo(-20, 0);
+                ctx.lineTo(20, 0);
+                ctx.lineTo(30, -stemHeight);
+                ctx.lineTo(-30, -stemHeight);
+                ctx.closePath();
+                ctx.fill();
+
+                // Cap
+                ctx.beginPath();
+                ctx.arc(0, -stemHeight - capRadius * 0.3, capRadius, 0, Math.PI * 2);
+                const capGradient = ctx.createRadialGradient(0, -stemHeight - capRadius * 0.3, 0, 0, -stemHeight - capRadius * 0.3, capRadius);
+                capGradient.addColorStop(0, `rgba(255, 200, 100, ${this.flashAlpha * 0.8})`);
+                capGradient.addColorStop(0.5, `rgba(255, 100, 0, ${this.flashAlpha * 0.6})`);
+                capGradient.addColorStop(1, `rgba(100, 50, 0, ${this.flashAlpha * 0.3})`);
+                ctx.fillStyle = capGradient;
                 ctx.fill();
             }
         }

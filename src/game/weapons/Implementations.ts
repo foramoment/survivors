@@ -3,6 +3,7 @@ import { distance, type Vector2 } from '../core/Utils';
 import { Weapon } from '../Weapon';
 import { Entity } from '../Entity';
 import { WEAPON_STATS } from '../data/GameData';
+import { particles } from '../core/ParticleSystem';
 
 // Helper to get stats for a weapon
 function getStats(weaponId: string) {
@@ -518,6 +519,7 @@ export class AcidPoolWeapon extends Weapon {
                 );
 
                 lob.onLand = (x, y) => {
+                    particles.emitPoison(x, y);
                     const zone = new Zone(
                         x, y,
                         this.area * (this.owner as any).stats.area,
@@ -566,6 +568,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
 
         target.takeDamage(damage);
         this.onDamage(target.pos, damage);
+        particles.emitLightning(target.pos.x, target.pos.y);
 
         const beam = new Beam(this.owner.pos, target.pos, 0.1, '#ffff00', 2);
         this.onSpawn(beam);
@@ -580,6 +583,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
         chain.onHit = (t: any, d: number) => {
             t.takeDamage(d);
             this.onDamage(t.pos, d);
+            particles.emitLightning(t.pos.x, t.pos.y);
         };
 
         this.onSpawn(chain);
@@ -676,6 +680,7 @@ export class FrostNovaWeapon extends Weapon {
 
             lob.onLand = (x, y) => {
                 const isEvolved = this.level >= 6;
+                particles.emitFrost(x, y);
                 const zone = new Zone(
                     x, y,
                     this.area * (this.owner as any).stats.area,

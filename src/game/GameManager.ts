@@ -6,6 +6,7 @@ import { CLASSES, POWERUPS, ENEMIES, WEAPONS } from './data/GameData';
 import { checkCollision, type Vector2, distance } from './core/Utils';
 import { Projectile, Zone, BouncingProjectile } from './weapons/WeaponTypes';
 import { SpatialHashGrid } from './core/SpatialHash';
+import { particles } from './core/ParticleSystem';
 
 type GameState = 'MENU' | 'PLAYING' | 'LEVEL_UP' | 'GAME_OVER';
 
@@ -424,6 +425,10 @@ export class GameManager {
                             this.spawnDamageNumber(e.pos, p.damage);
                             p.markHit(e);
 
+                            // Emit hit particles based on emoji
+                            const hitColor = this.getProjectileColor(p.emoji);
+                            particles.emitHit(e.pos.x, e.pos.y, hitColor);
+
                             // Try to bounce to another enemy
                             if (p.bouncesLeft > 0) {
                                 let nearestEnemy: Enemy | null = null;
@@ -451,6 +456,11 @@ export class GameManager {
                     } else if (p instanceof Projectile) {
                         e.takeDamage(p.damage);
                         this.spawnDamageNumber(e.pos, p.damage);
+
+                        // Emit hit particles based on emoji
+                        const hitColor = this.getProjectileColor(p.emoji);
+                        particles.emitHit(e.pos.x, e.pos.y, hitColor);
+
                         if (p.pierce !== undefined) {
                             p.pierce--;
                             if (p.pierce < 0) p.isDead = true;
@@ -533,6 +543,7 @@ export class GameManager {
         this.camera.x = this.player.pos.x - this.canvas.width / 2;
         this.camera.y = this.player.pos.y - this.canvas.height / 2;
 
+        this.updateParticles(dt);
         this.updateHUD();
     }
 
@@ -631,6 +642,9 @@ export class GameManager {
             if (p instanceof Projectile) p.draw(ctx, this.camera);
         });
 
+        // Draw particles
+        particles.draw(ctx, this.camera);
+
         ctx.font = '20px Arial';
         ctx.fillStyle = 'white';
         ctx.textAlign = 'center';
@@ -676,5 +690,32 @@ export class GameManager {
             ctx.lineTo(this.canvas.width, y);
         }
         ctx.stroke();
+    }
+
+    getProjectileColor(emoji: string): string {
+        // Map emojis to particle colors
+        const colorMap: Record<string, string> = {
+            '🔥': '#ff6600',
+            '❄️': '#88ccff',
+            '⚡': '#ffff00',
+            '🟢': '#00ff00',
+            '⚫': '#8800ff',
+            '💿': '#00ffff',
+            '🗡️': '#cccccc',
+            '⚔️': '#ffffff',
+            '🦠': '#88ff00',
+            '🧪': '#00ff88',
+            '🔋': '#00ff00',
+            '💥': '#ff8800',
+            '🛸': '#8888ff',
+            '🧠': '#ff00ff',
+            '☢️': '#ffff00',
+        };
+
+        return colorMap[emoji] || '#ffffff';
+    }
+
+    updateParticles(dt: number) {
+        particles.update(dt);
     }
 }
