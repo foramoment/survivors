@@ -326,6 +326,8 @@ export const WEAPON_STATS: Record<string, {
         speed: 500,
         duration: 5,
         pierce: 5, // bounces
+        count: 1,
+        countScaling: 1, // +1 disc per level
     },
     acid_pool: {
         damage: 10,
@@ -337,9 +339,9 @@ export const WEAPON_STATS: Record<string, {
         duration: 3.0,
     },
     lightning_chain: {
-        damage: 8,
+        damage: 25, // Buffed from 8
         damageScaling: 1.2,
-        cooldown: 2.0,
+        cooldown: 1.8,
         area: 800,
         areaScaling: 1.0,
         speed: 0,

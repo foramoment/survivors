@@ -1,4 +1,4 @@
-import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning, Beam, OrbitingProjectile, LobbedProjectile, DelayedExplosionZone, Projectile, Nanobot, MindBlastZone, VoidRayBeam } from './WeaponTypes';
+import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning, Beam, OrbitingProjectile, LobbedProjectile, DelayedExplosionZone, Projectile, MindBlastZone, VoidRayBeam, FrostZone, AcidZone, SporeZone, SingularityProjectile, PlasmaProjectile, NanobotCloud } from './WeaponTypes';
 import { distance, type Vector2 } from '../core/Utils';
 import { Weapon } from '../Weapon';
 import { Entity } from '../Entity';
@@ -154,39 +154,14 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
 
         const { damage } = (this.owner as any).getDamage(this.damage);
 
-        new Projectile(
+        const plasma = new PlasmaProjectile(
             this.owner.pos.x,
             this.owner.pos.y,
             velocity,
             this.duration,
             damage,
-            0,
-            this.projectileEmoji
+            1 // Low pierce so it explodes on first hit
         );
-
-        const plasma = new BouncingProjectile(
-            this.owner.pos.x,
-            this.owner.pos.y,
-            velocity,
-            this.duration,
-            damage,
-            0,
-            this.projectileEmoji
-        );
-
-        plasma.onBounce = (p) => {
-            const zone = new DelayedExplosionZone(
-                p.pos.x,
-                p.pos.y,
-                this.area * (this.owner as any).stats.area,
-                0,
-                damage,
-                '💥',
-                (pos, amt) => this.onDamage(pos, amt)
-            );
-            this.onSpawn(zone);
-            p.isDead = true;
-        };
 
         this.onSpawn(plasma);
     }
@@ -203,7 +178,7 @@ export class NanobotSwarmWeapon extends Weapon {
     name = "Nanobot Swarm";
     emoji = "🦠";
     description = "Swarm of nanobots that devour enemies.";
-    projectiles: Nanobot[] = [];
+    private activeCloud: NanobotCloud | null = null;
     private stats = getStats('nanobot_swarm');
 
     constructor(owner: any) {
@@ -211,32 +186,33 @@ export class NanobotSwarmWeapon extends Weapon {
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
         this.duration = this.stats.duration;
+        this.area = this.stats.area;
     }
 
     update(dt: number, _enemies: Entity[]) {
-        this.projectiles = this.projectiles.filter(p => !p.isDead);
-
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
 
-        if (this.cooldown <= 0) {
-            const count = 1 + Math.floor(this.level / 3);
+        // Clean up dead cloud
+        if (this.activeCloud && this.activeCloud.isDead) {
+            this.activeCloud = null;
+        }
 
-            for (let i = 0; i < count; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const dist = 50 + Math.random() * 100 * (this.owner as any).stats.area;
+        if (this.cooldown <= 0 && !this.activeCloud) {
+            const radius = 60 + this.level * 10 * (this.owner as any).stats.area;
+            const baseInterval = Math.max(0.1, 0.5 - (this.owner as any).stats.tick);
+            const boostedInterval = baseInterval / speedBoost;
 
-                const bot = new Nanobot(
-                    this.owner,
-                    dist,
-                    angle,
-                    this.duration * (this.owner as any).stats.duration,
-                    (this.owner as any).getDamage(this.damage).damage
-                );
-                this.onSpawn(bot);
-                this.projectiles.push(bot);
-            }
+            const cloud = new NanobotCloud(
+                this.owner,
+                radius,
+                this.duration * (this.owner as any).stats.duration,
+                (this.owner as any).getDamage(this.damage).damage,
+                Math.max(0.05, boostedInterval)
+            );
+            this.onSpawn(cloud);
+            this.activeCloud = cloud;
 
             this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
         }
@@ -245,6 +221,7 @@ export class NanobotSwarmWeapon extends Weapon {
     upgrade() {
         this.level++;
         this.damage *= this.stats.damageScaling;
+        this.area *= 1.1;
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
@@ -255,7 +232,7 @@ export class SporeCloudWeapon extends ZoneWeapon {
     name = "Spore Cloud";
     emoji = "🍄";
     description = "Leaves damaging zones.";
-    zoneEmoji = "🤢";
+    zoneEmoji = "";
     interval = 1;
     private stats = getStats('spore_cloud');
 
@@ -265,6 +242,24 @@ export class SporeCloudWeapon extends ZoneWeapon {
         this.duration = this.stats.duration;
         this.damage = this.stats.damage;
         this.area = this.stats.area;
+    }
+
+    spawnZone() {
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const baseInterval = Math.max(0.1, this.interval - (this.owner as any).stats.tick);
+        const boostedInterval = baseInterval / speedBoost;
+
+        const { damage } = (this.owner as any).getDamage(this.damage);
+
+        const zone = new SporeZone(
+            this.owner.pos.x,
+            this.owner.pos.y,
+            this.area * (this.owner as any).stats.area,
+            this.duration * (this.owner as any).stats.duration,
+            damage,
+            Math.max(0.01, boostedInterval)
+        );
+        this.onSpawn(zone);
     }
 
     upgrade() {
@@ -279,7 +274,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
     name = "Singularity Orb";
     emoji = "⚫";
     description = "Slow moving orb of destruction.";
-    projectileEmoji = "⚫";
+    projectileEmoji = "";
     pierce = 999;
     private stats = getStats('singularity_orb');
 
@@ -290,6 +285,30 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
         this.speed = this.stats.speed;
         this.area = this.stats.area;
         this.duration = this.stats.duration;
+    }
+
+    fire(target: Entity) {
+        const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
+        const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+        dir.x /= len;
+        dir.y /= len;
+
+        const speed = this.speed * (this.owner as any).stats.speed;
+        const velocity = { x: dir.x * speed, y: dir.y * speed };
+
+        const { damage } = (this.owner as any).getDamage(this.damage);
+        const isEvolved = this.level >= 6;
+
+        const proj = new SingularityProjectile(
+            this.owner.pos.x,
+            this.owner.pos.y,
+            velocity,
+            this.duration * (this.owner as any).stats.duration,
+            damage,
+            this.pierce
+        );
+        proj.pullStrength = isEvolved ? 150 : 80;
+        this.onSpawn(proj);
     }
 
     upgrade() {
@@ -439,6 +458,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
     projectileEmoji = "💿";
     pierce = 0;
     private stats = getStats('chrono_disc');
+    private pendingDiscs: { delay: number; target: Entity }[] = [];
 
     constructor(owner: any) {
         super(owner);
@@ -446,6 +466,52 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
         this.damage = this.stats.damage;
         this.speed = this.stats.speed;
         this.duration = this.stats.duration;
+    }
+
+    update(dt: number, enemies: Entity[]) {
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
+
+        // Process pending discs (staggered spawn)
+        for (let i = this.pendingDiscs.length - 1; i >= 0; i--) {
+            this.pendingDiscs[i].delay -= dt;
+            if (this.pendingDiscs[i].delay <= 0) {
+                this.fire(this.pendingDiscs[i].target);
+                this.pendingDiscs.splice(i, 1);
+            }
+        }
+
+        if (this.cooldown <= 0) {
+            let target: Entity | null = null;
+            let minDst = Infinity;
+
+            for (const enemy of enemies) {
+                const dst = distance(this.owner.pos, enemy.pos);
+                if (dst < this.area * (this.owner as any).stats.area && dst < minDst) {
+                    minDst = dst;
+                    target = enemy;
+                }
+            }
+
+            if (target) {
+                // Calculate disc count from stats
+                const count = (this.stats.count || 1) + Math.floor((this.level - 1) * (this.stats.countScaling || 0));
+
+                // First disc fires immediately
+                this.fire(target);
+
+                // Additional discs spawn with stagger
+                for (let i = 1; i < count; i++) {
+                    this.pendingDiscs.push({
+                        delay: i * 0.2, // 0.2s between each disc
+                        target: target
+                    });
+                }
+
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            }
+        }
     }
 
     fire(target: any) {
@@ -520,13 +586,12 @@ export class AcidPoolWeapon extends Weapon {
 
                 lob.onLand = (x, y) => {
                     particles.emitPoison(x, y);
-                    const zone = new Zone(
+                    const zone = new AcidZone(
                         x, y,
                         this.area * (this.owner as any).stats.area,
                         this.stats.duration * (this.owner as any).stats.duration,
                         (this.owner as any).getDamage(this.damage).damage,
-                        0.5,
-                        '🤢'
+                        0.5
                     );
                     this.onSpawn(zone);
                 };
@@ -681,13 +746,12 @@ export class FrostNovaWeapon extends Weapon {
             lob.onLand = (x, y) => {
                 const isEvolved = this.level >= 6;
                 particles.emitFrost(x, y);
-                const zone = new Zone(
+                const zone = new FrostZone(
                     x, y,
                     this.area * (this.owner as any).stats.area,
                     this.stats.duration * (this.owner as any).stats.duration,
                     (this.owner as any).getDamage(this.damage).damage,
                     0.5,
-                    '❄️',
                     isEvolved ? 0.9 : 0.5
                 );
                 this.onSpawn(zone);

@@ -391,6 +391,223 @@ export class ParticleSystem {
         });
     }
 
+    // === NEW WEAPON EFFECTS ===
+
+    emitAcidBubble(x: number, y: number, radius: number) {
+        // Rising bubbles
+        this.emit({
+            x: x + (Math.random() - 0.5) * radius,
+            y: y + (Math.random() - 0.5) * radius * 0.5,
+            count: 2,
+            color: ['#00ff00', '#44ff44', '#88ff00'],
+            speed: 40,
+            speedVariation: 0.5,
+            size: 4 + Math.random() * 4,
+            sizeEnd: 0,
+            life: 0.8,
+            lifeVariation: 0.3,
+            spread: Math.PI * 0.3,
+            angle: -Math.PI / 2, // Upward
+            gravity: -30,
+            glow: true,
+            glowSize: 5,
+            shape: 'circle'
+        });
+    }
+
+    emitColdMist(x: number, y: number, radius: number) {
+        // Rising cold vapor
+        this.emit({
+            x: x + (Math.random() - 0.5) * radius,
+            y: y + (Math.random() - 0.5) * radius * 0.3,
+            count: 3,
+            color: ['#aaddff', '#88ccff', '#ffffff', '#cceeff'],
+            speed: 25,
+            speedVariation: 0.6,
+            size: 8,
+            sizeVariation: 0.5,
+            sizeEnd: 15,
+            life: 1.2,
+            lifeVariation: 0.3,
+            spread: Math.PI * 0.4,
+            angle: -Math.PI / 2,
+            gravity: -20,
+            shape: 'circle'
+        });
+    }
+
+    emitSporeCloud(x: number, y: number, radius: number) {
+        // Floating spore particles
+        this.emit({
+            x: x + (Math.random() - 0.5) * radius,
+            y: y + (Math.random() - 0.5) * radius,
+            count: 4,
+            color: ['#885500', '#aa7700', '#664400', '#997700'],
+            speed: 15,
+            speedVariation: 1.0,
+            size: 3,
+            sizeVariation: 0.5,
+            sizeEnd: 1,
+            life: 2.0,
+            lifeVariation: 0.5,
+            spread: Math.PI * 2,
+            gravity: -10,
+            shape: 'circle'
+        });
+    }
+
+    emitPsionicWave(x: number, y: number, radius: number) {
+        // Psionic energy burst
+        this.emit({
+            x, y,
+            count: 25,
+            color: ['#ff00ff', '#cc00ff', '#ff66ff', '#aa00cc'],
+            speed: radius * 2,
+            speedVariation: 0.3,
+            size: 8,
+            sizeEnd: 2,
+            life: 0.4,
+            spread: Math.PI * 2,
+            glow: true,
+            glowSize: 15,
+            shape: 'circle'
+        });
+
+        // Inner sparks
+        this.emit({
+            x, y,
+            count: 15,
+            color: ['#ffffff', '#ffccff'],
+            speed: radius * 3,
+            speedVariation: 0.5,
+            size: 3,
+            sizeEnd: 0,
+            life: 0.3,
+            spread: Math.PI * 2,
+            glow: true,
+            glowSize: 8,
+            shape: 'spark'
+        });
+    }
+
+    emitPsionicCharge(x: number, y: number) {
+        // Charging particles converging
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 30 + Math.random() * 20;
+        this.emit({
+            x: x + Math.cos(angle) * dist,
+            y: y + Math.sin(angle) * dist,
+            count: 1,
+            color: ['#ff00ff', '#cc00ff'],
+            speed: 80,
+            size: 4,
+            sizeEnd: 0,
+            life: 0.3,
+            angle: angle + Math.PI, // Toward center
+            spread: 0.2,
+            glow: true,
+            glowSize: 8,
+            shape: 'circle'
+        });
+    }
+
+    emitNanoSwarm(x: number, y: number, radius: number) {
+        // Tiny swarming particles
+        this.emit({
+            x: x + (Math.random() - 0.5) * radius * 2,
+            y: y + (Math.random() - 0.5) * radius * 2,
+            count: 3,
+            color: ['#00ffff', '#00cccc', '#00ffaa', '#44ffff'],
+            speed: 50,
+            speedVariation: 1.0,
+            size: 2,
+            sizeVariation: 0.5,
+            sizeEnd: 1,
+            life: 0.4,
+            lifeVariation: 0.3,
+            spread: Math.PI * 2,
+            glow: true,
+            glowSize: 4,
+            shape: 'square'
+        });
+    }
+
+    emitSingularityDistortion(x: number, y: number, radius: number) {
+        // Spiraling particles being sucked in
+        for (let i = 0; i < 3; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = radius + Math.random() * 20;
+            this.emit({
+                x: x + Math.cos(angle) * dist,
+                y: y + Math.sin(angle) * dist,
+                count: 1,
+                color: ['#8800ff', '#4400aa', '#6600cc'],
+                speed: 60,
+                size: 3,
+                sizeEnd: 0,
+                life: 0.5,
+                angle: angle + Math.PI + 0.5, // Spiral inward
+                spread: 0.3,
+                glow: true,
+                glowSize: 6,
+                shape: 'circle'
+            });
+        }
+    }
+
+    emitPlasmaEnergy(x: number, y: number) {
+        // Plasma trail particles
+        this.emit({
+            x, y,
+            count: 4,
+            color: ['#00ff00', '#44ff44', '#00ff88', '#88ff00'],
+            speed: 30,
+            speedVariation: 0.8,
+            size: 6,
+            sizeVariation: 0.5,
+            sizeEnd: 0,
+            life: 0.4,
+            spread: Math.PI * 2,
+            glow: true,
+            glowSize: 10,
+            shape: 'circle'
+        });
+    }
+
+    emitPlasmaExplosion(x: number, y: number, radius: number) {
+        // Plasma burst
+        this.emit({
+            x, y,
+            count: 30,
+            color: ['#00ff00', '#44ff88', '#00ffaa', '#88ff44'],
+            speed: radius * 2,
+            speedVariation: 0.5,
+            size: 10,
+            sizeEnd: 0,
+            life: 0.4,
+            spread: Math.PI * 2,
+            glow: true,
+            glowSize: 15,
+            shape: 'circle'
+        });
+
+        // Core flash
+        this.emit({
+            x, y,
+            count: 10,
+            color: ['#ffffff', '#ccffcc'],
+            speed: radius * 1.5,
+            size: 5,
+            sizeEnd: 0,
+            life: 0.2,
+            spread: Math.PI * 2,
+            glow: true,
+            glowSize: 20,
+            shape: 'spark'
+        });
+    }
+
+
     update(dt: number) {
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];

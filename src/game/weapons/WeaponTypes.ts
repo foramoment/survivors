@@ -106,6 +106,151 @@ export class Beam extends Projectile {
     }
 }
 
+// === SPECIALIZED PROJECTILES ===
+
+export class SingularityProjectile extends Projectile {
+    private particleTimer: number = 0;
+    private rotation: number = 0;
+    pullStrength: number = 80;
+
+    constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number) {
+        super(x, y, velocity, duration, damage, pierce, '');
+        this.radius = 20;
+    }
+
+    update(dt: number, enemies?: Entity[]) {
+        super.update(dt, enemies);
+        this.rotation += dt * 3;
+
+        // Emit particles
+        this.particleTimer += dt;
+        if (this.particleTimer > 0.08) {
+            this.particleTimer = 0;
+            particles.emitSingularityDistortion(this.pos.x, this.pos.y, this.radius);
+        }
+
+        // Pull enemies toward singularity
+        if (enemies) {
+            for (const enemy of enemies) {
+                const dx = this.pos.x - enemy.pos.x;
+                const dy = this.pos.y - enemy.pos.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 200 && dist > 5) {
+                    const pullForce = this.pullStrength / dist;
+                    (enemy as any).pos.x += (dx / dist) * pullForce * dt;
+                    (enemy as any).pos.y += (dy / dist) * pullForce * dt;
+                }
+            }
+        }
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+
+        // Outer distortion ring
+        ctx.strokeStyle = 'rgba(100, 0, 200, 0.5)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 2, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Swirling effect
+        ctx.rotate(this.rotation);
+        for (let i = 0; i < 4; i++) {
+            ctx.rotate(Math.PI / 2);
+            ctx.beginPath();
+            ctx.arc(this.radius * 0.5, 0, 4, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(150, 50, 255, 0.6)`;
+            ctx.fill();
+        }
+        ctx.rotate(-this.rotation);
+
+        // Inner dark core
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+        gradient.addColorStop(0, 'rgba(20, 0, 40, 1)');
+        gradient.addColorStop(0.5, 'rgba(60, 0, 120, 0.8)');
+        gradient.addColorStop(1, 'rgba(100, 50, 200, 0.3)');
+
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.shadowColor = '#8800ff';
+        ctx.shadowBlur = 20;
+        ctx.fill();
+
+        // Event horizon ring
+        ctx.strokeStyle = 'rgba(255, 200, 255, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    }
+}
+
+export class PlasmaProjectile extends Projectile {
+    private particleTimer: number = 0;
+
+    constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number) {
+        super(x, y, velocity, duration, damage, pierce, '');
+        this.radius = 15;
+    }
+
+    update(dt: number, enemies?: Entity[]) {
+        super.update(dt, enemies);
+
+        // Emit plasma trail
+        this.particleTimer += dt;
+        if (this.particleTimer > 0.05) {
+            this.particleTimer = 0;
+            particles.emitPlasmaEnergy(this.pos.x, this.pos.y);
+        }
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+
+        // Outer glow
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 255, 100, 0.2)';
+        ctx.shadowColor = '#00ff00';
+        ctx.shadowBlur = 20;
+        ctx.fill();
+
+        // Plasma core
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+        gradient.addColorStop(0, 'rgba(200, 255, 200, 1)');
+        gradient.addColorStop(0.4, 'rgba(100, 255, 100, 0.9)');
+        gradient.addColorStop(1, 'rgba(0, 200, 50, 0.5)');
+
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Energy sparks
+        const time = Date.now() / 100;
+        for (let i = 0; i < 4; i++) {
+            const angle = time + i * Math.PI / 2;
+            const sparkX = Math.cos(angle) * this.radius * 0.6;
+            const sparkY = Math.sin(angle) * this.radius * 0.6;
+            ctx.beginPath();
+            ctx.arc(sparkX, sparkY, 3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.fill();
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    }
+}
+
 export class VoidRayBeam extends Projectile {
     owner: any;
     target: any;
@@ -309,18 +454,103 @@ export class ChainLightning extends Projectile {
         ctx.translate(-camera.x, -camera.y);
 
         for (const seg of this.segments) {
-            ctx.beginPath();
-            ctx.moveTo(seg.start.x, seg.start.y);
-            ctx.lineTo(seg.end.x, seg.end.y);
-
-            ctx.strokeStyle = `rgba(100, 200, 255, ${seg.alpha})`;
-            ctx.lineWidth = 2;
-            ctx.shadowColor = '#00ffff';
-            ctx.shadowBlur = 5;
-            ctx.stroke();
+            this.drawLightningBolt(ctx, seg.start, seg.end, seg.alpha);
         }
 
+        // Reset all styles
         ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+
+    private drawLightningBolt(ctx: CanvasRenderingContext2D, start: Vector2, end: Vector2, alpha: number) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Safety checks
+        if (dist < 5 || !isFinite(dist) || !isFinite(alpha) || alpha <= 0) return;
+
+        ctx.save();
+
+        // Generate zigzag points
+        const numSegments = Math.min(15, Math.max(4, Math.floor(dist / 30)));
+        const points: Vector2[] = [{ x: start.x, y: start.y }];
+
+        const perpX = -dy / dist;
+        const perpY = dx / dist;
+
+        for (let i = 1; i < numSegments; i++) {
+            const t = i / numSegments;
+            const baseX = start.x + dx * t;
+            const baseY = start.y + dy * t;
+
+            // Random offset perpendicular to line
+            const offset = (Math.random() - 0.5) * 25 * (1 - Math.abs(t - 0.5) * 1.5);
+            points.push({
+                x: baseX + perpX * offset,
+                y: baseY + perpY * offset
+            });
+        }
+        points.push({ x: end.x, y: end.y });
+
+        // Draw glow layer
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.strokeStyle = `rgba(100, 200, 255, ${alpha * 0.3})`;
+        ctx.lineWidth = 10;
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 20;
+        ctx.stroke();
+
+        // Draw main bolt
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.strokeStyle = `rgba(150, 230, 255, ${alpha * 0.8})`;
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+
+        // Draw bright core
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 5;
+        ctx.stroke();
+
+        // Draw small branches
+        if (alpha > 0.4 && dist > 40) {
+            for (let i = 2; i < points.length - 1; i += 2) {
+                if (Math.random() > 0.6) {
+                    const branchAngle = (Math.random() - 0.5) * Math.PI * 0.5;
+                    const branchLen = 10 + Math.random() * 20;
+                    const angle = Math.atan2(dy, dx) + branchAngle;
+
+                    ctx.beginPath();
+                    ctx.moveTo(points[i].x, points[i].y);
+                    ctx.lineTo(
+                        points[i].x + Math.cos(angle) * branchLen,
+                        points[i].y + Math.sin(angle) * branchLen
+                    );
+                    ctx.strokeStyle = `rgba(150, 230, 255, ${alpha * 0.4})`;
+                    ctx.lineWidth = 1;
+                    ctx.shadowBlur = 3;
+                    ctx.stroke();
+                }
+            }
+        }
+
         ctx.restore();
     }
 }
@@ -434,6 +664,285 @@ export class Zone extends Entity {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(this.emoji, 0, 0);
+
+        ctx.restore();
+    }
+}
+
+// === SPECIALIZED ZONES WITH PARTICLE EFFECTS ===
+
+export class FrostZone extends Zone {
+    private particleTimer: number = 0;
+    private iceShards: { x: number; y: number; angle: number; size: number }[] = [];
+
+    constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number, slowEffect: number = 0.5) {
+        super(x, y, radius, duration, damage, interval, '', slowEffect);
+        // Generate ice shards
+        for (let i = 0; i < 8; i++) {
+            this.iceShards.push({
+                x: (Math.random() - 0.5) * radius * 1.5,
+                y: (Math.random() - 0.5) * radius * 1.5,
+                angle: Math.random() * Math.PI * 2,
+                size: 5 + Math.random() * 10
+            });
+        }
+    }
+
+    update(dt: number) {
+        super.update(dt);
+        this.particleTimer += dt;
+        if (this.particleTimer > 0.1) {
+            this.particleTimer = 0;
+            particles.emitColdMist(this.pos.x, this.pos.y, this.radius);
+        }
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+
+        // Icy gradient background
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+        gradient.addColorStop(0, 'rgba(100, 200, 255, 0.4)');
+        gradient.addColorStop(0.7, 'rgba(150, 220, 255, 0.2)');
+        gradient.addColorStop(1, 'rgba(200, 240, 255, 0.05)');
+
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Frost edge
+        ctx.strokeStyle = 'rgba(200, 240, 255, 0.6)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([5, 10]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Ice shards
+        ctx.fillStyle = 'rgba(200, 240, 255, 0.7)';
+        for (const shard of this.iceShards) {
+            ctx.save();
+            ctx.translate(shard.x, shard.y);
+            ctx.rotate(shard.angle);
+            ctx.beginPath();
+            ctx.moveTo(0, -shard.size);
+            ctx.lineTo(shard.size * 0.3, shard.size * 0.5);
+            ctx.lineTo(-shard.size * 0.3, shard.size * 0.5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+}
+
+export class AcidZone extends Zone {
+    private particleTimer: number = 0;
+    private bubbles: { x: number; y: number; size: number; speed: number; offset: number }[] = [];
+
+    constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number) {
+        super(x, y, radius, duration, damage, interval, '', 0);
+        // Generate initial bubbles
+        for (let i = 0; i < 12; i++) {
+            this.bubbles.push({
+                x: (Math.random() - 0.5) * radius * 1.6,
+                y: (Math.random() - 0.5) * radius * 1.6,
+                size: 3 + Math.random() * 6,
+                speed: 20 + Math.random() * 30,
+                offset: Math.random() * Math.PI * 2
+            });
+        }
+    }
+
+    update(dt: number) {
+        super.update(dt);
+
+        // Animate bubbles
+        for (const bubble of this.bubbles) {
+            bubble.y -= bubble.speed * dt;
+            if (bubble.y < -this.radius) {
+                bubble.y = this.radius * 0.8;
+                bubble.x = (Math.random() - 0.5) * this.radius * 1.6;
+            }
+        }
+
+        this.particleTimer += dt;
+        if (this.particleTimer > 0.15) {
+            this.particleTimer = 0;
+            particles.emitAcidBubble(this.pos.x, this.pos.y, this.radius);
+        }
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+
+        // Toxic gradient
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+        gradient.addColorStop(0, 'rgba(0, 255, 0, 0.5)');
+        gradient.addColorStop(0.5, 'rgba(50, 200, 0, 0.35)');
+        gradient.addColorStop(1, 'rgba(100, 150, 0, 0.1)');
+
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Bubbling edge
+        ctx.strokeStyle = 'rgba(100, 255, 50, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw bubbles
+        for (const bubble of this.bubbles) {
+            const dist = Math.sqrt(bubble.x * bubble.x + bubble.y * bubble.y);
+            if (dist < this.radius) {
+                ctx.beginPath();
+                ctx.arc(bubble.x, bubble.y, bubble.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(150, 255, 100, ${0.3 + Math.sin(Date.now() / 200 + bubble.offset) * 0.2})`;
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(100, 255, 50, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
+    }
+}
+
+export class SporeZone extends Zone {
+    private particleTimer: number = 0;
+    private spores: { x: number; y: number; vx: number; vy: number; size: number; alpha: number }[] = [];
+
+    constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number) {
+        super(x, y, radius, duration, damage, interval, '', 0);
+        // Generate floating spores
+        for (let i = 0; i < 20; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * radius * 0.9;
+            this.spores.push({
+                x: Math.cos(angle) * dist,
+                y: Math.sin(angle) * dist,
+                vx: (Math.random() - 0.5) * 20,
+                vy: (Math.random() - 0.5) * 20 - 10,
+                size: 2 + Math.random() * 4,
+                alpha: 0.3 + Math.random() * 0.5
+            });
+        }
+    }
+
+    update(dt: number) {
+        super.update(dt);
+
+        // Animate spores
+        for (const spore of this.spores) {
+            spore.x += spore.vx * dt;
+            spore.y += spore.vy * dt;
+
+            // Wrap around
+            const dist = Math.sqrt(spore.x * spore.x + spore.y * spore.y);
+            if (dist > this.radius) {
+                const angle = Math.random() * Math.PI * 2;
+                spore.x = Math.cos(angle) * this.radius * 0.5;
+                spore.y = Math.sin(angle) * this.radius * 0.5;
+            }
+        }
+
+        this.particleTimer += dt;
+        if (this.particleTimer > 0.2) {
+            this.particleTimer = 0;
+            particles.emitSporeCloud(this.pos.x, this.pos.y, this.radius);
+        }
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+
+        // Murky cloud gradient
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+        gradient.addColorStop(0, 'rgba(100, 80, 40, 0.4)');
+        gradient.addColorStop(0.6, 'rgba(80, 60, 30, 0.25)');
+        gradient.addColorStop(1, 'rgba(60, 40, 20, 0.05)');
+
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Draw floating spores
+        for (const spore of this.spores) {
+            ctx.beginPath();
+            ctx.arc(spore.x, spore.y, spore.size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(150, 120, 60, ${spore.alpha})`;
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+}
+
+export class NanobotCloud extends Zone {
+    private particleTimer: number = 0;
+    owner: any;
+
+    constructor(owner: any, radius: number, duration: number, damage: number, interval: number) {
+        super(owner.pos.x, owner.pos.y, radius, duration, damage, interval, '', 0);
+        this.owner = owner;
+    }
+
+    update(dt: number) {
+        // Follow owner
+        this.pos.x = this.owner.pos.x;
+        this.pos.y = this.owner.pos.y;
+
+        super.update(dt);
+
+        // Emit nanobot particles
+        this.particleTimer += dt;
+        if (this.particleTimer > 0.05) {
+            this.particleTimer = 0;
+            particles.emitNanoSwarm(this.pos.x, this.pos.y, this.radius);
+        }
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+
+        // Outer shimmer ring
+        const time = Date.now() / 500;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(0, 255, 255, ${0.3 + Math.sin(time) * 0.1})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Inner field
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+        gradient.addColorStop(0, 'rgba(0, 200, 200, 0.15)');
+        gradient.addColorStop(0.7, 'rgba(0, 150, 150, 0.08)');
+        gradient.addColorStop(1, 'rgba(0, 100, 100, 0)');
+
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Tiny nanobot dots (static visual)
+        ctx.fillStyle = 'rgba(0, 255, 200, 0.6)';
+        for (let i = 0; i < 12; i++) {
+            const angle = time * 0.5 + i * Math.PI / 6;
+            const dist = this.radius * 0.3 + Math.sin(time * 2 + i) * 10;
+            ctx.beginPath();
+            ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         ctx.restore();
     }
@@ -897,14 +1406,17 @@ export class Nanobot extends Projectile {
 }
 
 export class MindBlastZone extends Zone {
-    stage: 'warning' | 'charge' | 'blast' = 'warning';
+    stage: 'warning' | 'charge' | 'blast' | 'fade' = 'warning';
     stageTimer: number = 0;
     onDamageCallback?: (pos: Vector2, amount: number) => void;
     stunDuration: number = 0;
+    private rings: { radius: number; alpha: number }[] = [];
+    private chargeParticleTimer: number = 0;
+    private blastTriggered: boolean = false;
 
     constructor(x: number, y: number, radius: number, damage: number, onDamage?: (pos: Vector2, amount: number) => void, stunDuration: number = 0) {
-        super(x, y, radius, 2.0, damage, 999, '🧠'); // 2s total duration
-        this.interval = 999; // Manual damage handling
+        super(x, y, radius, 2.5, damage, 999, ''); // No emoji
+        this.interval = 999;
         this.onDamageCallback = onDamage;
         this.stunDuration = stunDuration;
     }
@@ -912,26 +1424,55 @@ export class MindBlastZone extends Zone {
     update(dt: number, enemies?: Entity[]) {
         this.stageTimer += dt;
 
+        // Update rings
+        for (let i = this.rings.length - 1; i >= 0; i--) {
+            this.rings[i].radius += 200 * dt;
+            this.rings[i].alpha -= dt * 2;
+            if (this.rings[i].alpha <= 0) this.rings.splice(i, 1);
+        }
+
         if (this.stage === 'warning' && this.stageTimer > 0.5) {
             this.stage = 'charge';
-        } else if (this.stage === 'charge' && this.stageTimer > 1.0) {
-            this.stage = 'blast';
-            // Deal damage once at blast start
-            if (enemies) {
-                enemies.forEach(e => {
-                    if (distance(this.pos, e.pos) <= this.radius) {
-                        (e as any).takeDamage(this.damage);
-                        if (this.onDamageCallback) this.onDamageCallback(e.pos, this.damage);
-
-                        if (this.stunDuration > 0) {
-                            // Apply stun (freeze movement)
-                            // We set a stun timer on the enemy (assuming we add it to Enemy class or just hack it)
-                            (e as any).stunTimer = this.stunDuration;
-                        }
-                    }
-                });
+        } else if (this.stage === 'charge') {
+            // Emit charging particles
+            this.chargeParticleTimer += dt;
+            if (this.chargeParticleTimer > 0.05) {
+                this.chargeParticleTimer = 0;
+                particles.emitPsionicCharge(this.pos.x, this.pos.y);
             }
-        } else if (this.stage === 'blast' && this.stageTimer > 1.5) {
+
+            if (this.stageTimer > 1.0) {
+                this.stage = 'blast';
+                // Emit psionic wave
+                particles.emitPsionicWave(this.pos.x, this.pos.y, this.radius);
+                // Create expanding rings
+                for (let i = 0; i < 3; i++) {
+                    this.rings.push({ radius: 10 + i * 20, alpha: 1.0 });
+                }
+            }
+        } else if (this.stage === 'blast') {
+            if (!this.blastTriggered) {
+                this.blastTriggered = true;
+                // Deal damage once at blast start
+                if (enemies) {
+                    enemies.forEach(e => {
+                        if (distance(this.pos, e.pos) <= this.radius) {
+                            (e as any).takeDamage(this.damage);
+                            if (this.onDamageCallback) this.onDamageCallback(e.pos, this.damage);
+                            particles.emitHit(e.pos.x, e.pos.y, '#ff00ff');
+
+                            if (this.stunDuration > 0) {
+                                (e as any).stunTimer = this.stunDuration;
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (this.stageTimer > 1.8) {
+                this.stage = 'fade';
+            }
+        } else if (this.stage === 'fade' && this.stageTimer > 2.3) {
             this.isDead = true;
         }
     }
@@ -941,42 +1482,78 @@ export class MindBlastZone extends Zone {
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
         if (this.stage === 'warning') {
+            // Pulsing warning circle
+            const pulse = Math.sin(this.stageTimer * 10) * 0.2 + 0.5;
             ctx.beginPath();
             ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255, 0, 255, 0.5)`;
+            ctx.strokeStyle = `rgba(255, 0, 255, ${pulse})`;
             ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
+            ctx.setLineDash([8, 4]);
             ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Center point
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 100, 255, 0.8)';
+            ctx.fill();
+
         } else if (this.stage === 'charge') {
             // Charging effect - gathering energy
             const progress = (this.stageTimer - 0.5) / 0.5;
+
+            // Inner glow
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * progress);
+            gradient.addColorStop(0, 'rgba(255, 100, 255, 0.6)');
+            gradient.addColorStop(0.5, 'rgba(200, 0, 255, 0.3)');
+            gradient.addColorStop(1, 'rgba(150, 0, 200, 0.1)');
+
             ctx.beginPath();
             ctx.arc(0, 0, this.radius * progress, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(200, 0, 255, 0.3)`;
+            ctx.fillStyle = gradient;
             ctx.fill();
 
-            // Random lightning sparks inside
-            for (let i = 0; i < 3; i++) {
-                const ang = Math.random() * Math.PI * 2;
-                const r = Math.random() * this.radius;
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(Math.cos(ang) * r, Math.sin(ang) * r, 2, 2);
+            // Spinning energy lines
+            ctx.strokeStyle = 'rgba(255, 150, 255, 0.6)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 6; i++) {
+                const angle = (this.stageTimer * 3 + i * Math.PI / 3);
+                const len = this.radius * progress * 0.8;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(angle) * len, Math.sin(angle) * len);
+                ctx.stroke();
             }
-        } else if (this.stage === 'blast') {
-            // Blast visual
+
+        } else if (this.stage === 'blast' || this.stage === 'fade') {
+            const fadeAlpha = this.stage === 'fade' ? Math.max(0, 1 - (this.stageTimer - 1.8) / 0.5) : 1;
+
+            // Expanding rings
+            for (const ring of this.rings) {
+                ctx.beginPath();
+                ctx.arc(0, 0, ring.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 100, 255, ${ring.alpha * fadeAlpha})`;
+                ctx.lineWidth = 4;
+                ctx.shadowColor = '#ff00ff';
+                ctx.shadowBlur = 15;
+                ctx.stroke();
+            }
+
+            // Core explosion
+            const coreSize = this.radius * 0.6 * fadeAlpha;
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, coreSize);
+            gradient.addColorStop(0, `rgba(255, 255, 255, ${0.8 * fadeAlpha})`);
+            gradient.addColorStop(0.3, `rgba(255, 100, 255, ${0.6 * fadeAlpha})`);
+            gradient.addColorStop(1, `rgba(150, 0, 200, 0)`);
+
+            ctx.shadowBlur = 25;
             ctx.beginPath();
-            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(150, 0, 255, 0.6)`;
+            ctx.arc(0, 0, coreSize, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
             ctx.fill();
-
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 5;
-            ctx.stroke();
-
-            ctx.font = `${this.radius}px Arial`;
-            ctx.fillText('💥', 0, 0);
         }
 
+        ctx.shadowBlur = 0;
         ctx.restore();
     }
 }

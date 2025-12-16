@@ -625,6 +625,12 @@ export class GameManager {
     draw(ctx: CanvasRenderingContext2D) {
         if (this.state !== 'PLAYING' && this.state !== 'LEVEL_UP') return;
 
+        // Reset canvas state at the start of each frame
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        ctx.globalAlpha = 1;
+        ctx.setLineDash([]);
+
         this.drawGrid(ctx);
 
         this.projectiles.forEach(p => {
@@ -673,9 +679,16 @@ export class GameManager {
     }
 
     drawGrid(ctx: CanvasRenderingContext2D) {
+        ctx.save();
+
         const gridSize = 100;
         const offsetX = -this.camera.x % gridSize;
         const offsetY = -this.camera.y % gridSize;
+
+        // Reset any shadow effects from previous drawing
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+        ctx.globalAlpha = 1;
 
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 1;
@@ -690,6 +703,8 @@ export class GameManager {
             ctx.lineTo(this.canvas.width, y);
         }
         ctx.stroke();
+
+        ctx.restore();
     }
 
     getProjectileColor(emoji: string): string {
