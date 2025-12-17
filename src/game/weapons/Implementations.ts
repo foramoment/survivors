@@ -1,4 +1,5 @@
 import { ProjectileWeapon, ZoneWeapon, Zone, BouncingProjectile, ChainLightning, Beam, OrbitingProjectile, LobbedProjectile, DelayedExplosionZone, Projectile, MindBlastZone, VoidRayBeam, FrostZone, AcidZone, SporeZone, SingularityProjectile, PlasmaProjectile, NanobotCloud } from './WeaponTypes';
+import { ThunderstormLightning, BlackHoleProjectile, BlackHoleZone, AtomicBombZone, DimensionalRiftZone, FusionCoreSingularity, PsychicStormZone, AbsoluteZeroZone } from './EvolutionTypes';
 import { distance, type Vector2 } from '../core/Utils';
 import { Weapon } from '../Weapon';
 import { Entity } from '../Entity';
@@ -49,7 +50,7 @@ export class VoidRayWeapon extends Weapon {
             }
 
             if (target) {
-                const isEvolved = this.level >= 6;
+                const isEvolved = this.evolved;
                 const damage = (this.owner as any).getDamage(this.damage).damage * (isEvolved ? 2 : 1);
 
                 const beam = new VoidRayBeam(
@@ -97,21 +98,37 @@ export class PhantomSlashWeapon extends Weapon {
             const targets = enemies.filter(e => distance(this.owner.pos, e.pos) < this.area * (this.owner as any).stats.area);
 
             if (targets.length > 0) {
-                const count = (this.stats.count || 3) + Math.floor((this.level - 1) * (this.stats.countScaling || 1));
+                const isEvolved = this.evolved;
+                // Evolved: double slashes
+                const baseCount = (this.stats.count || 3) + Math.floor((this.level - 1) * (this.stats.countScaling || 1));
+                const count = isEvolved ? baseCount * 2 : baseCount;
+
                 for (let i = 0; i < count; i++) {
                     if (targets.length === 0) break;
                     const idx = Math.floor(Math.random() * targets.length);
                     const target = targets[idx];
-                    targets.splice(idx, 1);
+
+                    // Evolved: don't remove from targets (hit all)
+                    if (!isEvolved) {
+                        targets.splice(idx, 1);
+                    }
 
                     const { damage } = (this.owner as any).getDamage(this.damage);
                     (target as any).takeDamage(damage);
                     this.onDamage(target.pos, damage);
 
-                    const slash = new Zone(target.pos.x, target.pos.y, 40, 0.2, 0, 1, '⚔️');
-                    this.onSpawn(slash);
+                    if (isEvolved) {
+                        // Dimensional Blade: create rift zone that damages and slows
+                        const rift = new DimensionalRiftZone(target.pos.x, target.pos.y, damage * 0.2);
+                        this.onSpawn(rift);
+                    } else {
+                        const slash = new Zone(target.pos.x, target.pos.y, 40, 0.2, 0, 1, '⚔️');
+                        this.onSpawn(slash);
+                    }
                 }
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+                // Evolved: +30% CD
+                const cdMultiplier = isEvolved ? 1.3 : 1.0;
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown * cdMultiplier;
             }
         }
     }
@@ -143,6 +160,32 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         this.duration = this.stats.duration;
     }
 
+    update(dt: number, enemies: Entity[]) {
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
+
+        if (this.cooldown <= 0) {
+            let target: Entity | null = null;
+            let minDst = this.area * (this.owner as any).stats.area;
+
+            for (const enemy of enemies) {
+                const dst = distance(this.owner.pos, enemy.pos);
+                if (dst < minDst) {
+                    minDst = dst;
+                    target = enemy;
+                }
+            }
+
+            if (target) {
+                this.fire(target);
+                // Evolved: +40% CD
+                const cdMultiplier = this.evolved ? 1.4 : 1.0;
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown * cdMultiplier;
+            }
+        }
+    }
+
     fire(target: any) {
         const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
         const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
@@ -153,6 +196,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         const velocity = { x: dir.x * speed, y: dir.y * speed };
 
         const { damage } = (this.owner as any).getDamage(this.damage);
+        const isEvolved = this.evolved;
 
         const plasma = new PlasmaProjectile(
             this.owner.pos.x,
@@ -162,6 +206,15 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
             damage,
             1 // Low pierce so it explodes on first hit
         );
+
+        // Fusion Core: create pull zone on explosion
+        if (isEvolved) {
+            plasma.onExplosion = (x: number, y: number) => {
+                // Create fusion singularity pull zone
+                const pullZone = new FusionCoreSingularity(x, y, damage * 0.15);
+                this.onSpawn(pullZone);
+            };
+        }
 
         this.onSpawn(plasma);
     }
@@ -277,6 +330,8 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
     projectileEmoji = "";
     pierce = 999;
     private stats = getStats('singularity_orb');
+    private activeBlackHole: any = null;
+    private waitingForCollapse: boolean = false;
 
     constructor(owner: any) {
         super(owner);
@@ -285,6 +340,44 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
         this.speed = this.stats.speed;
         this.area = this.stats.area;
         this.duration = this.stats.duration;
+    }
+
+    update(dt: number, enemies: Entity[]) {
+        const isEvolved = this.evolved;
+
+        // For evolved version, wait for black hole to collapse
+        if (isEvolved && this.waitingForCollapse) {
+            if (this.activeBlackHole && this.activeBlackHole.isDead) {
+                this.waitingForCollapse = false;
+                this.activeBlackHole = null;
+            }
+            return;
+        }
+
+        // Standard cooldown logic
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
+
+        if (this.cooldown <= 0) {
+            let target: Entity | null = null;
+            let minDst = this.area * (this.owner as any).stats.area;
+
+            for (const enemy of enemies) {
+                const dst = distance(this.owner.pos, enemy.pos);
+                if (dst < minDst) {
+                    minDst = dst;
+                    target = enemy;
+                }
+            }
+
+            if (target) {
+                this.fire(target);
+                // Evolved version has +100% cooldown
+                const cdMultiplier = isEvolved ? 2.0 : 1.0;
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown * cdMultiplier;
+            }
+        }
     }
 
     fire(target: Entity) {
@@ -297,24 +390,47 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
         const velocity = { x: dir.x * speed, y: dir.y * speed };
 
         const { damage } = (this.owner as any).getDamage(this.damage);
-        const isEvolved = this.level >= 6;
+        const isEvolved = this.evolved;
 
-        const proj = new SingularityProjectile(
-            this.owner.pos.x,
-            this.owner.pos.y,
-            velocity,
-            this.duration * (this.owner as any).stats.duration,
-            damage,
-            this.pierce
-        );
-        proj.pullStrength = isEvolved ? 150 : 80;
-        this.onSpawn(proj);
+        if (isEvolved) {
+            // Create BlackHoleProjectile for evolved version
+            const proj = new BlackHoleProjectile(
+                this.owner.pos.x,
+                this.owner.pos.y,
+                velocity,
+                this.duration * (this.owner as any).stats.duration,
+                damage,
+                this.pierce
+            );
+
+            // When it dies, create a BlackHoleZone
+            proj.onDeath = (x: number, y: number) => {
+                const zone = new BlackHoleZone(x, y, 100, 3.0, damage * 0.2);
+                this.activeBlackHole = zone;
+                this.onSpawn(zone);
+            };
+
+            this.waitingForCollapse = true;
+            this.onSpawn(proj);
+        } else {
+            const proj = new SingularityProjectile(
+                this.owner.pos.x,
+                this.owner.pos.y,
+                velocity,
+                this.duration * (this.owner as any).stats.duration,
+                damage,
+                this.pierce
+            );
+            proj.pullStrength = 80;
+            this.onSpawn(proj);
+        }
     }
 
     upgrade() {
         this.level++;
         this.damage *= this.stats.damageScaling;
         this.area *= this.stats.areaScaling;
+        // NOTE: Cooldown does NOT decrease on upgrade (new balance rule)
     }
 }
 
@@ -324,6 +440,8 @@ export class OrbitalStrikeWeapon extends Weapon {
     emoji = "🛰️";
     description = "Calls down random explosions.";
     private stats = getStats('orbital_strike');
+    private activeAtomicBomb: any = null;
+    private waitingForExplosion: boolean = false;
 
     constructor(owner: any) {
         super(owner);
@@ -333,41 +451,37 @@ export class OrbitalStrikeWeapon extends Weapon {
     }
 
     update(dt: number, _enemies: Entity[]) {
+        const isEvolved = this.evolved;
+
+        // For evolved version, wait for atomic bomb to complete
+        if (isEvolved && this.waitingForExplosion) {
+            if (this.activeAtomicBomb && this.activeAtomicBomb.isDead) {
+                this.waitingForExplosion = false;
+                this.activeAtomicBomb = null;
+            }
+            return;
+        }
+
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
-        if (this.cooldown <= 0) {
-            const isEvolved = this.level >= 6;
 
+        if (this.cooldown <= 0) {
             if (isEvolved) {
-                const zone = new DelayedExplosionZone(
-                    this.owner.pos.x + (Math.random() - 0.5) * 400,
-                    this.owner.pos.y + (Math.random() - 0.5) * 300,
-                    500,
-                    4.0,
-                    (this.owner as any).getDamage(this.damage * 10).damage,
-                    '☢️',
-                    (pos, amount) => {
-                        for (let i = 0; i < 8; i++) {
-                            const angle = Math.random() * Math.PI * 2;
-                            const dist = 150 + Math.random() * 300;
-                            const miniZone = new DelayedExplosionZone(
-                                pos.x + Math.cos(angle) * dist,
-                                pos.y + Math.sin(angle) * dist,
-                                80,
-                                0.5,
-                                amount * 0.1,
-                                '💥',
-                                (p, a) => this.onDamage(p, a)
-                            );
-                            this.onSpawn(miniZone);
-                        }
-                        this.onDamage(pos, amount);
-                    },
-                    true
+                // ATOMIC BOMB: Single massive explosion with mushroom cloud
+                const atomicBomb = new AtomicBombZone(
+                    this.owner.pos.x + (Math.random() - 0.5) * 300,
+                    this.owner.pos.y + (Math.random() - 0.5) * 200,
+                    300, // Huge radius
+                    (this.owner as any).getDamage(this.damage * 8).damage,
+                    (pos, amount) => this.onDamage(pos, amount)
                 );
-                this.onSpawn(zone);
-                this.cooldown = this.baseCooldown * 5 * (this.owner as any).stats.cooldown;
+                this.activeAtomicBomb = atomicBomb;
+                this.waitingForExplosion = true;
+                this.onSpawn(atomicBomb);
+
+                // Massive cooldown for atomic bomb (8 seconds)
+                this.cooldown = 8.0 * (this.owner as any).stats.cooldown;
             } else {
                 const count = (this.stats.count || 1) + Math.floor((this.level - 1) * (this.stats.countScaling || 0.5));
 
@@ -386,7 +500,7 @@ export class OrbitalStrikeWeapon extends Weapon {
                     );
                     this.onSpawn(zone);
                 }
-                this.cooldown = this.baseCooldown * (1 + this.level * 0.05) * (this.owner as any).stats.cooldown;
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
             }
         }
     }
@@ -395,6 +509,7 @@ export class OrbitalStrikeWeapon extends Weapon {
         this.level++;
         this.damage *= this.stats.damageScaling;
         this.area *= this.stats.areaScaling;
+        // NOTE: Cooldown does NOT decrease on upgrade (new balance rule)
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
@@ -424,17 +539,30 @@ export class MindBlastWeapon extends Weapon {
 
             if (targets.length > 0) {
                 const target = targets[Math.floor(Math.random() * targets.length)];
-                const isEvolved = this.level >= 6;
+                const isEvolved = this.evolved;
 
-                const zone = new MindBlastZone(
-                    target.pos.x,
-                    target.pos.y,
-                    this.area * (this.owner as any).stats.area,
-                    (this.owner as any).getDamage(this.damage).damage,
-                    (pos, amount) => this.onDamage(pos, amount),
-                    isEvolved ? 2.0 : 0
-                );
-                this.onSpawn(zone);
+                if (isEvolved) {
+                    // Psychic Storm: cascading stun zone
+                    const zone = new PsychicStormZone(
+                        target.pos.x,
+                        target.pos.y,
+                        this.area * (this.owner as any).stats.area,
+                        (this.owner as any).getDamage(this.damage).damage,
+                        2.0, // 2s stun
+                        (pos, amount) => this.onDamage(pos, amount)
+                    );
+                    this.onSpawn(zone);
+                } else {
+                    const zone = new MindBlastZone(
+                        target.pos.x,
+                        target.pos.y,
+                        this.area * (this.owner as any).stats.area,
+                        (this.owner as any).getDamage(this.damage).damage,
+                        (pos, amount) => this.onDamage(pos, amount),
+                        0
+                    );
+                    this.onSpawn(zone);
+                }
 
                 this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
             }
@@ -619,6 +747,8 @@ export class LightningChainWeapon extends ProjectileWeapon {
     projectileEmoji = "⚡";
     pierce = 3;
     private stats = getStats('lightning_chain');
+    private activeChain: ChainLightning | ThunderstormLightning | null = null;
+    private waitingForChainComplete: boolean = false;
 
     constructor(owner: any) {
         super(owner);
@@ -628,23 +758,76 @@ export class LightningChainWeapon extends ProjectileWeapon {
         this.duration = this.stats.duration;
     }
 
+    update(dt: number, enemies: Entity[]) {
+        const isEvolved = this.evolved;
+
+        // For evolved version, wait for chain to complete before allowing cooldown refresh
+        if (isEvolved && this.waitingForChainComplete) {
+            if (this.activeChain && this.activeChain.isDead) {
+                this.waitingForChainComplete = false;
+                this.activeChain = null;
+            }
+            return; // Don't update cooldown while chain is active
+        }
+
+        // Standard cooldown logic
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
+
+        if (this.cooldown <= 0) {
+            let target: Entity | null = null;
+            let minDst = this.area * (this.owner as any).stats.area;
+
+            for (const enemy of enemies) {
+                const dst = distance(this.owner.pos, enemy.pos);
+                if (dst < minDst) {
+                    minDst = dst;
+                    target = enemy;
+                }
+            }
+
+            if (target) {
+                this.fire(target);
+                // Evolved version has +50% cooldown
+                const cdMultiplier = isEvolved ? 1.5 : 1.0;
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown * cdMultiplier;
+            }
+        }
+    }
+
     fire(target: any) {
         const { damage } = (this.owner as any).getDamage(this.damage);
+        const isEvolved = this.evolved;
 
         target.takeDamage(damage);
         this.onDamage(target.pos, damage);
         particles.emitLightning(target.pos.x, target.pos.y);
 
-        const beam = new Beam(this.owner.pos, target.pos, 0.1, '#ffff00', 2);
+        // Evolved: purple beam, normal: yellow
+        const beamColor = isEvolved ? '#aa00ff' : '#ffff00';
+        const beam = new Beam(this.owner.pos, target.pos, 0.1, beamColor, isEvolved ? 3 : 2);
         this.onSpawn(beam);
 
-        const isEvolved = this.level >= 6;
         const bounces = isEvolved ? 999 : (this.stats.pierce || 5) + this.level;
         const maxChainLength = isEvolved ? 10000 : this.stats.area;
 
-        const chain = new ChainLightning(target.pos.x, target.pos.y, damage, bounces, maxChainLength);
-        chain.hitEnemies.add(target);
+        // Use ThunderstormLightning for evolved version
+        let chain: ChainLightning | ThunderstormLightning;
+        if (isEvolved) {
+            const thunder = new ThunderstormLightning(target.pos.x, target.pos.y, damage, bounces, maxChainLength);
+            thunder.splitChance = 0.1; // 10% chance to split
+            thunder.onAllChainsComplete = () => {
+                this.waitingForChainComplete = false;
+            };
+            chain = thunder;
+            this.activeChain = chain;
+            this.waitingForChainComplete = true;
+        } else {
+            chain = new ChainLightning(target.pos.x, target.pos.y, damage, bounces, maxChainLength);
+        }
 
+        chain.hitEnemies.add(target);
         chain.onHit = (t: any, d: number) => {
             t.takeDamage(d);
             this.onDamage(t.pos, d);
@@ -657,6 +840,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
     upgrade() {
         this.level++;
         this.damage *= this.stats.damageScaling;
+        // NOTE: Cooldown does NOT decrease on upgrade (new balance rule)
     }
 }
 
@@ -744,17 +928,29 @@ export class FrostNovaWeapon extends Weapon {
             );
 
             lob.onLand = (x, y) => {
-                const isEvolved = this.level >= 6;
+                const isEvolved = this.evolved;
                 particles.emitFrost(x, y);
-                const zone = new FrostZone(
-                    x, y,
-                    this.area * (this.owner as any).stats.area,
-                    this.stats.duration * (this.owner as any).stats.duration,
-                    (this.owner as any).getDamage(this.damage).damage,
-                    0.5,
-                    isEvolved ? 0.9 : 0.5
-                );
-                this.onSpawn(zone);
+
+                if (isEvolved) {
+                    // Absolute Zero: complete freeze zone
+                    const zone = new AbsoluteZeroZone(
+                        x, y,
+                        this.area * (this.owner as any).stats.area,
+                        (this.owner as any).getDamage(this.damage).damage,
+                        this.stats.duration * (this.owner as any).stats.duration
+                    );
+                    this.onSpawn(zone);
+                } else {
+                    const zone = new FrostZone(
+                        x, y,
+                        this.area * (this.owner as any).stats.area,
+                        this.stats.duration * (this.owner as any).stats.duration,
+                        (this.owner as any).getDamage(this.damage).damage,
+                        0.5,
+                        0.5 // 50% slow
+                    );
+                    this.onSpawn(zone);
+                }
             };
 
             this.onSpawn(lob);

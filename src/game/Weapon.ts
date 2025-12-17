@@ -5,6 +5,7 @@ export abstract class Weapon {
     owner: Entity;
     cooldown: number = 0;
     level: number = 1;
+    evolved: boolean = false; // True when weapon has reached evolution state
 
     // Stats
     abstract name: string;

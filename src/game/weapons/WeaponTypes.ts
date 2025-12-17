@@ -194,6 +194,7 @@ export class SingularityProjectile extends Projectile {
 
 export class PlasmaProjectile extends Projectile {
     private particleTimer: number = 0;
+    onExplosion?: (x: number, y: number) => void;
 
     constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number) {
         super(x, y, velocity, duration, damage, pierce, '');
@@ -201,6 +202,7 @@ export class PlasmaProjectile extends Projectile {
     }
 
     update(dt: number, enemies?: Entity[]) {
+        const wasAlive = !this.isDead;
         super.update(dt, enemies);
 
         // Emit plasma trail
@@ -208,6 +210,11 @@ export class PlasmaProjectile extends Projectile {
         if (this.particleTimer > 0.05) {
             this.particleTimer = 0;
             particles.emitPlasmaEnergy(this.pos.x, this.pos.y);
+        }
+
+        // Call onExplosion when projectile dies
+        if (wasAlive && this.isDead && this.onExplosion) {
+            this.onExplosion(this.pos.x, this.pos.y);
         }
     }
 

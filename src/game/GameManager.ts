@@ -179,15 +179,16 @@ export class GameManager {
         const existingWeapon: any = this.player.weapons.find((w: any) => w.weaponId === weaponId);
         if (!existingWeapon) return;
 
-        // Mark as evolved
+        // Mark as evolved (this is the primary check used by weapons)
         existingWeapon.evolved = true;
+        existingWeapon.level = 6; // For compatibility with weaponLevels tracking
         existingWeapon.name = weaponData.evolution.name;
         existingWeapon.emoji = weaponData.evolution.emoji;
 
-        // Boost stats significantly
-        existingWeapon.damage *= 3;
-        existingWeapon.area *= 1.5;
-        existingWeapon.baseCooldown *= 0.5;
+        // Boost damage (but NOT cooldown - new balance rule)
+        existingWeapon.damage *= 2;
+        existingWeapon.area *= 1.3;
+        // NOTE: Removed baseCooldown *= 0.5 - evolved weapons handle their own CD
 
         this.weaponLevels.set(weaponId, 6);
     }

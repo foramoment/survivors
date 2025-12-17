@@ -130,9 +130,9 @@ export const WEAPONS = [
         description: "Calls down random explosions",
         class: OrbitalStrikeWeapon,
         evolution: {
-            name: "Nuclear Barrage",
+            name: "Atomic Bomb",
             emoji: "☢️",
-            description: "Explosive chain reaction missiles"
+            description: "Massive nuclear explosion with mushroom cloud"
         }
     },
     {
