@@ -224,15 +224,13 @@ export const WEAPONS = [
 // ============================================
 // WEAPON STATS CONFIG - Easy tuning in one place!
 // ============================================
-// Base stats are applied at level 1
-// Scaling is multiplied per level (e.g. damage *= damageScaling on upgrade)
+// Damage scaling is always 1.2x per level (configured in base Weapon class)
+// Area/Speed/Duration are modified by powerups, not level upgrades
 // ============================================
 export const WEAPON_STATS: Record<string, {
     damage: number;
-    damageScaling: number;
     cooldown: number;
     area: number;
-    areaScaling: number;
     speed: number;
     duration: number;
     // Optional extras
@@ -242,143 +240,115 @@ export const WEAPON_STATS: Record<string, {
 }> = {
     void_ray: {
         damage: 25,
-        damageScaling: 1.2,
         cooldown: 2.0,
         area: 1,
-        areaScaling: 1.0,
         speed: 0,
         duration: 0.5,
     },
     phantom_slash: {
         damage: 15,
-        damageScaling: 1.2,
         cooldown: 1.5,
         area: 250,
-        areaScaling: 1.0,
         speed: 0,
         duration: 0.2,
         count: 3,
-        countScaling: 1, // +1 per level
+        countScaling: 1,
     },
     plasma_cannon: {
         damage: 40,
-        damageScaling: 1.2,
         cooldown: 2.5,
         area: 150,
-        areaScaling: 1.1,
         speed: 300,
         duration: 3,
     },
     nanobot_swarm: {
-        damage: 0.8, // Nerfed from 8 (10x reduction)
-        damageScaling: 1.2,
+        damage: 0.8,
         cooldown: 0.5,
         area: 1.0,
-        areaScaling: 1.0,
         speed: 0,
         duration: 5,
     },
     spore_cloud: {
         damage: 10,
-        damageScaling: 1.2,
         cooldown: 2,
         area: 50,
-        areaScaling: 1.1,
         speed: 0,
         duration: 5,
     },
     singularity_orb: {
         damage: 50,
-        damageScaling: 1.2,
         cooldown: 4,
         area: 600,
-        areaScaling: 1.0,
         speed: 50,
-        duration: 2.5, // Reduced from 12 (range: 50*2.5 = 125px instead of 600px)
+        duration: 2.5,
         pierce: 999,
     },
     orbital_strike: {
         damage: 40,
-        damageScaling: 1.2,
         cooldown: 2.0,
         area: 100,
-        areaScaling: 1.1,
         speed: 0,
         duration: 1.0,
         count: 1,
-        countScaling: 0.5, // +0.5 per level (floored)
+        countScaling: 0.5,
     },
     mind_blast: {
         damage: 20,
-        damageScaling: 1.2,
         cooldown: 3,
         area: 120,
-        areaScaling: 1.0,
         speed: 0,
         duration: 0.5,
     },
     chrono_disc: {
         damage: 2.67,
-        damageScaling: 1.15,
         cooldown: 2.5,
         area: 400,
-        areaScaling: 1.0,
         speed: 500,
         duration: 5,
-        pierce: 5, // bounces
+        pierce: 5,
         count: 1,
-        countScaling: 1, // +1 disc per level
+        countScaling: 1,
     },
     acid_pool: {
         damage: 10,
-        damageScaling: 1.2,
         cooldown: 2.0,
         area: 80,
-        areaScaling: 1.1,
         speed: 0,
         duration: 3.0,
     },
     lightning_chain: {
-        damage: 25, // Buffed from 8
-        damageScaling: 1.2,
+        damage: 25,
         cooldown: 1.8,
         area: 800,
-        areaScaling: 1.0,
         speed: 0,
         duration: 0.3,
-        pierce: 5, // bounces (base)
+        pierce: 5,
     },
     spinning_ember: {
         damage: 15,
-        damageScaling: 1.2,
         cooldown: 3.0,
         area: 100,
-        areaScaling: 1.0,
-        speed: 3, // rotation speed
+        speed: 3,
         duration: 4,
         count: 2,
-        countScaling: 1, // +1 per level
+        countScaling: 1,
     },
     frost_nova: {
         damage: 8,
-        damageScaling: 1.2,
         cooldown: 2.5,
         area: 120,
-        areaScaling: 1.1,
         speed: 0,
         duration: 3.0,
     },
     fan_of_knives: {
         damage: 12,
-        damageScaling: 1.2,
         cooldown: 1.5,
         area: 0,
-        areaScaling: 1.0,
         speed: 700,
         duration: 1.5,
         pierce: 2,
         count: 3,
-        countScaling: 0.5, // +0.5 per level (floored)
+        countScaling: 0.5,
     },
 };
 

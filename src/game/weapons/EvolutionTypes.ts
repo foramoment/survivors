@@ -10,6 +10,7 @@
 import { Entity } from '../Entity';
 import { distance, type Vector2 } from '../core/Utils';
 import { particles } from '../core/ParticleSystem';
+import { damageSystem } from '../core/DamageSystem';
 import {
     ChainLightning,
     SingularityProjectile,
@@ -68,8 +69,8 @@ export class ThunderstormLightning extends ChainLightning {
                 alpha: 1
             });
 
-            // Deal damage
-            target.takeDamage(split.damage);
+            // Deal damage via DamageSystem
+            damageSystem.dealRawDamage(target, split.damage, target.pos);
             this.onHit(target, split.damage);
             split.hitEnemies.add(target);
 
@@ -271,7 +272,8 @@ export class BlackHoleProjectile extends SingularityProjectile {
                 end: { ...closest.pos },
                 alpha: 1
             });
-            closest.takeDamage(this.damage * 0.3);
+            // Deal damage via DamageSystem
+            damageSystem.dealRawDamage(closest, this.damage * 0.3, closest.pos);
             particles.emitHit(closest.pos.x, closest.pos.y, '#8800ff');
         }
     }

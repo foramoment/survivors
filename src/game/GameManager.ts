@@ -7,14 +7,20 @@ import { checkCollision, type Vector2, distance } from './core/Utils';
 import { Projectile, Zone, BouncingProjectile } from './weapons/WeaponTypes';
 import { SpatialHashGrid } from './core/SpatialHash';
 import { particles } from './core/ParticleSystem';
-
-type GameState = 'MENU' | 'PLAYING' | 'LEVEL_UP' | 'GAME_OVER';
+import { stateMachine, type GameState } from './core/StateMachine';
+import { damageSystem } from './core/DamageSystem';
 
 export class GameManager {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
 
-    state: GameState = 'MENU';
+    // Game state is now managed by stateMachine singleton
+    get state(): GameState {
+        return stateMachine.state;
+    }
+    set state(value: GameState) {
+        stateMachine.transition(value);
+    }
 
     player: Player | null = null;
     enemies: Enemy[] = [];
@@ -42,6 +48,11 @@ export class GameManager {
         this.canvas = canvas;
         this.ctx = ctx;
         this.uiLayer = document.getElementById('ui-layer')!;
+
+        // Connect DamageSystem to damage number display
+        damageSystem.setDamageNumberCallback((pos, amount, isCrit) => {
+            this.spawnDamageNumber(pos, amount, isCrit);
+        });
 
         this.showClassSelection();
     }
@@ -422,8 +433,8 @@ export class GameManager {
                     if (p instanceof BouncingProjectile) {
                         // Handle bouncing projectile
                         if (p.canHit(e)) {
-                            e.takeDamage(p.damage);
-                            this.spawnDamageNumber(e.pos, p.damage);
+                            // Use DamageSystem for consistent damage handling
+                            damageSystem.dealRawDamage(e, p.damage, e.pos);
                             p.markHit(e);
 
                             // Emit hit particles based on emoji
@@ -455,8 +466,8 @@ export class GameManager {
                             }
                         }
                     } else if (p instanceof Projectile) {
-                        e.takeDamage(p.damage);
-                        this.spawnDamageNumber(e.pos, p.damage);
+                        // Use DamageSystem for consistent damage handling
+                        damageSystem.dealRawDamage(e, p.damage, e.pos);
 
                         // Emit hit particles based on emoji
                         const hitColor = this.getProjectileColor(p.emoji);
@@ -469,8 +480,8 @@ export class GameManager {
                     } else if (p instanceof Zone) {
                         p.onOverlap(e);
                         if (p.timer >= p.interval) {
-                            e.takeDamage(p.damage);
-                            this.spawnDamageNumber(e.pos, p.damage);
+                            // Use DamageSystem for consistent damage handling
+                            damageSystem.dealRawDamage(e, p.damage, e.pos);
                         }
                     }
                 }

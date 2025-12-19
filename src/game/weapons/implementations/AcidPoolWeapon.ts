@@ -1,0 +1,77 @@
+/**
+ * ACID POOL WEAPON
+ * Throws acid flasks that create damaging puddles.
+ */
+import { Weapon } from '../../Weapon';
+import { Entity } from '../../Entity';
+import { type Vector2, distance } from '../../core/Utils';
+import { LobbedProjectile, AcidZone } from '../base';
+import { particles } from '../../core/ParticleSystem';
+import { WEAPON_STATS } from '../../data/GameData';
+
+function getStats(weaponId: string) {
+    return WEAPON_STATS[weaponId] || {
+        damage: 10, cooldown: 1.0, area: 100, speed: 0, duration: 1.0
+    };
+}
+
+export class AcidPoolWeapon extends Weapon {
+    name = "Acid Pool";
+    emoji = "🧪";
+    description = "Throws acid flasks that create puddles.";
+    private stats = getStats('acid_pool');
+
+    constructor(owner: any) {
+        super(owner);
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
+    }
+
+    update(dt: number, enemies: Entity[]) {
+        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
+        this.cooldown -= dt * speedBoost * timeSpeed;
+        if (this.cooldown <= 0) {
+            let target: any = null;
+            let minDst = Infinity;
+
+            for (const enemy of enemies) {
+                const dst = distance(this.owner.pos, enemy.pos);
+                if (dst < 500 && dst < minDst) {
+                    minDst = dst;
+                    target = enemy;
+                }
+            }
+
+            if (target) {
+                const lob = new LobbedProjectile(
+                    this.owner.pos.x,
+                    this.owner.pos.y,
+                    target.pos,
+                    0.8,
+                    '🧪'
+                );
+
+                lob.onLand = (x, y) => {
+                    particles.emitPoison(x, y);
+                    const zone = new AcidZone(
+                        x, y,
+                        this.area * (this.owner as any).stats.area,
+                        this.stats.duration * (this.owner as any).stats.duration,
+                        (this.owner as any).getDamage(this.damage).damage,
+                        0.5
+                    );
+                    this.onSpawn(zone);
+                };
+
+                this.onSpawn(lob);
+                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            }
+        }
+    }
+
+    // Uses base class upgrade()
+
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
+}
