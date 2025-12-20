@@ -265,27 +265,63 @@ export class GameManager {
     showLevelUp() {
         this.state = 'LEVEL_UP';
 
-        // 10% chance for lucky level-up
-        const isLucky = Math.random() < 0.1;
-        const upgradeCount = this.devMode ? 6 : (isLucky ? 6 : 3);
-
         const screen = document.createElement('div');
         screen.className = 'screen level-up-screen';
-        screen.innerHTML = `<h2>${this.devMode ? '🛠️ DEVELOPER MODE 🛠️' : (isLucky ? '✨ LUCKY LEVEL UP! ✨' : 'LEVEL UP!')}</h2>`;
+
+        // Developer Mode with Tabs
+        if (this.devMode) {
+            screen.innerHTML = `<h2>🛠️ DEVELOPER MODE 🛠️</h2>`;
+
+            // Create tabs
+            const tabs = document.createElement('div');
+            tabs.className = 'dev-tabs interactive';
+
+            const tabData = [
+                { id: 'powerups', label: '⚡ Powerups' },
+                { id: 'weapons', label: '⚔️ Weapons' },
+                { id: 'evolved', label: '🌟 Evolved' }
+            ];
+
+            tabData.forEach((tab, index) => {
+                const tabBtn = document.createElement('button');
+                tabBtn.className = 'dev-tab' + (index === 0 ? ' active' : '');
+                tabBtn.textContent = tab.label;
+                tabBtn.dataset.tab = tab.id;
+                tabBtn.onclick = () => this.switchDevTab(tab.id, screen);
+                tabs.appendChild(tabBtn);
+            });
+
+            screen.appendChild(tabs);
+
+            // Create grid container
+            const grid = document.createElement('div');
+            grid.className = 'dev-upgrade-grid';
+            grid.id = 'dev-grid';
+            screen.appendChild(grid);
+
+            this.uiLayer.appendChild(screen);
+
+            // Populate initial tab (powerups)
+            this.switchDevTab('powerups', screen);
+            return;
+        }
+
+        // Normal mode (unchanged)
+        const isLucky = Math.random() < 0.1;
+        const upgradeCount = isLucky ? 6 : 3;
+
+        screen.innerHTML = `<h2>${isLucky ? '✨ LUCKY LEVEL UP! ✨' : 'LEVEL UP!'}</h2>`;
 
         const grid = document.createElement('div');
-        grid.className = (isLucky || this.devMode) ? 'upgrade-grid-6' : 'upgrade-grid';
+        grid.className = isLucky ? 'upgrade-grid-6' : 'upgrade-grid';
 
         // Create pool of all options
         const allOptions: any[] = [];
 
         // Add powerups
-        // Add powerups
-        if (!this.devMode) {
-            POWERUPS.forEach(p => {
-                allOptions.push({ type: 'powerup', data: p });
-            });
-        }
+        POWERUPS.forEach(p => {
+            allOptions.push({ type: 'powerup', data: p });
+        });
 
         // Add weapons (excluding evolved weapons)
         WEAPONS.forEach(w => {
@@ -360,6 +396,152 @@ export class GameManager {
 
         screen.appendChild(grid);
         this.uiLayer.appendChild(screen);
+    }
+
+    switchDevTab(tabId: string, screen: HTMLElement) {
+        // Update active tab
+        const tabs = screen.querySelectorAll('.dev-tab');
+        tabs.forEach(tab => {
+            tab.classList.toggle('active', (tab as HTMLElement).dataset.tab === tabId);
+        });
+
+        // Get grid
+        const grid = document.getElementById('dev-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        if (tabId === 'powerups') {
+            // Show all powerups
+            POWERUPS.forEach(powerup => {
+                const card = this.createDevCard(
+                    powerup.emoji,
+                    powerup.name,
+                    powerup.description,
+                    '',
+                    () => {
+                        this.applyPowerup(powerup);
+                        screen.remove();
+                        this.state = 'PLAYING';
+                    }
+                );
+                grid.appendChild(card);
+            });
+        } else if (tabId === 'weapons') {
+            // Show all base weapons
+            WEAPONS.forEach(weaponData => {
+                const currentLevel = this.weaponLevels.get(weaponData.id) || 0;
+                const isEvolved = currentLevel >= 6;
+
+                if (isEvolved) return; // Skip fully evolved weapons
+
+                const canEvolve = currentLevel === 5;
+                const newLevel = currentLevel + 1;
+                const levelText = canEvolve ? 'EVOLVE!' : (currentLevel > 0 ? `lv ${currentLevel} → ${newLevel}` : 'NEW');
+
+                const emoji = canEvolve ? weaponData.evolution.emoji : weaponData.emoji;
+                const name = canEvolve ? weaponData.evolution.name : weaponData.name;
+                const desc = canEvolve ? weaponData.evolution.description : weaponData.description;
+
+                const card = this.createDevCard(
+                    emoji,
+                    name,
+                    desc,
+                    levelText,
+                    () => {
+                        this.addWeapon(weaponData.id);
+                        screen.remove();
+                        this.state = 'PLAYING';
+                    },
+                    canEvolve
+                );
+                grid.appendChild(card);
+            });
+        } else if (tabId === 'evolved') {
+            // Show evolved weapons (only those not yet evolved)
+            WEAPONS.forEach(weaponData => {
+                const currentLevel = this.weaponLevels.get(weaponData.id) || 0;
+
+                // Skip if weapon is already evolved
+                if (currentLevel >= 6) return;
+
+                const card = this.createDevCard(
+                    weaponData.evolution.emoji,
+                    weaponData.evolution.name,
+                    weaponData.evolution.description,
+                    '⚡ INSTANT EVOLVE',
+                    () => {
+                        this.addEvolvedWeapon(weaponData.id);
+                        screen.remove();
+                        this.state = 'PLAYING';
+                    },
+                    true // isEvolutionReady - use evolution-ready styling
+                );
+                grid.appendChild(card);
+            });
+        }
+    }
+
+    createDevCard(
+        emoji: string,
+        name: string,
+        description: string,
+        levelText: string,
+        onClick: () => void,
+        isEvolutionReady: boolean = false
+    ): HTMLElement {
+        const card = document.createElement('div');
+        card.className = 'upgrade-card interactive';
+
+        if (isEvolutionReady) {
+            card.classList.add('evolution-ready');
+        }
+
+        card.innerHTML = `
+            <div style="font-size: 3em">${emoji}</div>
+            <h3>${name}</h3>
+            ${levelText ? `<div class="level-indicator">${levelText}</div>` : ''}
+            <p>${description}</p>
+        `;
+
+        card.onclick = onClick;
+        return card;
+    }
+
+    addEvolvedWeapon(weaponId: string) {
+        if (!this.player) return;
+
+        const weaponData = WEAPONS.find(w => w.id === weaponId);
+        if (!weaponData) return;
+
+        // Check if weapon already exists
+        const existingWeapon: any = this.player.weapons.find((w: any) => w.weaponId === weaponId);
+
+        if (existingWeapon) {
+            // Upgrade to evolved if not already
+            if (existingWeapon.level < 6) {
+                existingWeapon.level = 6;
+                existingWeapon.evolved = true;
+                existingWeapon.name = weaponData.evolution.name;
+                existingWeapon.emoji = weaponData.evolution.emoji;
+                existingWeapon.damage *= 2;
+                existingWeapon.area *= 1.3;
+                this.weaponLevels.set(weaponId, 6);
+            }
+        } else {
+            // Add new weapon directly as evolved
+            const weapon: any = new weaponData.class(this.player);
+            weapon.weaponId = weaponId;
+            weapon.level = 6;
+            weapon.evolved = true;
+            weapon.name = weaponData.evolution.name;
+            weapon.emoji = weaponData.evolution.emoji;
+            weapon.damage *= 2;
+            weapon.area *= 1.3;
+            weapon.onSpawn = (entity: Entity) => this.spawnEntity(entity);
+            weapon.onDamage = (pos: Vector2, amount: number, isCrit: boolean) => this.spawnDamageNumber(pos, amount, isCrit);
+            this.player.weapons.push(weapon);
+            this.weaponLevels.set(weaponId, 6);
+        }
     }
 
     applyPowerup(opt: any) {
