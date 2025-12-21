@@ -25,8 +25,6 @@ export class LightningChainWeapon extends ProjectileWeapon {
     projectileEmoji = "⚡";
     pierce = 3;
     private stats = getStats('lightning_chain');
-    private activeChain: ChainLightning | ThunderstormLightning | null = null;
-    private waitingForChainComplete: boolean = false;
 
     constructor(owner: any) {
         super(owner);
@@ -38,14 +36,6 @@ export class LightningChainWeapon extends ProjectileWeapon {
 
     update(dt: number, enemies: Entity[]) {
         const isEvolved = this.evolved;
-
-        if (isEvolved && this.waitingForChainComplete) {
-            if (this.activeChain && this.activeChain.isDead) {
-                this.waitingForChainComplete = false;
-                this.activeChain = null;
-            }
-            return;
-        }
 
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
@@ -92,14 +82,8 @@ export class LightningChainWeapon extends ProjectileWeapon {
 
         let chain: ChainLightning | ThunderstormLightning;
         if (isEvolved) {
-            const thunder = new ThunderstormLightning(target.pos.x, target.pos.y, result.finalDamage, bounces, maxChainLength);
-            thunder.splitChance = 0.1;
-            thunder.onAllChainsComplete = () => {
-                this.waitingForChainComplete = false;
-            };
-            chain = thunder;
-            this.activeChain = chain;
-            this.waitingForChainComplete = true;
+            chain = new ThunderstormLightning(target.pos.x, target.pos.y, result.finalDamage, bounces, maxChainLength);
+            (chain as ThunderstormLightning).splitChance = 0.1;
         } else {
             chain = new ChainLightning(target.pos.x, target.pos.y, result.finalDamage, bounces, maxChainLength);
         }

@@ -66,23 +66,19 @@ export class OrbitalStrikeWeapon extends Weapon {
 
                 this.cooldown = 8.0 * (this.owner as any).stats.cooldown;
             } else {
-                const count = (this.stats.count || 1) + Math.floor((this.level - 1) * (this.stats.countScaling || 0.5));
+                const offsetX = (Math.random() - 0.5) * 1000;
+                const offsetY = (Math.random() - 0.5) * 800;
 
-                for (let i = 0; i < count; i++) {
-                    const offsetX = (Math.random() - 0.5) * 1000;
-                    const offsetY = (Math.random() - 0.5) * 800;
-
-                    const zone = new DelayedExplosionZone(
-                        this.owner.pos.x + offsetX,
-                        this.owner.pos.y + offsetY,
-                        this.area * (this.owner as any).stats.area * (1 + this.level * 0.1),
-                        1.0,
-                        normalResult.damage,
-                        '💥',
-                        (pos, amount) => this.onDamage(pos, amount, normalResult.isCrit)
-                    );
-                    this.onSpawn(zone);
-                }
+                const zone = new DelayedExplosionZone(
+                    this.owner.pos.x + offsetX,
+                    this.owner.pos.y + offsetY,
+                    this.area * (this.owner as any).stats.area * (1 + this.level * 0.1),
+                    1.0,
+                    normalResult.damage,
+                    '💥',
+                    (pos, amount) => this.onDamage(pos, amount, normalResult.isCrit)
+                );
+                this.onSpawn(zone);
                 this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
             }
         }

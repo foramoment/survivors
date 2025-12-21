@@ -26,8 +26,6 @@ import {
 export class ThunderstormLightning extends ChainLightning {
     splitChance: number = 0.1;
     private pendingSplits: { pos: Vector2; damage: number; bounces: number; hitEnemies: Set<any> }[] = [];
-    private allChainsComplete: boolean = false;
-    onAllChainsComplete?: () => void;
 
     update(dt: number, enemies?: Entity[]) {
         // Process pending splits
@@ -37,14 +35,6 @@ export class ThunderstormLightning extends ChainLightning {
         }
 
         super.update(dt, enemies);
-
-        // Check if all chains complete
-        if (this.hasChained && this.segments.length === 0 && this.pendingSplits.length === 0) {
-            if (!this.allChainsComplete) {
-                this.allChainsComplete = true;
-                if (this.onAllChainsComplete) this.onAllChainsComplete();
-            }
-        }
     }
 
     private createSplitChain(split: { pos: Vector2; damage: number; bounces: number; hitEnemies: Set<any> }, enemies: Entity[]) {

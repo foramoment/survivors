@@ -289,8 +289,6 @@ export const WEAPON_STATS: Record<string, {
         area: 100,
         speed: 0,
         duration: 1.0,
-        count: 1,
-        countScaling: 0.5,
     },
     mind_blast: {
         damage: 20,
