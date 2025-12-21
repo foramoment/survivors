@@ -7,10 +7,10 @@
  * - Balanced with increased cooldowns
  */
 
-import { Entity } from '../Entity';
 import { distance, type Vector2 } from '../core/Utils';
 import { particles } from '../core/ParticleSystem';
 import { damageSystem } from '../core/DamageSystem';
+import { levelSpatialHash } from '../core/SpatialHash';
 import {
     ChainLightning,
     SingularityProjectile,
@@ -27,22 +27,24 @@ export class ThunderstormLightning extends ChainLightning {
     splitChance: number = 0.1;
     private pendingSplits: { pos: Vector2; damage: number; bounces: number; hitEnemies: Set<any> }[] = [];
 
-    update(dt: number, enemies?: Entity[]) {
+    update(dt: number) {
         // Process pending splits
-        if (this.pendingSplits.length > 0 && enemies) {
+        if (this.pendingSplits.length > 0) {
             const split = this.pendingSplits.shift()!;
-            this.createSplitChain(split, enemies);
+            this.createSplitChain(split);
         }
 
-        super.update(dt, enemies);
+        super.update(dt);
     }
 
-    private createSplitChain(split: { pos: Vector2; damage: number; bounces: number; hitEnemies: Set<any> }, enemies: Entity[]) {
+    private createSplitChain(split: { pos: Vector2; damage: number; bounces: number; hitEnemies: Set<any> }) {
         // Find a new target not in hitEnemies
         let target: any = null;
         let minDst = this.range;
 
-        for (const enemy of enemies) {
+        const nearby = levelSpatialHash.getWithinRadius(split.pos, this.range);
+
+        for (const enemy of nearby) {
             if (split.hitEnemies.has(enemy)) continue;
             const d = distance(split.pos, enemy.pos);
             if (d < minDst) {
@@ -219,14 +221,14 @@ export class BlackHoleProjectile extends SingularityProjectile {
         this.pullStrength = 200; // Stronger pull
     }
 
-    update(dt: number, enemies?: Entity[]) {
-        super.update(dt, enemies);
+    update(dt: number) {
+        super.update(dt);
 
         // Dark lightning timer
         this.darkLightningTimer += dt;
-        if (this.darkLightningTimer >= this.darkLightningInterval && enemies) {
+        if (this.darkLightningTimer >= this.darkLightningInterval) {
             this.darkLightningTimer = 0;
-            this.fireDarkLightning(enemies);
+            this.fireDarkLightning();
         }
 
         // Update existing dark lightnings
@@ -243,12 +245,14 @@ export class BlackHoleProjectile extends SingularityProjectile {
         }
     }
 
-    private fireDarkLightning(enemies: Entity[]) {
+    private fireDarkLightning() {
         // Find closest enemy in range
         let closest: any = null;
         let minDist = 150;
 
-        for (const enemy of enemies) {
+        const potentialTargets = levelSpatialHash.getWithinRadius(this.pos, 150);
+
+        for (const enemy of potentialTargets) {
             const d = distance(this.pos, enemy.pos);
             if (d < minDist) {
                 minDist = d;
@@ -378,22 +382,22 @@ export class BlackHoleZone extends Zone {
         super(x, y, radius, duration, damage, 0.2, '', 0);
     }
 
-    update(dt: number, enemies?: Entity[]) {
+    update(dt: number) {
         super.update(dt);
         this.rotationAngle += dt * 2;
 
         // Pull enemies
-        if (enemies) {
-            for (const enemy of enemies) {
-                const dx = this.pos.x - enemy.pos.x;
-                const dy = this.pos.y - enemy.pos.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+        const enemiesInPullRange = levelSpatialHash.getWithinRadius(this.pos, this.radius * 2);
 
-                if (dist < this.radius * 2 && dist > 5) {
-                    const pullForce = this.pullStrength / dist;
-                    (enemy as any).pos.x += (dx / dist) * pullForce * dt;
-                    (enemy as any).pos.y += (dy / dist) * pullForce * dt;
-                }
+        for (const enemy of enemiesInPullRange) {
+            const dx = this.pos.x - enemy.pos.x;
+            const dy = this.pos.y - enemy.pos.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < this.radius * 2 && dist > 5) {
+                const pullForce = this.pullStrength / dist;
+                (enemy as any).pos.x += (dx / dist) * pullForce * dt;
+                (enemy as any).pos.y += (dy / dist) * pullForce * dt;
             }
         }
 
@@ -466,8 +470,8 @@ export class AtomicBombZone extends DelayedExplosionZone {
         super(x, y, radius, 1.2, damage, '☢️', onDamage, true);
     }
 
-    update(dt: number, enemies?: Entity[]) {
-        super.update(dt, enemies);
+    update(dt: number) {
+        super.update(dt);
 
         // After explosion, expand shockwave
         if (this.exploded && !this.atomicExploded) {
@@ -563,21 +567,21 @@ export class DimensionalRiftZone extends Zone {
         super(x, y, 60, 1.5, damage, 0.3, ''); // 60 radius, 1.5s duration
     }
 
-    update(dt: number, enemies?: Entity[]) {
+    update(dt: number) {
         super.update(dt);
         this.rotationAngle += dt * 3;
         this.pulsePhase += dt * 5;
 
         // Slow enemies in rift (50% slow)
-        if (enemies) {
-            for (const enemy of enemies) {
-                const dx = this.pos.x - enemy.pos.x;
-                const dy = this.pos.y - enemy.pos.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < this.radius) {
-                    (enemy as any).slowMultiplier = Math.min((enemy as any).slowMultiplier || 1, 0.5);
-                    (enemy as any).slowDuration = 0.5;
-                }
+        const enemiesInRift = levelSpatialHash.getWithinRadius(this.pos, this.radius);
+
+        for (const enemy of enemiesInRift) {
+            const dx = this.pos.x - enemy.pos.x;
+            const dy = this.pos.y - enemy.pos.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < this.radius) {
+                (enemy as any).slowMultiplier = Math.min((enemy as any).slowMultiplier || 1, 0.5);
+                (enemy as any).slowDuration = 0.5;
             }
         }
     }
@@ -649,22 +653,22 @@ export class FusionCoreSingularity extends Zone {
         super(x, y, 80, 2.0, damage, 0.2, ''); // 80 radius, 2s duration
     }
 
-    update(dt: number, enemies?: Entity[]) {
+    update(dt: number) {
         super.update(dt);
         this.rotationAngle += dt * 4;
 
         // Pull enemies toward center
-        if (enemies) {
-            for (const enemy of enemies) {
-                const dx = this.pos.x - enemy.pos.x;
-                const dy = this.pos.y - enemy.pos.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+        const enemiesInSingularity = levelSpatialHash.getWithinRadius(this.pos, this.radius * 1.5);
 
-                if (dist < this.radius * 1.5 && dist > 5) {
-                    const pullForce = this.pullStrength / dist;
-                    (enemy as any).pos.x += (dx / dist) * pullForce * dt;
-                    (enemy as any).pos.y += (dy / dist) * pullForce * dt;
-                }
+        for (const enemy of enemiesInSingularity) {
+            const dx = this.pos.x - enemy.pos.x;
+            const dy = this.pos.y - enemy.pos.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < this.radius * 1.5 && dist > 5) {
+                const pullForce = this.pullStrength / dist;
+                (enemy as any).pos.x += (dx / dist) * pullForce * dt;
+                (enemy as any).pos.y += (dy / dist) * pullForce * dt;
             }
         }
 
@@ -733,24 +737,24 @@ export class PsychicStormZone extends Zone {
         // Note: onDamage callback preserved for API compatibility but handled by Zone base class
     }
 
-    update(dt: number, enemies?: Entity[]) {
+    update(dt: number) {
         super.update(dt);
         this.wavePhase += dt * 8;
 
         // Stun enemies in range (only once per enemy)
-        if (enemies) {
-            for (const enemy of enemies) {
-                if (this.hasStunned.has(enemy)) continue;
+        const enemiesInPsiStorm = levelSpatialHash.getWithinRadius(this.pos, this.radius);
 
-                const dx = this.pos.x - enemy.pos.x;
-                const dy = this.pos.y - enemy.pos.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+        for (const enemy of enemiesInPsiStorm) {
+            if (this.hasStunned.has(enemy)) continue;
 
-                if (dist < this.radius) {
-                    (enemy as any).stunDuration = Math.max((enemy as any).stunDuration || 0, this.stunDuration);
-                    this.hasStunned.add(enemy);
-                    particles.emitHit(enemy.pos.x, enemy.pos.y, '#ff00ff');
-                }
+            const dx = this.pos.x - enemy.pos.x;
+            const dy = this.pos.y - enemy.pos.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < this.radius) {
+                (enemy as any).stunDuration = Math.max((enemy as any).stunDuration || 0, this.stunDuration);
+                this.hasStunned.add(enemy);
+                particles.emitHit(enemy.pos.x, enemy.pos.y, '#ff00ff');
             }
         }
     }
@@ -808,25 +812,25 @@ export class AbsoluteZeroZone extends Zone {
         super(x, y, radius, duration, damage, 0.5, '');
     }
 
-    update(dt: number, enemies?: Entity[]) {
+    update(dt: number) {
         super.update(dt);
         this.crystalAngle += dt;
 
         // Freeze enemies (100% slow)
-        if (enemies) {
-            for (const enemy of enemies) {
-                const dx = this.pos.x - enemy.pos.x;
-                const dy = this.pos.y - enemy.pos.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+        const enemiesInFreezeZone = levelSpatialHash.getWithinRadius(this.pos, this.radius);
 
-                if (dist < this.radius) {
-                    (enemy as any).slowMultiplier = 0; // Complete freeze
-                    (enemy as any).slowDuration = 0.5;
+        for (const enemy of enemiesInFreezeZone) {
+            const dx = this.pos.x - enemy.pos.x;
+            const dy = this.pos.y - enemy.pos.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    if (!this.frozenEnemies.has(enemy)) {
-                        this.frozenEnemies.add(enemy);
-                        particles.emitFrost(enemy.pos.x, enemy.pos.y);
-                    }
+            if (dist < this.radius) {
+                (enemy as any).slowMultiplier = 0; // Complete freeze
+                (enemy as any).slowDuration = 0.5;
+
+                if (!this.frozenEnemies.has(enemy)) {
+                    this.frozenEnemies.add(enemy);
+                    particles.emitFrost(enemy.pos.x, enemy.pos.y);
                 }
             }
         }

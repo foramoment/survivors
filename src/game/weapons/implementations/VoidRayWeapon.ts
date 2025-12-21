@@ -9,6 +9,7 @@ import { Entity } from '../../Entity';
 import { type Vector2, distance } from '../../core/Utils';
 import { VoidRayBeam } from '../base';
 import { WEAPON_STATS } from '../../data/GameData';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 function getStats(weaponId: string) {
     return WEAPON_STATS[weaponId] || {
@@ -29,7 +30,7 @@ export class VoidRayWeapon extends Weapon {
         this.area = this.stats.area;
     }
 
-    update(dt: number, enemies: Entity[]) {
+    update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
@@ -37,9 +38,13 @@ export class VoidRayWeapon extends Weapon {
             let target: Entity | null = null;
             let minDst = Infinity;
 
-            for (const enemy of enemies) {
+            const candidates = levelSpatialHash.getWithinRadius(this.owner.pos, 600);
+
+            for (const enemy of candidates) {
                 const dst = distance(this.owner.pos, enemy.pos);
-                if (dst < 600 && dst < minDst) {
+                // Note: getWithinRadius guarantees checked radius, but we check again for exact distance logic if needed.
+                // Here we need closest.
+                if (dst < minDst) {
                     minDst = dst;
                     target = enemy;
                 }

@@ -6,6 +6,7 @@ import { Entity } from '../../Entity';
 import { type Vector2, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 // ============================================
 // ZONE - Base class for area damage
@@ -358,7 +359,7 @@ export class DelayedExplosionZone extends Zone {
         this.isAtomic = isAtomic;
     }
 
-    update(dt: number, enemies?: Entity[]) {
+    update(dt: number) {
         if (this.exploded) {
             this.shockwaveRadius += dt * this.radius * 4;
             this.shockwaveAlpha -= dt * 2;
@@ -376,7 +377,7 @@ export class DelayedExplosionZone extends Zone {
         this.beamWidth = progress * (this.isAtomic ? 40 : 15);
 
         if (this.delay <= 0) {
-            this.explode(enemies);
+            this.explode();
             this.exploded = true;
             this.flashAlpha = 1;
             this.shockwaveAlpha = 1;
@@ -384,9 +385,7 @@ export class DelayedExplosionZone extends Zone {
         }
     }
 
-    explode(enemies?: Entity[]) {
-        if (!enemies) return;
-
+    explode() {
         if (!this.particlesEmitted) {
             this.particlesEmitted = true;
             if (this.isAtomic) {
@@ -396,7 +395,9 @@ export class DelayedExplosionZone extends Zone {
             }
         }
 
-        for (const enemy of enemies) {
+        const enemiesInBlast = levelSpatialHash.getWithinRadius(this.pos, this.radius);
+
+        for (const enemy of enemiesInBlast) {
             if (distance(this.pos, enemy.pos) <= this.radius) {
                 // Use DamageSystem for consistent damage handling
                 damageSystem.dealRawDamage(enemy, this.damage, enemy.pos);
@@ -624,7 +625,7 @@ export class MindBlastZone extends Zone {
         this.stunDuration = stunDuration;
     }
 
-    update(dt: number, enemies?: Entity[]) {
+    update(dt: number) {
         this.stageTimer += dt;
 
         for (let i = this.rings.length - 1; i >= 0; i--) {
@@ -652,19 +653,19 @@ export class MindBlastZone extends Zone {
         } else if (this.stage === 'blast') {
             if (!this.blastTriggered) {
                 this.blastTriggered = true;
-                if (enemies) {
-                    enemies.forEach(e => {
-                        if (distance(this.pos, e.pos) <= this.radius) {
-                            // Use DamageSystem for consistent damage handling
-                            damageSystem.dealRawDamage(e, this.damage, e.pos);
-                            particles.emitHit(e.pos.x, e.pos.y, '#ff00ff');
+                const enemiesInBlast = levelSpatialHash.getWithinRadius(this.pos, this.radius);
 
-                            if (this.stunDuration > 0) {
-                                (e as any).stunTimer = this.stunDuration;
-                            }
+                enemiesInBlast.forEach(e => {
+                    if (distance(this.pos, e.pos) <= this.radius) {
+                        // Use DamageSystem for consistent damage handling
+                        damageSystem.dealRawDamage(e, this.damage, e.pos);
+                        particles.emitHit(e.pos.x, e.pos.y, '#ff00ff');
+
+                        if (this.stunDuration > 0) {
+                            (e as any).stunTimer = this.stunDuration;
                         }
-                    });
-                }
+                    }
+                });
             }
 
             if (this.stageTimer > 1.8) {

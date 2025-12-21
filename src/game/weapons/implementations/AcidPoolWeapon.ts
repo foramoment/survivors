@@ -3,11 +3,11 @@
  * Throws acid flasks that create damaging puddles.
  */
 import { Weapon } from '../../Weapon';
-import { Entity } from '../../Entity';
 import { type Vector2, distance } from '../../core/Utils';
 import { LobbedProjectile, AcidZone } from '../base';
 import { particles } from '../../core/ParticleSystem';
 import { WEAPON_STATS } from '../../data/GameData';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 function getStats(weaponId: string) {
     return WEAPON_STATS[weaponId] || {
@@ -28,7 +28,7 @@ export class AcidPoolWeapon extends Weapon {
         this.area = this.stats.area;
     }
 
-    update(dt: number, enemies: Entity[]) {
+    update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
@@ -36,9 +36,12 @@ export class AcidPoolWeapon extends Weapon {
             let target: any = null;
             let minDst = Infinity;
 
-            for (const enemy of enemies) {
+            const searchRadius = 500;
+            const nearby = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
+
+            for (const enemy of nearby) {
                 const dst = distance(this.owner.pos, enemy.pos);
-                if (dst < 500 && dst < minDst) {
+                if (dst < searchRadius && dst < minDst) {
                     minDst = dst;
                     target = enemy;
                 }

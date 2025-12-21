@@ -96,3 +96,7 @@ export class SpatialHashGrid<T extends { pos: Vector2; radius: number }> {
         });
     }
 }
+
+// Global instance for the current level
+// Cast to any to allow usage with specific entity types (Enemy, etc)
+export const levelSpatialHash = new SpatialHashGrid<any>(100);

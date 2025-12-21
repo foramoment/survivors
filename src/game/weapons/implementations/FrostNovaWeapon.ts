@@ -5,7 +5,6 @@
  * Evolved: Absolute Zero - Complete freeze effect
  */
 import { Weapon } from '../../Weapon';
-import { Entity } from '../../Entity';
 import { type Vector2 } from '../../core/Utils';
 import { LobbedProjectile, FrostZone } from '../base';
 import { AbsoluteZeroZone } from '../EvolutionTypes';
@@ -31,7 +30,7 @@ export class FrostNovaWeapon extends Weapon {
         this.area = this.stats.area;
     }
 
-    update(dt: number, _enemies: Entity[]) {
+    update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;

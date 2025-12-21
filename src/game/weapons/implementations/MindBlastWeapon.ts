@@ -5,11 +5,11 @@
  * Evolved: Psychic Storm - Cascading stun zone
  */
 import { Weapon } from '../../Weapon';
-import { Entity } from '../../Entity';
-import { type Vector2, distance } from '../../core/Utils';
+import { type Vector2 } from '../../core/Utils';
 import { MindBlastZone } from '../base';
 import { PsychicStormZone } from '../EvolutionTypes';
 import { WEAPON_STATS } from '../../data/GameData';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 function getStats(weaponId: string) {
     return WEAPON_STATS[weaponId] || {
@@ -30,13 +30,14 @@ export class MindBlastWeapon extends Weapon {
         this.area = this.stats.area;
     }
 
-    update(dt: number, enemies: Entity[]) {
+    update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
 
         if (this.cooldown <= 0) {
-            const targets = enemies.filter(e => distance(this.owner.pos, e.pos) < 600);
+            const psiStormRange = 600;
+            const targets = levelSpatialHash.getWithinRadius(this.owner.pos, psiStormRange);
 
             if (targets.length > 0) {
                 const target = targets[Math.floor(Math.random() * targets.length)];

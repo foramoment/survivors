@@ -7,6 +7,7 @@ import { Entity } from '../../Entity';
 import { type Vector2, normalize, distance } from '../../core/Utils';
 import { Projectile } from './Projectile';
 import { Zone } from './Zone';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 // ============================================
 // PROJECTILE WEAPON - Fires projectiles at enemies
@@ -15,7 +16,7 @@ export abstract class ProjectileWeapon extends Weapon {
     abstract projectileEmoji: string;
     abstract pierce: number;
 
-    update(dt: number, enemies: Entity[]) {
+    update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
@@ -23,9 +24,12 @@ export abstract class ProjectileWeapon extends Weapon {
             let target: Entity | null = null;
             let minDst = Infinity;
 
-            for (const enemy of enemies) {
+            const searchRadius = this.area * (this.owner as any).stats.area;
+            const nearby = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
+
+            for (const enemy of nearby) {
                 const dst = distance(this.owner.pos, enemy.pos);
-                if (dst < this.area * (this.owner as any).stats.area && dst < minDst) {
+                if (dst < searchRadius && dst < minDst) {
                     minDst = dst;
                     target = enemy;
                 }
@@ -62,11 +66,6 @@ export abstract class ProjectileWeapon extends Weapon {
         this.onSpawn(proj);
     }
 
-    upgrade() {
-        this.level++;
-        this.damage *= 1.2;
-    }
-
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
 
@@ -77,7 +76,7 @@ export abstract class ZoneWeapon extends Weapon {
     abstract zoneEmoji: string;
     abstract interval: number;
 
-    update(dt: number, _enemies: Entity[]) {
+    update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
@@ -104,12 +103,6 @@ export abstract class ZoneWeapon extends Weapon {
             this.zoneEmoji
         );
         this.onSpawn(zone);
-    }
-
-    upgrade() {
-        this.level++;
-        this.damage *= 1.2;
-        this.area *= 1.1;
     }
 
     draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }

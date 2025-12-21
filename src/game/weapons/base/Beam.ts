@@ -2,11 +2,11 @@
  * BASE BEAM CLASSES
  * Extracted from WeaponTypes.ts for better AI context management.
  */
-import { Entity } from '../../Entity';
 import { type Vector2, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { Projectile } from './Projectile';
 import { damageSystem } from '../../core/DamageSystem';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 // ============================================
 // BEAM - Simple visual beam (no collision)
@@ -80,7 +80,7 @@ export class VoidRayBeam extends Projectile {
         }
     }
 
-    update(dt: number, _enemies?: any[]) {
+    update(dt: number) {
         this.timer += dt;
 
         if (this.target && !this.target.isDead) {
@@ -195,11 +195,11 @@ export class ChainLightning extends Projectile {
         // Base implementation does nothing - evolved versions can override
     }
 
-    update(dt: number, enemies?: Entity[]) {
+    update(dt: number) {
         this.segments.forEach(s => s.alpha -= dt * 5);
         this.segments = this.segments.filter(s => s.alpha > 0);
 
-        if (!this.hasChained && enemies) {
+        if (!this.hasChained) {
             this.hasChained = true;
 
             let currentBounces = this.bounces;
@@ -208,7 +208,10 @@ export class ChainLightning extends Projectile {
                 let target: any = null;
                 let minDst = this.range;
 
-                for (const enemy of enemies) {
+                // Use spatial hash for O(1) lookup
+                const nearby = levelSpatialHash.getWithinRadius(this.currentPos, this.range);
+
+                for (const enemy of nearby) {
                     if (this.hitEnemies.has(enemy)) continue;
 
                     const d = distance(this.currentPos, enemy.pos);
@@ -348,42 +351,6 @@ export class ChainLightning extends Projectile {
             }
         }
 
-        ctx.restore();
-    }
-}
-
-// ============================================
-// DRONE ENTITY - Follows owner
-// ============================================
-export class DroneEntity extends Entity {
-    owner: any;
-    offset: Vector2 = { x: 50, y: -50 };
-    canCollide: boolean = false;
-
-    constructor(owner: any) {
-        super(owner.pos.x, owner.pos.y, 10);
-        this.owner = owner;
-        this.canCollide = false;
-    }
-
-    update(dt: number, _enemies?: Entity[]) {
-        const targetX = this.owner.pos.x + this.offset.x;
-        const targetY = this.owner.pos.y + this.offset.y;
-
-        this.pos.x += (targetX - this.pos.x) * 5 * dt;
-        this.pos.y += (targetY - this.pos.y) * 5 * dt;
-
-        this.offset.y = -50 + Math.sin(Date.now() / 500) * 10;
-        this.offset.x = 50 + Math.cos(Date.now() / 700) * 10;
-    }
-
-    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        ctx.save();
-        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-        ctx.font = '30px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🛸', 0, 0);
         ctx.restore();
     }
 }

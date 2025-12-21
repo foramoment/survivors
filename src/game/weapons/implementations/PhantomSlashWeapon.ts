@@ -5,12 +5,12 @@
  * Evolved: Dimensional Blade - Creates rift zones that slow enemies
  */
 import { Weapon } from '../../Weapon';
-import { Entity } from '../../Entity';
-import { type Vector2, distance } from '../../core/Utils';
+import { type Vector2 } from '../../core/Utils';
 import { Zone } from '../base';
 import { DimensionalRiftZone } from '../EvolutionTypes';
 import { WEAPON_STATS } from '../../data/GameData';
 import { damageSystem } from '../../core/DamageSystem';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 function getStats(weaponId: string) {
     return WEAPON_STATS[weaponId] || {
@@ -31,12 +31,19 @@ export class PhantomSlashWeapon extends Weapon {
         this.area = this.stats.area;
     }
 
-    update(dt: number, enemies: Entity[]) {
+    update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
-            const targets = enemies.filter(e => distance(this.owner.pos, e.pos) < this.area * (this.owner as any).stats.area);
+            const attackRadius = this.area * (this.owner as any).stats.area;
+            const nearbyTargets = levelSpatialHash.getWithinRadius(this.owner.pos, attackRadius);
+
+            // Filter by exact distance since grid is coarse
+            // Note: getWithinRadius already does distance check, but returns array. 
+            // We can just use it directly since it filters.
+            // However, we need a copy if we're going to splice efficiently, or just track used indices.
+            const targets = [...nearbyTargets];
 
             if (targets.length > 0) {
                 const isEvolved = this.evolved;

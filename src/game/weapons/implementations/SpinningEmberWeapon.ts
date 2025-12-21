@@ -3,7 +3,6 @@
  * Fireballs that orbit around the player.
  */
 import { Weapon } from '../../Weapon';
-import { Entity } from '../../Entity';
 import { type Vector2 } from '../../core/Utils';
 import { OrbitingProjectile } from '../base';
 import { WEAPON_STATS } from '../../data/GameData';
@@ -27,7 +26,7 @@ export class SpinningEmberWeapon extends Weapon {
         this.damage = this.stats.damage;
     }
 
-    update(dt: number, _enemies: Entity[]) {
+    update(dt: number) {
         this.projectiles = this.projectiles.filter(p => !p.isDead);
 
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;

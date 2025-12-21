@@ -11,6 +11,7 @@ import { ThunderstormLightning } from '../EvolutionTypes';
 import { particles } from '../../core/ParticleSystem';
 import { WEAPON_STATS } from '../../data/GameData';
 import { damageSystem } from '../../core/DamageSystem';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 function getStats(weaponId: string) {
     return WEAPON_STATS[weaponId] || {
@@ -34,7 +35,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
         this.duration = this.stats.duration;
     }
 
-    update(dt: number, enemies: Entity[]) {
+    update(dt: number) {
         const isEvolved = this.evolved;
 
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
@@ -44,8 +45,12 @@ export class LightningChainWeapon extends ProjectileWeapon {
         if (this.cooldown <= 0) {
             let target: Entity | null = null;
             let minDst = this.area * (this.owner as any).stats.area;
+            const searchRadius = minDst;
 
-            for (const enemy of enemies) {
+            // Use spatial hash for O(1) lookup
+            const nearby = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
+
+            for (const enemy of nearby) {
                 const dst = distance(this.owner.pos, enemy.pos);
                 if (dst < minDst) {
                     minDst = dst;

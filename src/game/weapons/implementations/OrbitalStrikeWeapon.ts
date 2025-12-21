@@ -5,7 +5,6 @@
  * Evolved: Atomic Bomb - Massive nuclear explosion
  */
 import { Weapon } from '../../Weapon';
-import { Entity } from '../../Entity';
 import { type Vector2 } from '../../core/Utils';
 import { DelayedExplosionZone } from '../base';
 import { AtomicBombZone } from '../EvolutionTypes';
@@ -32,7 +31,7 @@ export class OrbitalStrikeWeapon extends Weapon {
         this.area = this.stats.area;
     }
 
-    update(dt: number, _enemies: Entity[]) {
+    update(dt: number) {
         const isEvolved = this.evolved;
 
         if (isEvolved && this.waitingForExplosion) {

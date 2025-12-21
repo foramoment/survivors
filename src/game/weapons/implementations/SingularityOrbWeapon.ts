@@ -9,6 +9,7 @@ import { Entity } from '../../Entity';
 import { distance } from '../../core/Utils';
 import { BlackHoleProjectile, BlackHoleZone } from '../EvolutionTypes';
 import { WEAPON_STATS } from '../../data/GameData';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 function getStats(weaponId: string) {
     return WEAPON_STATS[weaponId] || {
@@ -35,7 +36,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
         this.duration = this.stats.duration;
     }
 
-    update(dt: number, enemies: Entity[]) {
+    update(dt: number) {
         const isEvolved = this.evolved;
 
         if (isEvolved && this.waitingForCollapse) {
@@ -54,7 +55,10 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
             let target: Entity | null = null;
             let minDst = this.area * (this.owner as any).stats.area;
 
-            for (const enemy of enemies) {
+            const searchRadius = minDst;
+            const nearbyEnemies = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
+
+            for (const enemy of nearbyEnemies) {
                 const dst = distance(this.owner.pos, enemy.pos);
                 if (dst < minDst) {
                     minDst = dst;

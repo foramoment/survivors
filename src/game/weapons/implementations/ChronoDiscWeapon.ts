@@ -6,6 +6,7 @@ import { ProjectileWeapon, BouncingProjectile } from '../base';
 import { Entity } from '../../Entity';
 import { distance } from '../../core/Utils';
 import { WEAPON_STATS } from '../../data/GameData';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 function getStats(weaponId: string) {
     return WEAPON_STATS[weaponId] || {
@@ -30,7 +31,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
         this.duration = this.stats.duration;
     }
 
-    update(dt: number, enemies: Entity[]) {
+    update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
@@ -47,9 +48,12 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
             let target: Entity | null = null;
             let minDst = Infinity;
 
-            for (const enemy of enemies) {
+            const searchRadius = this.area * (this.owner as any).stats.area;
+            const nearby = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
+
+            for (const enemy of nearby) {
                 const dst = distance(this.owner.pos, enemy.pos);
-                if (dst < this.area * (this.owner as any).stats.area && dst < minDst) {
+                if (dst < searchRadius && dst < minDst) {
                     minDst = dst;
                     target = enemy;
                 }

@@ -5,7 +5,7 @@ import { Entity } from './Entity';
 import { CLASSES, POWERUPS, ENEMIES, WEAPONS } from './data/GameData';
 import { checkCollision, type Vector2, distance } from './core/Utils';
 import { Projectile, Zone, BouncingProjectile } from './weapons/WeaponTypes';
-import { SpatialHashGrid } from './core/SpatialHash';
+import { levelSpatialHash } from './core/SpatialHash';
 import { particles } from './core/ParticleSystem';
 import { stateMachine, type GameState } from './core/StateMachine';
 import { damageSystem } from './core/DamageSystem';
@@ -40,9 +40,7 @@ export class GameManager {
 
     devMode: boolean = false;
 
-    // Spatial hash grid for efficient enemy collision detection
-    // Cell size of 50 works well for enemy radius of ~12-18
-    enemyGrid: SpatialHashGrid<Enemy> = new SpatialHashGrid(50);
+
 
     constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
         this.canvas = canvas;
@@ -574,7 +572,7 @@ export class GameManager {
         }
 
         this.player.update(dt);
-        this.player.weapons.forEach(w => w.update(dt, this.enemies));
+        this.player.weapons.forEach(w => w.update(dt));
 
         // Reset enemy stats and forces before updates/collisions
         this.enemies.forEach(e => {
@@ -584,13 +582,13 @@ export class GameManager {
 
         // === ENEMY SEPARATION USING SPATIAL HASH ===
         // 1. Build spatial hash grid
-        this.enemyGrid.clear();
-        this.enemyGrid.insertAll(this.enemies);
+        levelSpatialHash.clear();
+        levelSpatialHash.insertAll(this.enemies);
 
         // 2. Calculate separation forces for each enemy
         for (const enemy of this.enemies) {
             // Get nearby enemies from spatial grid (O(1) average case)
-            const nearby = this.enemyGrid.getNearby(enemy.pos, enemy.radius * 3);
+            const nearby = levelSpatialHash.getNearby(enemy.pos, enemy.radius * 3);
 
             for (const other of nearby) {
                 if (other === enemy) continue;
@@ -600,7 +598,7 @@ export class GameManager {
 
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const p = this.projectiles[i];
-            p.update(dt, this.enemies);
+            p.update(dt);
             if (p.isDead) {
                 this.projectiles.splice(i, 1);
             }

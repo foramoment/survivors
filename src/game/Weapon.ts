@@ -37,7 +37,7 @@ export abstract class Weapon {
         this.owner = owner;
     }
 
-    abstract update(dt: number, enemies: Entity[]): void;
+    abstract update(dt: number): void;
     abstract draw(ctx: CanvasRenderingContext2D, camera: Vector2): void;
 
     /**

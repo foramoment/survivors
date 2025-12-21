@@ -3,7 +3,6 @@
  * Swarm of nanobots that damage enemies around the player.
  */
 import { Weapon } from '../../Weapon';
-import { Entity } from '../../Entity';
 import { type Vector2 } from '../../core/Utils';
 import { NanobotCloud } from '../base';
 import { WEAPON_STATS } from '../../data/GameData';
@@ -29,7 +28,7 @@ export class NanobotSwarmWeapon extends Weapon {
         this.area = this.stats.area;
     }
 
-    update(dt: number, _enemies: Entity[]) {
+    update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;

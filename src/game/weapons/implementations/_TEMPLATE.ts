@@ -16,6 +16,7 @@ import { Entity } from '../../Entity';
 import { type Vector2, distance } from '../../core/Utils';
 import { Projectile, Zone as _Zone } from '../base';
 import { WEAPON_STATS } from '../../data/GameData';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 function getStats(weaponId: string) {
     return WEAPON_STATS[weaponId] || {
@@ -41,7 +42,7 @@ export class TemplateWeapon extends Weapon {
     }
 
     // === MAIN UPDATE LOOP ===
-    update(dt: number, enemies: Entity[]) {
+    update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
@@ -51,7 +52,10 @@ export class TemplateWeapon extends Weapon {
             let target: Entity | null = null;
             let minDst = this.area * (this.owner as any).stats.area;
 
-            for (const enemy of enemies) {
+            const searchRadius = this.area * (this.owner as any).stats.area;
+            const potentialTargets = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
+
+            for (const enemy of potentialTargets) {
                 const dst = distance(this.owner.pos, enemy.pos);
                 if (dst < minDst) {
                     minDst = dst;

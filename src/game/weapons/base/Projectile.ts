@@ -5,6 +5,7 @@
 import { Entity } from '../../Entity';
 import { type Vector2, normalize, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
+import { levelSpatialHash } from '../../core/SpatialHash';
 
 // ============================================
 // PROJECTILE - Base class for all flying entities
@@ -26,7 +27,7 @@ export class Projectile extends Entity {
         this.emoji = emoji;
     }
 
-    update(dt: number, _enemies?: Entity[]) {
+    update(dt: number) {
         this.pos.x += this.velocity.x * dt;
         this.pos.y += this.velocity.y * dt;
         this.duration -= dt;
@@ -91,8 +92,8 @@ export class SingularityProjectile extends Projectile {
         this.radius = 20;
     }
 
-    update(dt: number, enemies?: Entity[]) {
-        super.update(dt, enemies);
+    update(dt: number) {
+        super.update(dt);
         this.rotation += dt * 3;
 
         this.particleTimer += dt;
@@ -101,17 +102,17 @@ export class SingularityProjectile extends Projectile {
             particles.emitSingularityDistortion(this.pos.x, this.pos.y, this.radius);
         }
 
-        if (enemies) {
-            for (const enemy of enemies) {
-                const dx = this.pos.x - enemy.pos.x;
-                const dy = this.pos.y - enemy.pos.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+        const enemiesInPullRange = levelSpatialHash.getWithinRadius(this.pos, 200);
 
-                if (dist < 200 && dist > 5) {
-                    const pullForce = this.pullStrength / dist;
-                    (enemy as any).pos.x += (dx / dist) * pullForce * dt;
-                    (enemy as any).pos.y += (dy / dist) * pullForce * dt;
-                }
+        for (const enemy of enemiesInPullRange) {
+            const dx = this.pos.x - enemy.pos.x;
+            const dy = this.pos.y - enemy.pos.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < 200 && dist > 5) {
+                const pullForce = this.pullStrength / dist;
+                (enemy as any).pos.x += (dx / dist) * pullForce * dt;
+                (enemy as any).pos.y += (dy / dist) * pullForce * dt;
             }
         }
     }
@@ -171,9 +172,9 @@ export class PlasmaProjectile extends Projectile {
         this.radius = 15;
     }
 
-    update(dt: number, enemies?: Entity[]) {
+    update(dt: number) {
         const wasAlive = !this.isDead;
-        super.update(dt, enemies);
+        super.update(dt);
 
         this.particleTimer += dt;
         if (this.particleTimer > 0.05) {
@@ -240,7 +241,7 @@ export class OrbitingProjectile extends Projectile {
         this.canCollide = true;
     }
 
-    update(dt: number, _enemies?: Entity[]) {
+    update(dt: number) {
         this.angle += this.speed * dt;
         this.pos.x = this.owner.pos.x + Math.cos(this.angle) * this.distance;
         this.pos.y = this.owner.pos.y + Math.sin(this.angle) * this.distance;
@@ -268,7 +269,7 @@ export class LobbedProjectile extends Projectile {
         this.canCollide = false;
     }
 
-    update(dt: number, _enemies?: Entity[]) {
+    update(dt: number) {
         this.duration -= dt;
         const t = 1 - (this.duration / this.totalDuration);
 
@@ -304,7 +305,7 @@ export class Nanobot extends Projectile {
         this.canCollide = true;
     }
 
-    update(dt: number, _enemies?: Entity[]) {
+    update(dt: number) {
         this.angle += this.rotationSpeed * dt;
         const currentDist = this.distance + Math.sin(Date.now() / 200) * 20;
 

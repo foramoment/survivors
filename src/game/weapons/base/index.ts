@@ -31,8 +31,7 @@ export {
 export {
     Beam,
     VoidRayBeam,
-    ChainLightning,
-    DroneEntity
+    ChainLightning
 } from './Beam';
 
 // Abstract weapon classes

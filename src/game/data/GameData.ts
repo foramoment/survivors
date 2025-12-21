@@ -74,8 +74,6 @@ export const WEAPONS = [
         }
     },
     {
-        // The user asked to "Replace weapon Drone Support".
-        // Let's change ID to 'plasma_cannon'.
         id: 'plasma_cannon',
         name: "Plasma Cannon",
         emoji: "🔋",
@@ -298,7 +296,7 @@ export const WEAPON_STATS: Record<string, {
         duration: 0.5,
     },
     chrono_disc: {
-        damage: 2.67,
+        damage: 25,
         cooldown: 2.5,
         area: 400,
         speed: 500,
