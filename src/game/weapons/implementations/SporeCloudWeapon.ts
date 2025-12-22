@@ -3,7 +3,6 @@
  * Leaves damaging zone at player position.
  */
 import { ZoneWeapon, SporeZone } from '../base';
-import { WEAPON_STATS } from '../../data/GameData';
 
 export class SporeCloudWeapon extends ZoneWeapon {
     name = "Spore Cloud";
@@ -11,14 +10,21 @@ export class SporeCloudWeapon extends ZoneWeapon {
     description = "Leaves damaging zones.";
     zoneEmoji = "";
     interval = 1;
-    private stats = WEAPON_STATS['spore_cloud'];
+
+    static readonly CONFIG = {
+        damage: 10,
+        cooldown: 2,
+        area: 50,
+        speed: 0,
+        duration: 5,
+    };
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = this.stats.cooldown;
-        this.duration = this.stats.duration;
-        this.damage = this.stats.damage;
-        this.area = this.stats.area;
+        this.baseCooldown = SporeCloudWeapon.CONFIG.cooldown;
+        this.duration = SporeCloudWeapon.CONFIG.duration;
+        this.damage = SporeCloudWeapon.CONFIG.damage;
+        this.area = SporeCloudWeapon.CONFIG.area;
     }
 
     spawnZone() {

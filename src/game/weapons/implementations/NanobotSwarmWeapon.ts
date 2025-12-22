@@ -5,21 +5,27 @@
 import { Weapon } from '../../Weapon';
 import { type Vector2 } from '../../core/Utils';
 import { NanobotCloud } from '../base';
-import { WEAPON_STATS } from '../../data/GameData';
 
 export class NanobotSwarmWeapon extends Weapon {
     name = "Nanobot Swarm";
     emoji = "🦠";
     description = "Swarm of nanobots that devour enemies.";
     private activeCloud: NanobotCloud | null = null;
-    private stats = WEAPON_STATS['nanobot_swarm'];
+
+    static readonly CONFIG = {
+        damage: 0.8,
+        cooldown: 0.5,
+        area: 1.0,
+        speed: 0,
+        duration: 5,
+    };
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = this.stats.cooldown;
-        this.damage = this.stats.damage;
-        this.duration = this.stats.duration;
-        this.area = this.stats.area;
+        this.baseCooldown = NanobotSwarmWeapon.CONFIG.cooldown;
+        this.damage = NanobotSwarmWeapon.CONFIG.damage;
+        this.duration = NanobotSwarmWeapon.CONFIG.duration;
+        this.area = NanobotSwarmWeapon.CONFIG.area;
     }
 
     update(dt: number) {

@@ -5,7 +5,6 @@
 import { ProjectileWeapon, BouncingProjectile } from '../base';
 import { Entity } from '../../Entity';
 import { distance } from '../../core/Utils';
-import { WEAPON_STATS } from '../../data/GameData';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
 export class ChronoDiscWeapon extends ProjectileWeapon {
@@ -14,15 +13,27 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
     description = "Ricochet disc that bounces between enemies.";
     projectileEmoji = "💿";
     pierce = 0;
-    private stats = WEAPON_STATS['chrono_disc'];
     private pendingDiscs: { delay: number; target: Entity }[] = [];
+
+    static readonly CONFIG = {
+        damage: 25,
+        cooldown: 2.5,
+        area: 400,
+        speed: 500,
+        duration: 5,
+        pierce: 5,
+        count: 1,
+        countScaling: 1,
+    };
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = this.stats.cooldown;
-        this.damage = this.stats.damage;
-        this.speed = this.stats.speed;
-        this.duration = this.stats.duration;
+        this.baseCooldown = ChronoDiscWeapon.CONFIG.cooldown;
+        this.damage = ChronoDiscWeapon.CONFIG.damage;
+        this.speed = ChronoDiscWeapon.CONFIG.speed;
+        this.duration = ChronoDiscWeapon.CONFIG.duration;
+        this.pierce = ChronoDiscWeapon.CONFIG.pierce || 3;
+        this.area = ChronoDiscWeapon.CONFIG.area;
     }
 
     update(dt: number) {
@@ -54,7 +65,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
             }
 
             if (target) {
-                const count = (this.stats.count || 1) + Math.floor((this.level - 1) * (this.stats.countScaling || 0));
+                const count = (ChronoDiscWeapon.CONFIG.count || 1) + Math.floor((this.level - 1) * (ChronoDiscWeapon.CONFIG.countScaling || 0));
 
                 this.fire(target);
 
@@ -79,7 +90,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
         const speed = this.speed * (this.owner as any).stats.speed;
         const velocity = { x: dir.x * speed, y: dir.y * speed };
 
-        const bounces = (this.stats.pierce || 5) + this.level;
+        const bounces = (ChronoDiscWeapon.CONFIG.pierce || 5) + this.level;
 
         const projectile = new BouncingProjectile(
             this.owner.pos.x,
@@ -89,7 +100,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
             (this.owner as any).getDamage(this.damage).damage,
             bounces,
             this.projectileEmoji,
-            this.stats.area
+            this.area
         );
 
         this.onSpawn(projectile);

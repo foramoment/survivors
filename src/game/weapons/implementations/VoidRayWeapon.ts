@@ -8,20 +8,26 @@ import { Weapon } from '../../Weapon';
 import { Entity } from '../../Entity';
 import { type Vector2, distance } from '../../core/Utils';
 import { VoidRayBeam } from '../base';
-import { WEAPON_STATS } from '../../data/GameData';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
 export class VoidRayWeapon extends Weapon {
     name = "Void Ray";
     emoji = "🔫";
     description = "Fires a powerful charging beam.";
-    private stats = WEAPON_STATS['void_ray'];
+
+    static readonly CONFIG = {
+        damage: 25,
+        cooldown: 2.0,
+        area: 1,
+        speed: 0,
+        duration: 0.5,
+    };
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = this.stats.cooldown;
-        this.damage = this.stats.damage;
-        this.area = this.stats.area;
+        this.baseCooldown = VoidRayWeapon.CONFIG.cooldown;
+        this.damage = VoidRayWeapon.CONFIG.damage;
+        this.area = VoidRayWeapon.CONFIG.area;
     }
 
     update(dt: number) {

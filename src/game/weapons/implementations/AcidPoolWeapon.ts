@@ -6,20 +6,26 @@ import { Weapon } from '../../Weapon';
 import { type Vector2, distance } from '../../core/Utils';
 import { LobbedProjectile, AcidZone } from '../base';
 import { particles } from '../../core/ParticleSystem';
-import { WEAPON_STATS } from '../../data/GameData';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
 export class AcidPoolWeapon extends Weapon {
     name = "Acid Pool";
     emoji = "🧪";
     description = "Throws acid flasks that create puddles.";
-    private stats = WEAPON_STATS['acid_pool'];
+
+    static readonly CONFIG = {
+        damage: 10,
+        cooldown: 2.0,
+        area: 80,
+        speed: 0,
+        duration: 3.0,
+    };
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = this.stats.cooldown;
-        this.damage = this.stats.damage;
-        this.area = this.stats.area;
+        this.baseCooldown = AcidPoolWeapon.CONFIG.cooldown;
+        this.damage = AcidPoolWeapon.CONFIG.damage;
+        this.area = AcidPoolWeapon.CONFIG.area;
     }
 
     update(dt: number) {
@@ -55,7 +61,7 @@ export class AcidPoolWeapon extends Weapon {
                     const zone = new AcidZone(
                         x, y,
                         this.area * (this.owner as any).stats.area,
-                        this.stats.duration * (this.owner as any).stats.duration,
+                        AcidPoolWeapon.CONFIG.duration * (this.owner as any).stats.duration,
                         (this.owner as any).getDamage(this.damage).damage,
                         0.5
                     );

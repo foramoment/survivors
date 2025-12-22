@@ -5,19 +5,27 @@
 import { Weapon } from '../../Weapon';
 import { type Vector2 } from '../../core/Utils';
 import { OrbitingProjectile } from '../base';
-import { WEAPON_STATS } from '../../data/GameData';
 
 export class SpinningEmberWeapon extends Weapon {
     name = "Spinning Ember";
     emoji = "🔥";
     description = "Fireballs that orbit you.";
     projectiles: OrbitingProjectile[] = [];
-    private stats = WEAPON_STATS['spinning_ember'];
+
+    static readonly CONFIG = {
+        damage: 15,
+        cooldown: 3.0,
+        area: 100,
+        speed: 3,
+        duration: 4,
+        count: 2,
+        countScaling: 1,
+    };
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = this.stats.cooldown;
-        this.damage = this.stats.damage;
+        this.baseCooldown = SpinningEmberWeapon.CONFIG.cooldown;
+        this.damage = SpinningEmberWeapon.CONFIG.damage;
     }
 
     update(dt: number) {
@@ -27,15 +35,15 @@ export class SpinningEmberWeapon extends Weapon {
         const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
         this.cooldown -= dt * speedBoost * timeSpeed;
         if (this.cooldown <= 0) {
-            const count = (this.stats.count || 2) + Math.floor((this.level - 1) * (this.stats.countScaling || 1));
-            const duration = this.stats.duration * (this.owner as any).stats.duration;
+            const count = (SpinningEmberWeapon.CONFIG.count || 2) + Math.floor((this.level - 1) * (SpinningEmberWeapon.CONFIG.countScaling || 1));
+            const duration = SpinningEmberWeapon.CONFIG.duration * (this.owner as any).stats.duration;
 
             for (let i = 0; i < count; i++) {
                 const angle = (Math.PI * 2 / count) * i;
                 const proj = new OrbitingProjectile(
                     this.owner,
-                    this.stats.area,
-                    this.stats.speed,
+                    SpinningEmberWeapon.CONFIG.area,
+                    SpinningEmberWeapon.CONFIG.speed,
                     duration,
                     (this.owner as any).getDamage(this.damage).damage,
                     '🔥'
