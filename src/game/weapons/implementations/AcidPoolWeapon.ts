@@ -57,7 +57,7 @@ export class AcidPoolWeapon extends Weapon {
                 );
 
                 lob.onLand = (x, y) => {
-                    particles.emitPoison(x, y);
+                    //particles.emitPoison(x, y);
                     const zone = new AcidZone(
                         x, y,
                         this.area * (this.owner as any).stats.area,

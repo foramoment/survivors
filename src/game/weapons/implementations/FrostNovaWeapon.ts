@@ -50,7 +50,7 @@ export class FrostNovaWeapon extends Weapon {
 
             lob.onLand = (x, y) => {
                 const isEvolved = this.evolved;
-                particles.emitFrost(x, y);
+                //particles.emitFrost(x, y);
 
                 if (isEvolved) {
                     const zone = new AbsoluteZeroZone(

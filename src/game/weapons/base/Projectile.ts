@@ -99,7 +99,7 @@ export class SingularityProjectile extends Projectile {
         this.particleTimer += dt;
         if (this.particleTimer > 0.08) {
             this.particleTimer = 0;
-            particles.emitSingularityDistortion(this.pos.x, this.pos.y, this.radius);
+            //particles.emitSingularityDistortion(this.pos.x, this.pos.y, this.radius);
         }
 
         const enemiesInPullRange = levelSpatialHash.getWithinRadius(this.pos, 200);
@@ -179,7 +179,7 @@ export class PlasmaProjectile extends Projectile {
         this.particleTimer += dt;
         if (this.particleTimer > 0.05) {
             this.particleTimer = 0;
-            particles.emitPlasmaEnergy(this.pos.x, this.pos.y);
+            //particles.emitPlasmaEnergy(this.pos.x, this.pos.y);
         }
 
         if (wasAlive && this.isDead && this.onExplosion) {

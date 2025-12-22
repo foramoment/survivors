@@ -76,7 +76,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
             target: target,
             position: target.pos
         });
-        particles.emitLightning(target.pos.x, target.pos.y);
+        //particles.emitLightning(target.pos.x, target.pos.y);
 
         const beamColor = isEvolved ? '#aa00ff' : '#ffff00';
         const beam = new Beam(this.owner.pos, target.pos, 0.1, beamColor, isEvolved ? 3 : 2);
@@ -102,7 +102,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
                 target: t,
                 position: t.pos
             });
-            particles.emitLightning(t.pos.x, t.pos.y);
+            //particles.emitLightning(t.pos.x, t.pos.y);
         };
 
         this.onSpawn(chain);

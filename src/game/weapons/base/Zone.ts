@@ -37,7 +37,7 @@ export class Zone extends Entity {
 
     onOverlap(enemy: any) {
         if (this.slowEffect > 0) {
-            enemy.speedMultiplier = Math.max(0.1, 1 - this.slowEffect);
+            enemy.speedMultiplier = Math.max(0.01, 1 - this.slowEffect);
         }
     }
 
@@ -89,7 +89,7 @@ export class FrostZone extends Zone {
         this.particleTimer += dt;
         if (this.particleTimer > 0.1) {
             this.particleTimer = 0;
-            particles.emitColdMist(this.pos.x, this.pos.y, this.radius);
+            //particles.emitColdMist(this.pos.x, this.pos.y, this.radius);
         }
     }
 
@@ -165,7 +165,7 @@ export class AcidZone extends Zone {
         this.particleTimer += dt;
         if (this.particleTimer > 0.15) {
             this.particleTimer = 0;
-            particles.emitAcidBubble(this.pos.x, this.pos.y, this.radius);
+            //particles.emitAcidBubble(this.pos.x, this.pos.y, this.radius);
         }
     }
 
@@ -245,7 +245,7 @@ export class SporeZone extends Zone {
         this.particleTimer += dt;
         if (this.particleTimer > 0.2) {
             this.particleTimer = 0;
-            particles.emitSporeCloud(this.pos.x, this.pos.y, this.radius);
+            //particles.emitSporeCloud(this.pos.x, this.pos.y, this.radius);
         }
     }
 
@@ -295,7 +295,7 @@ export class NanobotCloud extends Zone {
         this.particleTimer += dt;
         if (this.particleTimer > 0.05) {
             this.particleTimer = 0;
-            particles.emitNanoSwarm(this.pos.x, this.pos.y, this.radius);
+            //particles.emitNanoSwarm(this.pos.x, this.pos.y, this.radius);
         }
     }
 

@@ -94,7 +94,7 @@ export class VoidRayBeam extends Projectile {
                 if (this.target && !this.target.isDead) {
                     // Use DamageSystem for consistent damage handling
                     damageSystem.dealRawDamage(this.target, this.damage, this.target.pos);
-                    particles.emitHit(this.target.pos.x, this.target.pos.y, this.color);
+                    //particles.emitHit(this.target.pos.x, this.target.pos.y, this.color);
                 }
             }
         } else if (this.stage === 'fire') {

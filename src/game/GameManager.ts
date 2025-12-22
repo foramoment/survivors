@@ -618,8 +618,8 @@ export class GameManager {
                             p.markHit(e);
 
                             // Emit hit particles based on emoji
-                            const hitColor = this.getProjectileColor(p.emoji);
-                            particles.emitHit(e.pos.x, e.pos.y, hitColor);
+                            // const hitColor = this.getProjectileColor(p.emoji);
+                            // particles.emitHit(e.pos.x, e.pos.y, hitColor);
 
                             // Try to bounce to another enemy
                             if (p.bouncesLeft > 0) {
@@ -650,8 +650,8 @@ export class GameManager {
                         damageSystem.dealRawDamage(e, p.damage, e.pos);
 
                         // Emit hit particles based on emoji
-                        const hitColor = this.getProjectileColor(p.emoji);
-                        particles.emitHit(e.pos.x, e.pos.y, hitColor);
+                        // const hitColor = this.getProjectileColor(p.emoji);
+                        // particles.emitHit(e.pos.x, e.pos.y, hitColor);
 
                         if (p.pierce !== undefined) {
                             p.pierce--;

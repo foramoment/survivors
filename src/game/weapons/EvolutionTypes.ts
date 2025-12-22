@@ -67,7 +67,7 @@ export class ThunderstormLightning extends ChainLightning {
             split.hitEnemies.add(target);
 
             // Emit particles
-            particles.emitLightning(target.pos.x, target.pos.y);
+            //particles.emitLightning(target.pos.x, target.pos.y);
 
             // Check for another split
             if (Math.random() < this.splitChance) {
@@ -268,7 +268,7 @@ export class BlackHoleProjectile extends SingularityProjectile {
             });
             // Deal damage via DamageSystem
             damageSystem.dealRawDamage(closest, this.damage * 0.3, closest.pos);
-            particles.emitHit(closest.pos.x, closest.pos.y, '#8800ff');
+            //particles.emitHit(closest.pos.x, closest.pos.y, '#8800ff');
         }
     }
 
@@ -403,7 +403,7 @@ export class BlackHoleZone extends Zone {
 
         // Emit particles
         if (Math.random() > 0.7) {
-            particles.emitSingularityDistortion(this.pos.x, this.pos.y, this.radius);
+            //particles.emitSingularityDistortion(this.pos.x, this.pos.y, this.radius);
         }
     }
 
@@ -470,26 +470,26 @@ export class AtomicBombZone extends DelayedExplosionZone {
         super(x, y, radius, 1.2, damage, '☢️', onDamage, true);
     }
 
-    update(dt: number) {
-        super.update(dt);
+    // update(dt: number) {
+    //     super.update(dt);
 
-        // After explosion, expand shockwave
-        if (this.exploded && !this.atomicExploded) {
-            this.atomicExploded = true;
-            // Emit tons of particles
-            for (let i = 0; i < 20; i++) {
-                particles.emitExplosion(
-                    this.pos.x + (Math.random() - 0.5) * this.radius,
-                    this.pos.y + (Math.random() - 0.5) * this.radius
-                );
-            }
-        }
+    //     // After explosion, expand shockwave
+    //     if (this.exploded && !this.atomicExploded) {
+    //         this.atomicExploded = true;
+    //         // Emit tons of particles
+    //         for (let i = 0; i < 20; i++) {
+    //             particles.emitExplosion(
+    //                 this.pos.x + (Math.random() - 0.5) * this.radius,
+    //                 this.pos.y + (Math.random() - 0.5) * this.radius
+    //             );
+    //         }
+    //     }
 
-        if (this.atomicExploded) {
-            this.atomicShockwaveRadius += dt * 500;
-            this.atomicMushroomHeight = Math.min(this.radius * 2, this.atomicMushroomHeight + dt * 200);
-        }
-    }
+    //     if (this.atomicExploded) {
+    //         this.atomicShockwaveRadius += dt * 500;
+    //         this.atomicMushroomHeight = Math.min(this.radius * 2, this.atomicMushroomHeight + dt * 200);
+    //     }
+    // }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         // Use base class draw for targeting phase
@@ -672,10 +672,10 @@ export class FusionCoreSingularity extends Zone {
             }
         }
 
-        // Emit particles
-        if (Math.random() > 0.8) {
-            particles.emitHit(this.pos.x, this.pos.y, '#00ff66');
-        }
+        // // Emit particles
+        // if (Math.random() > 0.8) {
+        //     particles.emitHit(this.pos.x, this.pos.y, '#00ff66');
+        // }
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
@@ -754,7 +754,7 @@ export class PsychicStormZone extends Zone {
             if (dist < this.radius) {
                 (enemy as any).stunDuration = Math.max((enemy as any).stunDuration || 0, this.stunDuration);
                 this.hasStunned.add(enemy);
-                particles.emitHit(enemy.pos.x, enemy.pos.y, '#ff00ff');
+                //particles.emitHit(enemy.pos.x, enemy.pos.y, '#ff00ff');
             }
         }
     }
@@ -809,7 +809,7 @@ export class AbsoluteZeroZone extends Zone {
     freezeDuration: number = 2.0;
 
     constructor(x: number, y: number, radius: number, damage: number, duration: number) {
-        super(x, y, radius, duration, damage, 0.5, '');
+        super(x, y, radius, duration, damage, 0.5, '', 0.99);
     }
 
     update(dt: number) {
@@ -830,7 +830,7 @@ export class AbsoluteZeroZone extends Zone {
 
                 if (!this.frozenEnemies.has(enemy)) {
                     this.frozenEnemies.add(enemy);
-                    particles.emitFrost(enemy.pos.x, enemy.pos.y);
+                    //particles.emitFrost(enemy.pos.x, enemy.pos.y);
                 }
             }
         }
