@@ -11,17 +11,11 @@ import { VoidRayBeam } from '../base';
 import { WEAPON_STATS } from '../../data/GameData';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 300, duration: 1.0
-    };
-}
-
 export class VoidRayWeapon extends Weapon {
     name = "Void Ray";
     emoji = "🔫";
     description = "Fires a powerful charging beam.";
-    private stats = getStats('void_ray');
+    private stats = WEAPON_STATS['void_ray'];
 
     constructor(owner: any) {
         super(owner);

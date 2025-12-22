@@ -11,19 +11,13 @@ import { FusionCoreSingularity } from '../EvolutionTypes';
 import { WEAPON_STATS } from '../../data/GameData';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 300, duration: 1.0
-    };
-}
-
 export class PlasmaCannonWeapon extends ProjectileWeapon {
     name = "Plasma Cannon";
     emoji = "🔋";
     description = "Fires massive explosive plasma rounds.";
     projectileEmoji = "🟢";
     pierce = 999;
-    private stats = getStats('plasma_cannon');
+    private stats = WEAPON_STATS['plasma_cannon'];
 
     constructor(owner: any) {
         super(owner);

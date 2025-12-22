@@ -8,19 +8,13 @@ import { distance } from '../../core/Utils';
 import { WEAPON_STATS } from '../../data/GameData';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 300, duration: 1.0, pierce: 5, count: 1, countScaling: 0
-    };
-}
-
 export class ChronoDiscWeapon extends ProjectileWeapon {
     name = "Chrono Disc";
     emoji = "💿";
     description = "Ricochet disc that bounces between enemies.";
     projectileEmoji = "💿";
     pierce = 0;
-    private stats = getStats('chrono_disc');
+    private stats = WEAPON_STATS['chrono_disc'];
     private pendingDiscs: { delay: number; target: Entity }[] = [];
 
     constructor(owner: any) {

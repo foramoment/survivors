@@ -7,18 +7,12 @@ import { type Vector2 } from '../../core/Utils';
 import { NanobotCloud } from '../base';
 import { WEAPON_STATS } from '../../data/GameData';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 0, duration: 1.0
-    };
-}
-
 export class NanobotSwarmWeapon extends Weapon {
     name = "Nanobot Swarm";
     emoji = "🦠";
     description = "Swarm of nanobots that devour enemies.";
     private activeCloud: NanobotCloud | null = null;
-    private stats = getStats('nanobot_swarm');
+    private stats = WEAPON_STATS['nanobot_swarm'];
 
     constructor(owner: any) {
         super(owner);

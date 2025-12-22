@@ -18,19 +18,13 @@ import { Projectile, Zone as _Zone } from '../base';
 import { WEAPON_STATS } from '../../data/GameData';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 300, duration: 1.0
-    };
-}
-
 export class TemplateWeapon extends Weapon {
     // === BASIC INFO ===
     name = "[WEAPON NAME]";      // Display name
     emoji = "[EMOJI]";           // Icon: 🔫 ⚔️ 💥 ❄️ ⚡ etc
     description = "[DESCRIPTION]";
 
-    private stats = getStats('[weapon_id]'); // Match WEAPON_STATS key
+    private stats = WEAPON_STATS['[weapon_id]']; // Match WEAPON_STATS key
 
     constructor(owner: any) {
         super(owner);

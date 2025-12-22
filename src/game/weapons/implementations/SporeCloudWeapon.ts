@@ -5,19 +5,13 @@
 import { ZoneWeapon, SporeZone } from '../base';
 import { WEAPON_STATS } from '../../data/GameData';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 0, duration: 1.0
-    };
-}
-
 export class SporeCloudWeapon extends ZoneWeapon {
     name = "Spore Cloud";
     emoji = "🍄";
     description = "Leaves damaging zones.";
     zoneEmoji = "";
     interval = 1;
-    private stats = getStats('spore_cloud');
+    private stats = WEAPON_STATS['spore_cloud'];
 
     constructor(owner: any) {
         super(owner);

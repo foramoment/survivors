@@ -11,17 +11,11 @@ import { AbsoluteZeroZone } from '../EvolutionTypes';
 import { particles } from '../../core/ParticleSystem';
 import { WEAPON_STATS } from '../../data/GameData';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 0, duration: 1.0
-    };
-}
-
 export class FrostNovaWeapon extends Weapon {
     name = "Frost Nova";
     emoji = "❄️";
     description = "Throws freezing grenades.";
-    private stats = getStats('frost_nova');
+    private stats = WEAPON_STATS['frost_nova'];
 
     constructor(owner: any) {
         super(owner);

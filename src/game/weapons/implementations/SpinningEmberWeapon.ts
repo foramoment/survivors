@@ -7,18 +7,12 @@ import { type Vector2 } from '../../core/Utils';
 import { OrbitingProjectile } from '../base';
 import { WEAPON_STATS } from '../../data/GameData';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 3, duration: 1.0, count: 2, countScaling: 1
-    };
-}
-
 export class SpinningEmberWeapon extends Weapon {
     name = "Spinning Ember";
     emoji = "🔥";
     description = "Fireballs that orbit you.";
     projectiles: OrbitingProjectile[] = [];
-    private stats = getStats('spinning_ember');
+    private stats = WEAPON_STATS['spinning_ember'];
 
     constructor(owner: any) {
         super(owner);

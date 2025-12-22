@@ -12,17 +12,11 @@ import { WEAPON_STATS } from '../../data/GameData';
 import { damageSystem } from '../../core/DamageSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, count: 3, countScaling: 1
-    };
-}
-
 export class PhantomSlashWeapon extends Weapon {
     name = "Phantom Slash";
     emoji = "⚔️";
     description = "Instantly cuts random enemies.";
-    private stats = getStats('phantom_slash');
+    private stats = WEAPON_STATS['phantom_slash'];
 
     constructor(owner: any) {
         super(owner);

@@ -9,17 +9,11 @@ import { particles } from '../../core/ParticleSystem';
 import { WEAPON_STATS } from '../../data/GameData';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 0, duration: 1.0
-    };
-}
-
 export class AcidPoolWeapon extends Weapon {
     name = "Acid Pool";
     emoji = "🧪";
     description = "Throws acid flasks that create puddles.";
-    private stats = getStats('acid_pool');
+    private stats = WEAPON_STATS['acid_pool'];
 
     constructor(owner: any) {
         super(owner);

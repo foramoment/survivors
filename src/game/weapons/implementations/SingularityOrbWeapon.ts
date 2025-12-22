@@ -11,19 +11,13 @@ import { BlackHoleProjectile, BlackHoleZone } from '../EvolutionTypes';
 import { WEAPON_STATS } from '../../data/GameData';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 100, duration: 1.0
-    };
-}
-
 export class SingularityOrbWeapon extends ProjectileWeapon {
     name = "Singularity Orb";
     emoji = "⚫";
     description = "Slow moving orb of destruction.";
     projectileEmoji = "";
     pierce = 999;
-    private stats = getStats('singularity_orb');
+    private stats = WEAPON_STATS['singularity_orb'];
     private activeBlackHole: any = null;
     private waitingForCollapse: boolean = false;
 

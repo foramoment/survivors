@@ -13,19 +13,13 @@ import { WEAPON_STATS } from '../../data/GameData';
 import { damageSystem } from '../../core/DamageSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, duration: 1.0, pierce: 5
-    };
-}
-
 export class LightningChainWeapon extends ProjectileWeapon {
     name = "Lightning Chain";
     emoji = "⚡";
     description = "Lightning that chains between enemies.";
     projectileEmoji = "⚡";
     pierce = 3;
-    private stats = getStats('lightning_chain');
+    private stats = WEAPON_STATS['lightning_chain'];
 
     constructor(owner: any) {
         super(owner);

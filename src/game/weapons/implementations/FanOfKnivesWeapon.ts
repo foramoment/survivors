@@ -5,19 +5,13 @@
 import { ProjectileWeapon, Projectile } from '../base';
 import { WEAPON_STATS } from '../../data/GameData';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, speed: 300, duration: 1.0, pierce: 2, count: 3, countScaling: 0.5
-    };
-}
-
 export class FanOfKnivesWeapon extends ProjectileWeapon {
     name = "Fan of Knives";
     emoji = "🗡️";
     description = "Fires a spread of knives.";
     projectileEmoji = "🗡️";
     pierce = 2;
-    private stats = getStats('fan_of_knives');
+    private stats = WEAPON_STATS['fan_of_knives'];
 
     constructor(owner: any) {
         super(owner);

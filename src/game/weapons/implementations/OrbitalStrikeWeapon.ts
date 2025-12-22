@@ -10,17 +10,11 @@ import { DelayedExplosionZone } from '../base';
 import { AtomicBombZone } from '../EvolutionTypes';
 import { WEAPON_STATS } from '../../data/GameData';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 0, duration: 1.0, count: 1, countScaling: 0.5
-    };
-}
-
 export class OrbitalStrikeWeapon extends Weapon {
     name = "Orbital Strike";
     emoji = "🛰️";
     description = "Calls down random explosions.";
-    private stats = getStats('orbital_strike');
+    private stats = WEAPON_STATS['orbital_strike'];
     private activeAtomicBomb: any = null;
     private waitingForExplosion: boolean = false;
 

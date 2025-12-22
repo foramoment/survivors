@@ -11,17 +11,11 @@ import { PsychicStormZone } from '../EvolutionTypes';
 import { WEAPON_STATS } from '../../data/GameData';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
-function getStats(weaponId: string) {
-    return WEAPON_STATS[weaponId] || {
-        damage: 10, cooldown: 1.0, area: 100, speed: 0, duration: 1.0
-    };
-}
-
 export class MindBlastWeapon extends Weapon {
     name = "Mind Blast";
     emoji = "🧠";
     description = "Psionic storm at enemy location.";
-    private stats = getStats('mind_blast');
+    private stats = WEAPON_STATS['mind_blast'];
 
     constructor(owner: any) {
         super(owner);
