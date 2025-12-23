@@ -39,6 +39,7 @@ export class GameManager {
     weaponLevels: Map<string, number> = new Map();
 
     devMode: boolean = false;
+    killCount: number = 0;
 
 
 
@@ -52,7 +53,7 @@ export class GameManager {
             this.spawnDamageNumber(pos, amount, isCrit);
         });
 
-        this.showClassSelection();
+        // Note: showClassSelection is now handled by ScreenManager
     }
 
     showClassSelection() {
@@ -140,11 +141,10 @@ export class GameManager {
         this.projectiles = [];
         this.xpCrystals = [];
         this.damageNumbers = [];
+        this.killCount = 0;
         this.gameTime = 0;
         this.state = 'PLAYING';
-
-        this.uiLayer.innerHTML = '';
-        this.createHUD();
+        // Note: HUD is now created by GameScreen
     }
 
     addWeapon(weaponId: string) {
@@ -704,6 +704,7 @@ export class GameManager {
                 const crystalValue = enemy.xpValue;
                 this.spawnXPCrystal(enemy.pos.x, enemy.pos.y, crystalValue);
                 this.enemies.splice(i, 1);
+                this.killCount++;
             }
         }
 
@@ -757,14 +758,26 @@ export class GameManager {
         const x = this.player.pos.x + Math.cos(angle) * dist;
         const y = this.player.pos.y + Math.sin(angle) * dist;
 
-        let type = ENEMIES[0];
-        if (this.gameTime > 30) type = ENEMIES[1];
-        if (this.gameTime > 60) type = ENEMIES[2];
-        if (this.gameTime > 120) type = ENEMIES[3];
-        if (this.gameTime > 180) type = ENEMIES[4];
-        if (this.gameTime > 240) type = ENEMIES[5]; // Golem
-        if (this.gameTime > 300) type = ENEMIES[6]; // Spectre
-        if (this.gameTime > 360) type = ENEMIES[7]; // Boss
+        // === ДИНАМИЧЕСКАЯ СИСТЕМА СПАВНА ===
+        // Волна длится 60 секунд, переход 90%/10% → 10%/90%
+        const WAVE_DURATION = 60;
+
+        // Определяем текущую волну (0, 1, 2, ...)
+        const waveIndex = Math.floor(this.gameTime / WAVE_DURATION);
+
+        // Прогресс внутри волны (0.0 - 1.0)
+        const waveProgress = (this.gameTime % WAVE_DURATION) / WAVE_DURATION;
+
+        // Индексы врагов (с ограничением по размеру массива)
+        const primaryIndex = Math.min(waveIndex, ENEMIES.length - 2);
+        const secondaryIndex = Math.min(waveIndex + 1, ENEMIES.length - 1);
+
+        // Вероятность спавна следующего врага: 10% → 90%
+        const secondaryChance = 0.1 + (waveProgress * 0.8);
+
+        const type = Math.random() < secondaryChance
+            ? ENEMIES[secondaryIndex]
+            : ENEMIES[primaryIndex];
 
         // 1% chance to spawn elite enemy
         const isElite = Math.random() < 0.01;

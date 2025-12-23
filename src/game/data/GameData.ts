@@ -221,13 +221,38 @@ export const WEAPONS = [
 
 
 
-export const ENEMIES = [
-    { name: "Snake", hp: 10, speed: 100, damage: 5, xpValue: 1, emoji: "🪱" },
-    { name: "Lizard", hp: 20, speed: 80, damage: 8, xpValue: 2, emoji: "🦎" },
-    { name: "Hedgehog", hp: 30, speed: 70, damage: 10, xpValue: 3, emoji: "🦔" },
-    { name: "Alien", hp: 50, speed: 90, damage: 12, xpValue: 4, emoji: "👽" },
-    { name: "Mecha", hp: 80, speed: 60, damage: 15, xpValue: 6, emoji: "🤖" },
-    { name: "Golem", hp: 200, speed: 40, damage: 25, xpValue: 15, emoji: "🗿" },
-    { name: "Spectre", hp: 60, speed: 110, damage: 20, xpValue: 8, emoji: "👻" },
-    { name: "Boss", hp: 500, speed: 120, damage: 30, xpValue: 100, emoji: "👹" },
+// ⚙️ Конфигурация врагов — измени эти значения для балансировки
+export const ENEMY_CONFIG = {
+    baseHp: 10,           // Базовое HP первого врага
+    hpMultiplier: 2,      // Множитель HP для каждого следующего (x2)
+    baseDamage: 5,        // Базовый урон первого врага
+    damageMultiplier: 1.5, // Множитель урона для каждого следующего (x1.5)
+    baseXp: 1,            // Базовый XP первого врага
+    xpMultiplier: 1.5,    // Множитель XP для каждого следующего (x1.5)
+    baseSpeed: 100,       // Базовая скорость
+};
+
+// Шаблоны врагов — только имя, эмоджи и модификатор скорости
+const ENEMY_TEMPLATES = [
+    { name: "Void Bat", emoji: "🦇", speedMod: 1.0 },
+    { name: "Scout Drone", emoji: "🛸", speedMod: 0.8 },
+    { name: "Xeno Spider", emoji: "🕷️", speedMod: 0.7 },
+    { name: "Alien Grunt", emoji: "👾", speedMod: 0.9 },
+    { name: "Mech Trooper", emoji: "🤖", speedMod: 0.6 },
+    { name: "Asteroid Golem", emoji: "🪨", speedMod: 0.4 },
+    { name: "Void Wraith", emoji: "🌀", speedMod: 1.1 },
+    { name: "Death Walker", emoji: "💀", speedMod: 1.2 },
+    { name: "Tentacle Horror", emoji: "🐙", speedMod: 0.5 },  // НОВЫЙ
+    { name: "Plasma Elemental", emoji: "�", speedMod: 0.9 },  // НОВЫЙ
+    { name: "Doom Harbinger", emoji: "☠️", speedMod: 1.0 },  // НОВЫЙ
 ];
+
+// Генерация массива врагов с динамическими статами
+export const ENEMIES = ENEMY_TEMPLATES.map((template, index) => ({
+    name: template.name,
+    hp: Math.floor(ENEMY_CONFIG.baseHp * Math.pow(ENEMY_CONFIG.hpMultiplier, index)),
+    speed: Math.floor(ENEMY_CONFIG.baseSpeed * template.speedMod),
+    damage: Math.floor(ENEMY_CONFIG.baseDamage * Math.pow(ENEMY_CONFIG.damageMultiplier, index)),
+    xpValue: Math.floor(ENEMY_CONFIG.baseXp * Math.pow(ENEMY_CONFIG.xpMultiplier, index)),
+    emoji: template.emoji,
+}));
