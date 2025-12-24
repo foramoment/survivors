@@ -11,7 +11,7 @@ export class FanOfKnivesWeapon extends ProjectileWeapon {
     projectileEmoji = "🗡️";
     pierce = 2;
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 12,
         cooldown: 1.5,
         area: 0,
@@ -24,16 +24,16 @@ export class FanOfKnivesWeapon extends ProjectileWeapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = FanOfKnivesWeapon.CONFIG.cooldown;
-        this.damage = FanOfKnivesWeapon.CONFIG.damage;
-        this.speed = FanOfKnivesWeapon.CONFIG.speed;
-        this.duration = FanOfKnivesWeapon.CONFIG.duration;
-        this.area = FanOfKnivesWeapon.CONFIG.area;
-        this.pierce = FanOfKnivesWeapon.CONFIG.pierce || 2;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.speed = this.stats.speed;
+        this.duration = this.stats.duration;
+        this.area = this.stats.area;
+        this.pierce = this.stats.pierce;
     }
 
     fire(target: any) {
-        const count = (FanOfKnivesWeapon.CONFIG.count || 3) + Math.floor((this.level - 1) * (FanOfKnivesWeapon.CONFIG.countScaling || 0.5));
+        const count = (this.stats.count || 3) + Math.floor((this.level - 1) * (this.stats.countScaling || 0.5));
         const spread = Math.PI / 4;
 
         const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
@@ -60,6 +60,4 @@ export class FanOfKnivesWeapon extends ProjectileWeapon {
             this.onSpawn(proj);
         }
     }
-
-    // Uses base class upgrade()
 }

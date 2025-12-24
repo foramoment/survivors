@@ -101,7 +101,7 @@ export class PhantomSlashWeapon extends Weapon {
     emoji = "⚔️";
     description = "Instantly cuts random enemies.";
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 15,
         cooldown: 1.5,
         area: 250,
@@ -113,28 +113,20 @@ export class PhantomSlashWeapon extends Weapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = PhantomSlashWeapon.CONFIG.cooldown;
-        this.damage = PhantomSlashWeapon.CONFIG.damage;
-        this.area = PhantomSlashWeapon.CONFIG.area;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
         if (this.cooldown <= 0) {
-            const attackRadius = this.area * (this.owner as any).stats.area;
-            const nearbyTargets = levelSpatialHash.getWithinRadius(this.owner.pos, attackRadius);
-
-            // Filter by exact distance since grid is coarse
-            // Note: getWithinRadius already does distance check, but returns array. 
-            // We can just use it directly since it filters.
-            // However, we need a copy if we're going to splice efficiently, or just track used indices.
-            const targets = [...nearbyTargets];
+            const targets = [...this.findAllEnemies()];
 
             if (targets.length > 0) {
                 const isEvolved = this.evolved;
-                const baseCount = (PhantomSlashWeapon.CONFIG.count || 3) + Math.floor((this.level - 1) * (PhantomSlashWeapon.CONFIG.countScaling || 1));
+                const baseCount = (this.stats.count || 3) + Math.floor((this.level - 1) * (this.stats.countScaling || 1));
                 const count = isEvolved ? baseCount * 2 : baseCount;
 
                 for (let i = 0; i < count; i++) {
@@ -167,9 +159,4 @@ export class PhantomSlashWeapon extends Weapon {
             }
         }
     }
-
-    // Uses base class upgrade() with damageScaling and areaScaling
-
-    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }
-

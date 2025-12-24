@@ -5,17 +5,14 @@
  * Evolved: Void Cannon - Double damage, wider beam
  */
 import { Weapon } from '../../Weapon';
-import { Entity } from '../../Entity';
-import { type Vector2, distance } from '../../core/Utils';
 import { VoidRayBeam } from '../base';
-import { levelSpatialHash } from '../../core/SpatialHash';
 
 export class VoidRayWeapon extends Weapon {
     name = "Void Ray";
     emoji = "🔫";
     description = "Fires a powerful charging beam.";
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 25,
         cooldown: 2.0,
         area: 1,
@@ -25,30 +22,17 @@ export class VoidRayWeapon extends Weapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = VoidRayWeapon.CONFIG.cooldown;
-        this.damage = VoidRayWeapon.CONFIG.damage;
-        this.area = VoidRayWeapon.CONFIG.area;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
+
         if (this.cooldown <= 0) {
-            let target: Entity | null = null;
-            let minDst = Infinity;
-
-            const candidates = levelSpatialHash.getWithinRadius(this.owner.pos, 600);
-
-            for (const enemy of candidates) {
-                const dst = distance(this.owner.pos, enemy.pos);
-                // Note: getWithinRadius guarantees checked radius, but we check again for exact distance logic if needed.
-                // Here we need closest.
-                if (dst < minDst) {
-                    minDst = dst;
-                    target = enemy;
-                }
-            }
+            const target = this.findClosestEnemy(600);
 
             if (target) {
                 const isEvolved = this.evolved;
@@ -69,8 +53,4 @@ export class VoidRayWeapon extends Weapon {
             }
         }
     }
-
-    // Uses base class upgrade() with damageScaling and areaScaling
-
-    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }

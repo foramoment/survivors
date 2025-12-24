@@ -16,36 +16,30 @@ export const CLASSES = [
     { name: "Psionicist", emoji: "🧠", bonus: "Area +20%", weaponId: 'mind_blast', hp: 75, stats: { area: 1.2 } },
     { name: "Time Keeper", emoji: "⏳", bonus: "Proj Speed +20%", weaponId: 'chrono_disc', hp: 100, stats: { speed: 1.2 } },
     { name: "Alien Symbiote", emoji: "👽", bonus: "Growth +20%", weaponId: 'acid_pool', hp: 95, stats: { growth: 1.2 } },
-    { name: "Storm Mage", emoji: "⚡", bonus: "Lightning chains enemies", weaponId: 'lightning_chain', hp: 70, stats: { might: 1.15 } },
-    { name: "Berserker", emoji: "🔥", bonus: "HP +50%, Armor -2", weaponId: 'spinning_ember', hp: 150, stats: { armor: -2, might: 1.1 } },
+    { name: "Storm Mage", emoji: "⚡", bonus: "Might +15%", weaponId: 'lightning_chain', hp: 70, stats: { might: 1.15 } },
+    { name: "Berserker", emoji: "🔥", bonus: "HP +50%, Armor -2, Might +10%", weaponId: 'spinning_ember', hp: 150, stats: { armor: -2, might: 1.1 } },
     { name: "Ice Mage", emoji: "🧊", bonus: "Area +15%, Cooldown -10%", weaponId: 'frost_nova', hp: 85, stats: { area: 1.15, cooldown: 0.9 } },
     { name: "Shadow Assassin", emoji: "🥷", bonus: "Crit +15%, Move Speed +15%", weaponId: 'fan_of_knives', hp: 80, stats: { critChance: 0.2, moveSpeed: 1.15 } },
 ];
 
 export const POWERUPS = [
     // Basic
-    { name: "Titanium Plating", description: "Armor +1", type: "armor", value: 1, emoji: "🛡️" },
     { name: "Nano-Repair", description: "Regen +0.5/s", type: "regen", value: 0.5, emoji: "❤️" },
     { name: "Targeting HUD", description: "Crit +5%", type: "critChance", value: 0.05, emoji: "🎯" },
     { name: "Plasma Core", description: "Might +5%", type: "might", value: 0.05, emoji: "💪" },
     { name: "Cooling System", description: "Cooldown -5%", type: "cooldown", value: -0.05, emoji: "❄️" },
-    { name: "Vitality Booster", description: "Max HP +5", type: "maxHp", value: 5, emoji: "🏥" },
 
     // Creative
     { name: "Gravity Well", description: "Pull range +20%", type: "magnet", value: 20, emoji: "🧲" },
     { name: "Chain Reaction", description: "Area +10%", type: "area", value: 0.1, emoji: "💣" },
-    // { name: "Energy Shield", description: "Armor +1", type: "armor", value: 1, emoji: "🛡️" }, // Duplicate
     { name: "Vampiric Link", description: "Growth +10%", type: "growth", value: 0.1, emoji: "🧛" },
-    { name: "Static Field", description: "Duration +10%", type: "duration", value: 0.1, emoji: "⚡" },
-    { name: "Bounty Hunter", description: "Greed +20%", type: "greed", value: 0.2, emoji: "💰" },
+    { name: "Temporal Flux", description: "Duration +15%", type: "duration", value: 0.15, emoji: "⏰" },
     { name: "Berserker Rage", description: "Crit Dmg +25%", type: "critDamage", value: 0.25, emoji: "😡" },
     { name: "Barrier Field", description: "Max HP +10", type: "maxHp", value: 10, emoji: "🔮" },
     { name: "Overclock", description: "Speed +10%", type: "speed", value: 0.1, emoji: "⏩" },
     { name: "Phase Shift", description: "Move Speed +10%", type: "moveSpeed", value: 0.1, emoji: "👻" },
-    { name: "Scavenger", description: "Luck +20%", type: "luck", value: 0.2, emoji: "🎲" },
     { name: "Rapid Tick", description: "Zone tick -0.1s", type: "tick", value: 0.1, emoji: "⏱️" },
-    { name: "Temporal Flux", description: "Duration +15%", type: "duration", value: 0.15, emoji: "⏰" },
-    { name: "Void Shield", description: "Armor +2", type: "armor", value: 2, emoji: "🌌" },
+    { name: "Void Shield", description: "Armor +1", type: "armor", value: 1, emoji: "🌌" },
 ];
 
 export const WEAPONS = [

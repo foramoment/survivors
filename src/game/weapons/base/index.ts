@@ -39,3 +39,5 @@ export {
     ProjectileWeapon,
     ZoneWeapon
 } from './WeaponBase';
+
+export type { ProjectileParams } from './WeaponBase';

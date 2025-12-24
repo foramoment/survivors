@@ -270,7 +270,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
     projectileEmoji = "";
     pierce = 999;
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 50,
         cooldown: 4,
         area: 600,
@@ -284,11 +284,11 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = SingularityOrbWeapon.CONFIG.cooldown;
-        this.damage = SingularityOrbWeapon.CONFIG.damage;
-        this.speed = SingularityOrbWeapon.CONFIG.speed;
-        this.area = SingularityOrbWeapon.CONFIG.area;
-        this.duration = SingularityOrbWeapon.CONFIG.duration;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.speed = this.stats.speed;
+        this.area = this.stats.area;
+        this.duration = this.stats.duration;
     }
 
     update(dt: number) {
@@ -303,23 +303,10 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
         }
 
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
-            let target: Entity | null = null;
-            let minDst = this.area * (this.owner as any).stats.area;
-
-            const searchRadius = minDst;
-            const nearbyEnemies = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
-
-            for (const enemy of nearbyEnemies) {
-                const dst = distance(this.owner.pos, enemy.pos);
-                if (dst < minDst) {
-                    minDst = dst;
-                    target = enemy;
-                }
-            }
+            const target = this.findClosestEnemy();
 
             if (target) {
                 this.fire(target);
@@ -330,14 +317,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
     }
 
     fire(target: Entity) {
-        const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
-        const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
-        dir.x /= len;
-        dir.y /= len;
-
-        const speed = this.speed * (this.owner as any).stats.speed;
-        const velocity = { x: dir.x * speed, y: dir.y * speed };
-
+        const velocity = this.calculateVelocityToTarget(target);
         const { damage } = (this.owner as any).getDamage(this.damage);
         const isEvolved = this.evolved;
 
@@ -372,6 +352,4 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
             this.onSpawn(proj);
         }
     }
-
-    // Uses base class upgrade()
 }

@@ -4,10 +4,22 @@
  */
 import { Weapon } from '../../Weapon';
 import { Entity } from '../../Entity';
-import { type Vector2, normalize, distance } from '../../core/Utils';
+import { type Vector2 } from '../../core/Utils';
 import { Projectile } from './Projectile';
 import { Zone } from './Zone';
-import { levelSpatialHash } from '../../core/SpatialHash';
+
+// ============================================
+// PROJECTILE PARAMS - For factory method
+// ============================================
+export interface ProjectileParams {
+    x: number;
+    y: number;
+    velocity: Vector2;
+    duration: number;
+    damage: number;
+    pierce: number;
+    emoji: string;
+}
 
 // ============================================
 // PROJECTILE WEAPON - Fires projectiles at enemies
@@ -18,23 +30,10 @@ export abstract class ProjectileWeapon extends Weapon {
 
     update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
+
         if (this.cooldown <= 0) {
-            let target: Entity | null = null;
-            let minDst = Infinity;
-
-            const searchRadius = this.area * (this.owner as any).stats.area;
-            const nearby = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
-
-            for (const enemy of nearby) {
-                const dst = distance(this.owner.pos, enemy.pos);
-                if (dst < searchRadius && dst < minDst) {
-                    minDst = dst;
-                    target = enemy;
-                }
-            }
-
+            const target = this.findClosestEnemy();
             if (target) {
                 this.fire(target);
                 this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
@@ -43,30 +42,39 @@ export abstract class ProjectileWeapon extends Weapon {
     }
 
     fire(target: Entity) {
-        const dir = normalize({
-            x: target.pos.x - this.owner.pos.x,
-            y: target.pos.y - this.owner.pos.y
-        });
-
-        const speed = this.speed * (this.owner as any).stats.speed;
-        const velocity = { x: dir.x * speed, y: dir.y * speed };
-
+        const velocity = this.calculateVelocityToTarget(target);
         const { damage } = (this.owner as any).getDamage(this.damage);
 
-        const proj = new Projectile(
-            this.owner.pos.x,
-            this.owner.pos.y,
+        const proj = this.createProjectile({
+            x: this.owner.pos.x,
+            y: this.owner.pos.y,
             velocity,
-            this.duration * (this.owner as any).stats.duration,
+            duration: this.duration * (this.owner as any).stats.duration,
             damage,
-            this.pierce,
-            this.projectileEmoji
-        );
+            pierce: this.pierce,
+            emoji: this.projectileEmoji
+        });
 
+        this.onProjectileCreated(proj);
         this.onSpawn(proj);
     }
 
-    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
+    /**
+     * Factory method for creating projectiles.
+     * Override to create different projectile types (BouncingProjectile, PlasmaProjectile, etc.)
+     */
+    protected createProjectile(params: ProjectileParams): Entity {
+        return new Projectile(
+            params.x, params.y, params.velocity,
+            params.duration, params.damage, params.pierce, params.emoji
+        );
+    }
+
+    /**
+     * Hook called after projectile is created but before spawning.
+     * Override to add evolved behavior or callbacks.
+     */
+    protected onProjectileCreated(_proj: Entity): void { }
 }
 
 // ============================================
@@ -78,8 +86,7 @@ export abstract class ZoneWeapon extends Weapon {
 
     update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
         if (this.cooldown <= 0) {
             this.spawnZone();
             this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
@@ -104,6 +111,4 @@ export abstract class ZoneWeapon extends Weapon {
         );
         this.onSpawn(zone);
     }
-
-    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }

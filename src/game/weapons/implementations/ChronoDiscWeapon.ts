@@ -4,18 +4,16 @@
  */
 import { ProjectileWeapon, BouncingProjectile } from '../base';
 import { Entity } from '../../Entity';
-import { distance } from '../../core/Utils';
-import { levelSpatialHash } from '../../core/SpatialHash';
 
 export class ChronoDiscWeapon extends ProjectileWeapon {
     name = "Chrono Disc";
     emoji = "💿";
     description = "Ricochet disc that bounces between enemies.";
     projectileEmoji = "💿";
-    pierce = 0;
+    pierce = 5;
     private pendingDiscs: { delay: number; target: Entity }[] = [];
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 25,
         cooldown: 2.5,
         area: 400,
@@ -28,18 +26,17 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = ChronoDiscWeapon.CONFIG.cooldown;
-        this.damage = ChronoDiscWeapon.CONFIG.damage;
-        this.speed = ChronoDiscWeapon.CONFIG.speed;
-        this.duration = ChronoDiscWeapon.CONFIG.duration;
-        this.pierce = ChronoDiscWeapon.CONFIG.pierce || 3;
-        this.area = ChronoDiscWeapon.CONFIG.area;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.speed = this.stats.speed;
+        this.duration = this.stats.duration;
+        this.pierce = this.stats.pierce;
+        this.area = this.stats.area;
     }
 
     update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
 
         for (let i = this.pendingDiscs.length - 1; i >= 0; i--) {
             this.pendingDiscs[i].delay -= dt;
@@ -50,22 +47,10 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
         }
 
         if (this.cooldown <= 0) {
-            let target: Entity | null = null;
-            let minDst = Infinity;
-
-            const searchRadius = this.area * (this.owner as any).stats.area;
-            const nearby = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
-
-            for (const enemy of nearby) {
-                const dst = distance(this.owner.pos, enemy.pos);
-                if (dst < searchRadius && dst < minDst) {
-                    minDst = dst;
-                    target = enemy;
-                }
-            }
+            const target = this.findClosestEnemy();
 
             if (target) {
-                const count = (ChronoDiscWeapon.CONFIG.count || 1) + Math.floor((this.level - 1) * (ChronoDiscWeapon.CONFIG.countScaling || 0));
+                const count = (this.stats.count || 1) + Math.floor((this.level - 1) * (this.stats.countScaling || 0));
 
                 this.fire(target);
 
@@ -81,16 +66,9 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
         }
     }
 
-    fire(target: any) {
-        const dir = { x: target.pos.x - this.owner.pos.x, y: target.pos.y - this.owner.pos.y };
-        const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
-        dir.x /= len;
-        dir.y /= len;
-
-        const speed = this.speed * (this.owner as any).stats.speed;
-        const velocity = { x: dir.x * speed, y: dir.y * speed };
-
-        const bounces = (ChronoDiscWeapon.CONFIG.pierce || 5) + this.level;
+    fire(target: Entity) {
+        const velocity = this.calculateVelocityToTarget(target);
+        const bounces = this.stats.pierce + this.level;
 
         const projectile = new BouncingProjectile(
             this.owner.pos.x,
@@ -105,6 +83,4 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
 
         this.onSpawn(projectile);
     }
-
-    // Uses base class upgrade()
 }

@@ -31,18 +31,14 @@ export class Player extends Entity {
         cooldown: 1,
         speed: 1,
         duration: 1,
-        amount: 0,
         moveSpeed: 1,
         magnet: 100,
-        luck: 1,
         growth: 1,
-        greed: 1,
         armor: 0,
         regen: 0,
         critChance: 0.05,
         critDamage: 1.5,
-        tick: 0,
-        timeSpeed: 1
+        tick: 0
     };
 
     className: string = "Survivor";

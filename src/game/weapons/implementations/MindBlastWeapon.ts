@@ -92,7 +92,7 @@ export class MindBlastWeapon extends Weapon {
     emoji = "🧠";
     description = "Psionic storm at enemy location.";
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 20,
         cooldown: 3,
         area: 120,
@@ -102,22 +102,20 @@ export class MindBlastWeapon extends Weapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = MindBlastWeapon.CONFIG.cooldown;
-        this.damage = MindBlastWeapon.CONFIG.damage;
-        this.area = MindBlastWeapon.CONFIG.area;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
-            const psiStormRange = 600;
-            const targets = levelSpatialHash.getWithinRadius(this.owner.pos, psiStormRange);
+            const targets = this.findRandomEnemies(1, 600);
 
             if (targets.length > 0) {
-                const target = targets[Math.floor(Math.random() * targets.length)];
+                const target = targets[0];
                 const isEvolved = this.evolved;
                 const result = (this.owner as any).getDamage(this.damage);
 
@@ -147,8 +145,4 @@ export class MindBlastWeapon extends Weapon {
             }
         }
     }
-
-    // Uses base class upgrade()
-
-    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }

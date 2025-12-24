@@ -3,7 +3,6 @@
  * Swarm of nanobots that damage enemies around the player.
  */
 import { Weapon } from '../../Weapon';
-import { type Vector2 } from '../../core/Utils';
 import { NanobotCloud } from '../base';
 
 export class NanobotSwarmWeapon extends Weapon {
@@ -12,7 +11,7 @@ export class NanobotSwarmWeapon extends Weapon {
     description = "Swarm of nanobots that devour enemies.";
     private activeCloud: NanobotCloud | null = null;
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 0.8,
         cooldown: 0.5,
         area: 1.0,
@@ -22,16 +21,15 @@ export class NanobotSwarmWeapon extends Weapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = NanobotSwarmWeapon.CONFIG.cooldown;
-        this.damage = NanobotSwarmWeapon.CONFIG.damage;
-        this.duration = NanobotSwarmWeapon.CONFIG.duration;
-        this.area = NanobotSwarmWeapon.CONFIG.area;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.duration = this.stats.duration;
+        this.area = this.stats.area;
     }
 
     update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
 
         if (this.activeCloud && this.activeCloud.isDead) {
             this.activeCloud = null;
@@ -55,8 +53,4 @@ export class NanobotSwarmWeapon extends Weapon {
             this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
         }
     }
-
-    // Uses base class upgrade()
-
-    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }

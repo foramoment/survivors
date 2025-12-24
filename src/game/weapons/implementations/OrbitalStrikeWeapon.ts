@@ -112,7 +112,7 @@ export class OrbitalStrikeWeapon extends Weapon {
     emoji = "🛰️";
     description = "Calls down random explosions.";
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 40,
         cooldown: 2.0,
         area: 100,
@@ -125,9 +125,9 @@ export class OrbitalStrikeWeapon extends Weapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = OrbitalStrikeWeapon.CONFIG.cooldown;
-        this.damage = OrbitalStrikeWeapon.CONFIG.damage;
-        this.area = OrbitalStrikeWeapon.CONFIG.area;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number) {
@@ -142,8 +142,7 @@ export class OrbitalStrikeWeapon extends Weapon {
         }
 
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
             // Calculate damage once with crit
@@ -181,8 +180,4 @@ export class OrbitalStrikeWeapon extends Weapon {
             }
         }
     }
-
-    // Uses base class upgrade()
-
-    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }

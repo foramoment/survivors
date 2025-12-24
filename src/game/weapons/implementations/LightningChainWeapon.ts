@@ -6,7 +6,6 @@
  */
 import { ProjectileWeapon, Beam } from '../base';
 import { ChainLightning } from '../WeaponTypes';
-import { Entity } from '../../Entity';
 import { distance, type Vector2 } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
@@ -205,7 +204,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
     projectileEmoji = "⚡";
     pierce = 3;
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 25,
         cooldown: 1.8,
         area: 800,
@@ -216,36 +215,22 @@ export class LightningChainWeapon extends ProjectileWeapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = LightningChainWeapon.CONFIG.cooldown;
-        this.damage = LightningChainWeapon.CONFIG.damage;
-        this.pierce = LightningChainWeapon.CONFIG.pierce || 3;
-        this.area = LightningChainWeapon.CONFIG.area;
-        this.speed = 0;
-        this.duration = LightningChainWeapon.CONFIG.duration;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.pierce = this.stats.pierce;
+        this.area = this.stats.area;
+        this.speed = this.stats.speed;
+        this.duration = this.stats.duration;
     }
 
     update(dt: number) {
         const isEvolved = this.evolved;
 
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
-            let target: Entity | null = null;
-            let minDst = this.area * (this.owner as any).stats.area;
-            const searchRadius = minDst;
-
-            // Use spatial hash for O(1) lookup
-            const nearby = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
-
-            for (const enemy of nearby) {
-                const dst = distance(this.owner.pos, enemy.pos);
-                if (dst < minDst) {
-                    minDst = dst;
-                    target = enemy;
-                }
-            }
+            const target = this.findClosestEnemy();
 
             if (target) {
                 this.fire(target);
@@ -296,6 +281,4 @@ export class LightningChainWeapon extends ProjectileWeapon {
 
         this.onSpawn(chain);
     }
-
-    // Uses base class upgrade() with damageScaling
 }

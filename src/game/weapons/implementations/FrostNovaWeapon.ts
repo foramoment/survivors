@@ -108,7 +108,7 @@ export class FrostNovaWeapon extends Weapon {
     emoji = "❄️";
     description = "Throws freezing grenades.";
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 8,
         cooldown: 2.5,
         area: 120,
@@ -118,15 +118,14 @@ export class FrostNovaWeapon extends Weapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = FrostNovaWeapon.CONFIG.cooldown;
-        this.damage = FrostNovaWeapon.CONFIG.damage;
-        this.area = FrostNovaWeapon.CONFIG.area;
+        this.baseCooldown = this.stats.cooldown;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     update(dt: number) {
         const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const timeSpeed = (this.owner as any).stats.timeSpeed || 1;
-        this.cooldown -= dt * speedBoost * timeSpeed;
+        this.cooldown -= dt * speedBoost;
         if (this.cooldown <= 0) {
             const range = 400;
             const offsetX = (Math.random() - 0.5) * 2 * range;
@@ -150,14 +149,14 @@ export class FrostNovaWeapon extends Weapon {
                         x, y,
                         this.area * (this.owner as any).stats.area,
                         (this.owner as any).getDamage(this.damage).damage,
-                        FrostNovaWeapon.CONFIG.duration * (this.owner as any).stats.duration
+                        this.stats.duration * (this.owner as any).stats.duration
                     );
                     this.onSpawn(zone);
                 } else {
                     const zone = new FrostZone(
                         x, y,
                         this.area * (this.owner as any).stats.area,
-                        FrostNovaWeapon.CONFIG.duration * (this.owner as any).stats.duration,
+                        this.stats.duration * (this.owner as any).stats.duration,
                         (this.owner as any).getDamage(this.damage).damage,
                         0.5,
                         0.5
@@ -170,8 +169,4 @@ export class FrostNovaWeapon extends Weapon {
             this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
         }
     }
-
-    // Uses base class upgrade()
-
-    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) { }
 }

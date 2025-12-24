@@ -11,7 +11,7 @@ export class SporeCloudWeapon extends ZoneWeapon {
     zoneEmoji = "";
     interval = 1;
 
-    static readonly CONFIG = {
+    readonly stats = {
         damage: 10,
         cooldown: 2,
         area: 50,
@@ -21,10 +21,10 @@ export class SporeCloudWeapon extends ZoneWeapon {
 
     constructor(owner: any) {
         super(owner);
-        this.baseCooldown = SporeCloudWeapon.CONFIG.cooldown;
-        this.duration = SporeCloudWeapon.CONFIG.duration;
-        this.damage = SporeCloudWeapon.CONFIG.damage;
-        this.area = SporeCloudWeapon.CONFIG.area;
+        this.baseCooldown = this.stats.cooldown;
+        this.duration = this.stats.duration;
+        this.damage = this.stats.damage;
+        this.area = this.stats.area;
     }
 
     spawnZone() {
@@ -44,6 +44,4 @@ export class SporeCloudWeapon extends ZoneWeapon {
         );
         this.onSpawn(zone);
     }
-
-    // Uses base class upgrade()
 }
