@@ -1,4 +1,4 @@
 import './style.css'
-import { Engine } from './game/core/Engine'
+import { initEngine } from './game/core/Engine'
 
-new Engine();
+initEngine();

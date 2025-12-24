@@ -1,4 +1,21 @@
+/**
+ * ENGINE - Main game engine with screen management
+ * 
+ * Responsibilities:
+ *   - Canvas and rendering setup
+ *   - Screen registration and initialization
+ *   - Main game loop
+ *   - Coordination between ScreenManager and GameManager
+ */
+
 import { GameManager } from '../GameManager';
+import { screenManager } from '../ui/ScreenManager';
+import { MainMenuScreen } from '../ui/screens/MainMenuScreen';
+import { ClassSelectionScreen } from '../ui/screens/ClassSelectionScreen';
+import { GameScreen } from '../ui/screens/GameScreen';
+import { OptionsScreen } from '../ui/screens/OptionsScreen';
+import { GameOverScreen } from '../ui/screens/GameOverScreen';
+import { ParticleDebugScreen } from '../ui/screens/ParticleDebugScreen';
 
 export class Engine {
     canvas: HTMLCanvasElement;
@@ -12,10 +29,39 @@ export class Engine {
         this.resize();
         window.addEventListener('resize', () => this.resize());
 
+        // Create GameManager (without auto-showing class selection)
         this.gameManager = new GameManager(this.canvas, this.ctx);
+
+        // Register all screens
+        this.registerScreens();
+
+        // Start at main menu
+        screenManager.goto('main_menu');
 
         // Start loop
         requestAnimationFrame((t) => this.loop(t));
+    }
+
+    private registerScreens(): void {
+        // Main Menu
+        screenManager.register('main_menu', new MainMenuScreen(this.canvas, this.ctx));
+
+        // Class Selection - with callback to start game
+        const classSelection = new ClassSelectionScreen(this.canvas, this.ctx);
+        screenManager.register('class_selection', classSelection);
+
+        // Game Screen - with callback to start game via GameManager
+        const gameScreen = new GameScreen(this.canvas, this.ctx);
+        screenManager.register('game', gameScreen);
+
+        // Options
+        screenManager.register('options', new OptionsScreen(this.canvas, this.ctx));
+
+        // Game Over
+        screenManager.register('game_over', new GameOverScreen(this.canvas, this.ctx));
+
+        // Particle Debug
+        screenManager.register('particle_debug', new ParticleDebugScreen(this.canvas, this.ctx));
     }
 
     resize() {
@@ -32,11 +78,34 @@ export class Engine {
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw background (simple grid or space)
+        // Draw background
         this.drawBackground();
 
-        this.gameManager.update(safeDt);
-        this.gameManager.draw(this.ctx);
+        // Update and draw current screen
+        screenManager.update(safeDt);
+
+        // GameManager handles its own update/draw when game is active
+        if (screenManager.currentScreenId === 'game') {
+            this.gameManager.update(safeDt);
+            this.gameManager.draw(this.ctx);
+
+            // Update HUD via GameScreen
+            const gameScreen = screenManager.get('game') as GameScreen;
+            if (gameScreen && this.gameManager.player) {
+                gameScreen.updateHUD({
+                    hp: this.gameManager.player.hp,
+                    maxHp: this.gameManager.player.maxHp,
+                    xp: this.gameManager.player.xp,
+                    xpToLevel: this.gameManager.player.nextLevelXp,
+                    level: this.gameManager.player.level,
+                    gameTime: this.gameManager.gameTime,
+                    killCount: this.gameManager.killCount,
+                    powerBoostActive: this.gameManager.player.weaponSpeedBoostTimer > 0
+                });
+            }
+        }
+
+        screenManager.draw(this.ctx);
 
         requestAnimationFrame((t) => this.loop(t));
     }
@@ -44,8 +113,20 @@ export class Engine {
     drawBackground() {
         this.ctx.fillStyle = '#111';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Draw grid relative to camera (handled in GameManager usually, but for now simple static or moving grid)
-        // We'll let GameManager handle the world rendering including background to support camera movement
     }
+
+    /**
+     * Get the GameManager instance (for screens to interact with)
+     */
+    getGameManager(): GameManager {
+        return this.gameManager;
+    }
+}
+
+// Export singleton for global access
+export let engine: Engine;
+
+export function initEngine(): Engine {
+    engine = new Engine();
+    return engine;
 }
