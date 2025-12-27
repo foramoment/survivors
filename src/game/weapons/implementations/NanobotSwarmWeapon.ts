@@ -3,6 +3,7 @@
  * Swarm of nanobots that damage enemies around the player.
  */
 import { Weapon } from '../../Weapon';
+import type { Player } from '../../entities/Player';
 import { NanobotCloud } from '../base';
 
 export class NanobotSwarmWeapon extends Weapon {
@@ -19,7 +20,7 @@ export class NanobotSwarmWeapon extends Weapon {
         duration: 5,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -28,7 +29,7 @@ export class NanobotSwarmWeapon extends Weapon {
     }
 
     update(dt: number) {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
 
         if (this.activeCloud && this.activeCloud.isDead) {
@@ -36,21 +37,21 @@ export class NanobotSwarmWeapon extends Weapon {
         }
 
         if (this.cooldown <= 0 && !this.activeCloud) {
-            const radius = 60 + this.level * 10 * (this.owner as any).stats.area;
-            const baseInterval = Math.max(0.1, 0.5 - (this.owner as any).stats.tick);
+            const radius = 60 + this.level * 10 * this.owner.stats.area;
+            const baseInterval = Math.max(0.1, 0.5 - this.owner.stats.tick);
             const boostedInterval = baseInterval / speedBoost;
 
             const cloud = new NanobotCloud(
                 this.owner,
                 radius,
-                this.duration * (this.owner as any).stats.duration,
-                (this.owner as any).getDamage(this.damage).damage,
+                this.duration * this.owner.stats.duration,
+                this.owner.getDamage(this.damage).damage,
                 Math.max(0.05, boostedInterval)
             );
             this.onSpawn(cloud);
             this.activeCloud = cloud;
 
-            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
         }
     }
 }

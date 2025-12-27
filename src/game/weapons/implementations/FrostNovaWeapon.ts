@@ -5,7 +5,8 @@
  * Evolved: Absolute Zero - Complete freeze effect
  */
 import { Weapon } from '../../Weapon';
-import { type Vector2 } from '../../core/Utils';
+import type { Player } from '../../entities/Player';
+import type { Vector2 } from '../../core/Utils';
 import { LobbedProjectile, FrostZone, Zone } from '../base';
 import { particles } from '../../core/ParticleSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
@@ -116,7 +117,7 @@ export class FrostNovaWeapon extends Weapon {
         duration: 3.0,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -124,7 +125,7 @@ export class FrostNovaWeapon extends Weapon {
     }
 
     update(dt: number) {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
         if (this.cooldown <= 0) {
             const range = 400;
@@ -147,17 +148,17 @@ export class FrostNovaWeapon extends Weapon {
                 if (isEvolved) {
                     const zone = new AbsoluteZeroZone(
                         x, y,
-                        this.area * (this.owner as any).stats.area,
-                        (this.owner as any).getDamage(this.damage).damage,
-                        this.stats.duration * (this.owner as any).stats.duration
+                        this.area * this.owner.stats.area,
+                        this.owner.getDamage(this.damage).damage,
+                        this.stats.duration * this.owner.stats.duration
                     );
                     this.onSpawn(zone);
                 } else {
                     const zone = new FrostZone(
                         x, y,
-                        this.area * (this.owner as any).stats.area,
-                        this.stats.duration * (this.owner as any).stats.duration,
-                        (this.owner as any).getDamage(this.damage).damage,
+                        this.area * this.owner.stats.area,
+                        this.stats.duration * this.owner.stats.duration,
+                        this.owner.getDamage(this.damage).damage,
                         0.5,
                         0.5
                     );
@@ -166,7 +167,7 @@ export class FrostNovaWeapon extends Weapon {
             };
 
             this.onSpawn(lob);
-            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
         }
     }
 }

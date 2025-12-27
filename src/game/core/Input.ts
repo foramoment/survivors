@@ -1,4 +1,4 @@
-import { type Vector2 } from './Utils';
+import type { Vector2 } from './Utils';
 import { Joystick } from '../ui/Joystick';
 
 export class Input {

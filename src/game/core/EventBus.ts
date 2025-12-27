@@ -14,7 +14,7 @@
  *   unsubscribe();
  */
 
-import { type Vector2 } from './Utils';
+import type { Vector2 } from './Utils';
 
 // ============================================
 // EVENT TYPES - Add new events here

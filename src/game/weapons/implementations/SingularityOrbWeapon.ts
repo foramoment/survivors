@@ -5,6 +5,7 @@
  * Evolved: Black Hole - Creates black hole zone on death
  */
 import { ProjectileWeapon, SingularityProjectile, Zone } from '../base';
+import type { Player } from '../../entities/Player';
 import { Entity } from '../../Entity';
 import { distance, type Vector2 } from '../../core/Utils';
 import { levelSpatialHash } from '../../core/SpatialHash';
@@ -282,7 +283,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
     private activeBlackHole: any = null;
     private waitingForCollapse: boolean = false;
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -302,7 +303,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
             return;
         }
 
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
@@ -311,14 +312,14 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
             if (target) {
                 this.fire(target);
                 const cdMultiplier = isEvolved ? 2.0 : 1.0;
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown * cdMultiplier;
+                this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
             }
         }
     }
 
     fire(target: Entity) {
         const velocity = this.calculateVelocityToTarget(target);
-        const { damage } = (this.owner as any).getDamage(this.damage);
+        const { damage } = this.owner.getDamage(this.damage);
         const isEvolved = this.evolved;
 
         if (isEvolved) {
@@ -326,7 +327,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
                 this.owner.pos.x,
                 this.owner.pos.y,
                 velocity,
-                this.duration * (this.owner as any).stats.duration,
+                this.duration * this.owner.stats.duration,
                 damage,
                 this.pierce
             );
@@ -344,7 +345,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
                 this.owner.pos.x,
                 this.owner.pos.y,
                 velocity,
-                this.duration * (this.owner as any).stats.duration,
+                this.duration * this.owner.stats.duration,
                 damage,
                 this.pierce
             );

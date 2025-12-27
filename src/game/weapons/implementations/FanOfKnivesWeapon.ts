@@ -3,6 +3,7 @@
  * Fires a spread of knives at enemies.
  */
 import { ProjectileWeapon, Projectile } from '../base';
+import type { Player } from '../../entities/Player';
 
 export class FanOfKnivesWeapon extends ProjectileWeapon {
     name = "Fan of Knives";
@@ -22,7 +23,7 @@ export class FanOfKnivesWeapon extends ProjectileWeapon {
         countScaling: 0.5,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -44,16 +45,16 @@ export class FanOfKnivesWeapon extends ProjectileWeapon {
             const angle = baseAngle + offset;
 
             const velocity = {
-                x: Math.cos(angle) * this.speed * (this.owner as any).stats.speed,
-                y: Math.sin(angle) * this.speed * (this.owner as any).stats.speed
+                x: Math.cos(angle) * this.speed * this.owner.stats.speed,
+                y: Math.sin(angle) * this.speed * this.owner.stats.speed
             };
 
             const proj = new Projectile(
                 this.owner.pos.x,
                 this.owner.pos.y,
                 velocity,
-                this.duration * (this.owner as any).stats.duration,
-                (this.owner as any).getDamage(this.damage).damage,
+                this.duration * this.owner.stats.duration,
+                this.owner.getDamage(this.damage).damage,
                 this.pierce,
                 this.projectileEmoji
             );

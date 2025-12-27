@@ -1,4 +1,5 @@
 import { Entity } from './Entity';
+import type { Player } from './entities/Player';
 import { type Vector2, distance, normalize } from './core/Utils';
 import { levelSpatialHash } from './core/SpatialHash';
 
@@ -11,7 +12,7 @@ import { levelSpatialHash } from './core/SpatialHash';
  * - Callbacks for spawning entities and damage numbers
  */
 export abstract class Weapon {
-    owner: Entity;
+    owner: Player;
     cooldown: number = 0;
     level: number = 1;
     evolved: boolean = false;
@@ -34,7 +35,7 @@ export abstract class Weapon {
     onSpawn: (entity: Entity) => void = () => { };
     onDamage: (pos: Vector2, amount: number, isCrit?: boolean) => void = () => { };
 
-    constructor(owner: Entity) {
+    constructor(owner: Player) {
         this.owner = owner;
     }
 
@@ -66,7 +67,7 @@ export abstract class Weapon {
         // Apply stats.area multiplier only when using default this.area
         const searchRadius = maxRange !== undefined
             ? maxRange
-            : this.area * (this.owner as any).stats.area;
+            : this.area * this.owner.stats.area;
         const nearby = levelSpatialHash.getWithinRadius(this.owner.pos, searchRadius);
 
         if (nearby.length === 0) return [];
@@ -123,7 +124,7 @@ export abstract class Weapon {
             x: target.pos.x - this.owner.pos.x,
             y: target.pos.y - this.owner.pos.y
         });
-        const speed = this.speed * (this.owner as any).stats.speed;
+        const speed = this.speed * this.owner.stats.speed;
         return { x: dir.x * speed, y: dir.y * speed };
     }
 }

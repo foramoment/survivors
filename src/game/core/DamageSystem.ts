@@ -14,7 +14,7 @@
  *   // From zone with pre-calculated damage (no modifiers):
  *   damageSystem.dealRawDamage(enemy, 50, enemy.pos)
  */
-import { type Vector2 } from './Utils';
+import type { Vector2 } from './Utils';
 import { events } from './EventBus';
 
 export interface DamageParams {

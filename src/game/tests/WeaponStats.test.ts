@@ -142,7 +142,7 @@ describe('Weapon Stats Safety Net', () => {
             luck: 1
         },
         getDamage: (d: number) => ({ damage: d, isCrit: false })
-    };
+    } as any;
 
     it('Void Ray Stats', () => {
         const weapon = new VoidRayWeapon(mockOwner);

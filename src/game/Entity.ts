@@ -1,4 +1,4 @@
-import { type Vector2 } from './core/Utils';
+import type { Vector2 } from './core/Utils';
 
 export abstract class Entity {
     pos: Vector2;

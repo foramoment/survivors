@@ -5,6 +5,7 @@
  * Evolved: Thunderstorm - Infinite chain with split chance
  */
 import { ProjectileWeapon, Beam } from '../base';
+import type { Player } from '../../entities/Player';
 import { ChainLightning } from '../WeaponTypes';
 import { distance, type Vector2 } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
@@ -213,7 +214,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
         pierce: 5,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -226,7 +227,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
     update(dt: number) {
         const isEvolved = this.evolved;
 
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
@@ -235,7 +236,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
             if (target) {
                 this.fire(target);
                 const cdMultiplier = isEvolved ? 1.5 : 1.0;
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown * cdMultiplier;
+                this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
             }
         }
     }
@@ -271,7 +272,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
         // Chain hits use DamageSystem too
         chain.onHit = (t: any, d: number) => {
             damageSystem.dealDamage({
-                baseDamage: d / ((this.owner as any).stats?.might || 1), // Undo might since DamageSystem applies it
+                baseDamage: d / (this.owner.stats?.might || 1), // Undo might since DamageSystem applies it
                 source: this,
                 target: t,
                 position: t.pos

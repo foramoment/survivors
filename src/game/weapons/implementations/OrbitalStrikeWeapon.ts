@@ -5,7 +5,8 @@
  * Evolved: Atomic Bomb - Massive nuclear explosion
  */
 import { Weapon } from '../../Weapon';
-import { type Vector2 } from '../../core/Utils';
+import type { Player } from '../../entities/Player';
+import type { Vector2 } from '../../core/Utils';
 import { DelayedExplosionZone } from '../base';
 import { particles } from '../../core/ParticleSystem';
 
@@ -123,7 +124,7 @@ export class OrbitalStrikeWeapon extends Weapon {
     private activeAtomicBomb: any = null;
     private waitingForExplosion: boolean = false;
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -141,13 +142,13 @@ export class OrbitalStrikeWeapon extends Weapon {
             return;
         }
 
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
             // Calculate damage once with crit
-            const atomicResult = (this.owner as any).getDamage(this.damage * 8);
-            const normalResult = (this.owner as any).getDamage(this.damage);
+            const atomicResult = this.owner.getDamage(this.damage * 8);
+            const normalResult = this.owner.getDamage(this.damage);
 
             if (isEvolved) {
                 const atomicBomb = new AtomicBombZone(
@@ -161,7 +162,7 @@ export class OrbitalStrikeWeapon extends Weapon {
                 this.waitingForExplosion = true;
                 this.onSpawn(atomicBomb);
 
-                this.cooldown = 8.0 * (this.owner as any).stats.cooldown;
+                this.cooldown = 8.0 * this.owner.stats.cooldown;
             } else {
                 const offsetX = (Math.random() - 0.5) * 1000;
                 const offsetY = (Math.random() - 0.5) * 800;
@@ -169,14 +170,14 @@ export class OrbitalStrikeWeapon extends Weapon {
                 const zone = new DelayedExplosionZone(
                     this.owner.pos.x + offsetX,
                     this.owner.pos.y + offsetY,
-                    this.area * (this.owner as any).stats.area * (1 + this.level * 0.1),
+                    this.area * this.owner.stats.area * (1 + this.level * 0.1),
                     1.0,
                     normalResult.damage,
                     '💥',
                     (pos, amount) => this.onDamage(pos, amount, normalResult.isCrit)
                 );
                 this.onSpawn(zone);
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+                this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
             }
         }
     }

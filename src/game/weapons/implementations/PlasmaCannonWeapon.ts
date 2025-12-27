@@ -5,8 +5,9 @@
  * Evolved: Fusion Core - Creates pull zone on explosion
  */
 import { ProjectileWeapon, PlasmaProjectile, Zone, type ProjectileParams } from '../base';
+import type { Player } from '../../entities/Player';
 import { Entity } from '../../Entity';
-import { type Vector2 } from '../../core/Utils';
+import type { Vector2 } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
@@ -106,7 +107,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         duration: 3,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -116,7 +117,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
     }
 
     update(dt: number) {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
@@ -125,7 +126,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
             if (target) {
                 this.fire(target);
                 const cdMultiplier = this.evolved ? 1.4 : 1.0;
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown * cdMultiplier;
+                this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
             }
         }
     }
@@ -140,7 +141,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
     protected onProjectileCreated(proj: Entity): void {
         if (this.evolved) {
             const plasma = proj as PlasmaProjectile;
-            const { damage } = (this.owner as any).getDamage(this.damage);
+            const { damage } = this.owner.getDamage(this.damage);
             plasma.onExplosion = (x: number, y: number) => {
                 const pullZone = new FusionCoreSingularity(x, y, damage * 0.15);
                 this.onSpawn(pullZone);

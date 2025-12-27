@@ -3,6 +3,7 @@
  * Leaves damaging zone at player position.
  */
 import { ZoneWeapon, SporeZone } from '../base';
+import type { Player } from '../../entities/Player';
 
 export class SporeCloudWeapon extends ZoneWeapon {
     name = "Spore Cloud";
@@ -19,7 +20,7 @@ export class SporeCloudWeapon extends ZoneWeapon {
         duration: 5,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.duration = this.stats.duration;
@@ -28,17 +29,17 @@ export class SporeCloudWeapon extends ZoneWeapon {
     }
 
     spawnZone() {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const baseInterval = Math.max(0.1, this.interval - (this.owner as any).stats.tick);
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
+        const baseInterval = Math.max(0.1, this.interval - this.owner.stats.tick);
         const boostedInterval = baseInterval / speedBoost;
 
-        const { damage } = (this.owner as any).getDamage(this.damage);
+        const { damage } = this.owner.getDamage(this.damage);
 
         const zone = new SporeZone(
             this.owner.pos.x,
             this.owner.pos.y,
-            this.area * (this.owner as any).stats.area,
-            this.duration * (this.owner as any).stats.duration,
+            this.area * this.owner.stats.area,
+            this.duration * this.owner.stats.duration,
             damage,
             Math.max(0.01, boostedInterval)
         );

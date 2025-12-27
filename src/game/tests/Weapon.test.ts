@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Weapon } from '../Weapon';
-import { type Vector2 } from '../core/Utils';
+import type { Vector2 } from '../core/Utils';
 
 // Mock SpatialHash
 vi.mock('../core/SpatialHash', () => ({

@@ -4,7 +4,7 @@
  */
 import { Weapon } from '../../Weapon';
 import { Entity } from '../../Entity';
-import { type Vector2 } from '../../core/Utils';
+import type { Vector2 } from '../../core/Utils';
 import { Projectile } from './Projectile';
 import { Zone } from './Zone';
 
@@ -29,27 +29,27 @@ export abstract class ProjectileWeapon extends Weapon {
     abstract pierce: number;
 
     update(dt: number) {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
             const target = this.findClosestEnemy();
             if (target) {
                 this.fire(target);
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+                this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
             }
         }
     }
 
     fire(target: Entity) {
         const velocity = this.calculateVelocityToTarget(target);
-        const { damage } = (this.owner as any).getDamage(this.damage);
+        const { damage } = this.owner.getDamage(this.damage);
 
         const proj = this.createProjectile({
             x: this.owner.pos.x,
             y: this.owner.pos.y,
             velocity,
-            duration: this.duration * (this.owner as any).stats.duration,
+            duration: this.duration * this.owner.stats.duration,
             damage,
             pierce: this.pierce,
             emoji: this.projectileEmoji
@@ -85,26 +85,26 @@ export abstract class ZoneWeapon extends Weapon {
     abstract interval: number;
 
     update(dt: number) {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
         if (this.cooldown <= 0) {
             this.spawnZone();
-            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+            this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
         }
     }
 
     spawnZone() {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
-        const baseInterval = Math.max(0.1, this.interval - (this.owner as any).stats.tick);
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
+        const baseInterval = Math.max(0.1, this.interval - this.owner.stats.tick);
         const boostedInterval = baseInterval / speedBoost;
 
-        const { damage } = (this.owner as any).getDamage(this.damage);
+        const { damage } = this.owner.getDamage(this.damage);
 
         const zone = new Zone(
             this.owner.pos.x,
             this.owner.pos.y,
-            this.area * (this.owner as any).stats.area,
-            this.duration * (this.owner as any).stats.duration,
+            this.area * this.owner.stats.area,
+            this.duration * this.owner.stats.duration,
             damage,
             Math.max(0.01, boostedInterval),
             this.zoneEmoji

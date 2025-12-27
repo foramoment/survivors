@@ -3,6 +3,7 @@
  * Ricochet disc that bounces between enemies.
  */
 import { ProjectileWeapon, BouncingProjectile } from '../base';
+import type { Player } from '../../entities/Player';
 import { Entity } from '../../Entity';
 
 export class ChronoDiscWeapon extends ProjectileWeapon {
@@ -24,7 +25,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
         countScaling: 1,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -35,7 +36,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
     }
 
     update(dt: number) {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
 
         for (let i = this.pendingDiscs.length - 1; i >= 0; i--) {
@@ -61,7 +62,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
                     });
                 }
 
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+                this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
             }
         }
     }
@@ -74,8 +75,8 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
             this.owner.pos.x,
             this.owner.pos.y,
             velocity,
-            this.duration * (this.owner as any).stats.duration,
-            (this.owner as any).getDamage(this.damage).damage,
+            this.duration * this.owner.stats.duration,
+            this.owner.getDamage(this.damage).damage,
             bounces,
             this.projectileEmoji,
             this.area

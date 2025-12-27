@@ -5,7 +5,8 @@
  * Evolved: Psychic Storm - Cascading stun zone
  */
 import { Weapon } from '../../Weapon';
-import { type Vector2 } from '../../core/Utils';
+import type { Player } from '../../entities/Player';
+import type { Vector2 } from '../../core/Utils';
 import { MindBlastZone, Zone } from '../base';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { particles } from '../../core/ParticleSystem';
@@ -100,7 +101,7 @@ export class MindBlastWeapon extends Weapon {
         duration: 0.5,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -108,7 +109,7 @@ export class MindBlastWeapon extends Weapon {
     }
 
     update(dt: number) {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
@@ -117,13 +118,13 @@ export class MindBlastWeapon extends Weapon {
             if (targets.length > 0) {
                 const target = targets[0];
                 const isEvolved = this.evolved;
-                const result = (this.owner as any).getDamage(this.damage);
+                const result = this.owner.getDamage(this.damage);
 
                 if (isEvolved) {
                     const zone = new PsychicStormZone(
                         target.pos.x,
                         target.pos.y,
-                        this.area * (this.owner as any).stats.area,
+                        this.area * this.owner.stats.area,
                         result.damage,
                         2.0,
                         (pos, amount) => this.onDamage(pos, amount, result.isCrit)
@@ -133,7 +134,7 @@ export class MindBlastWeapon extends Weapon {
                     const zone = new MindBlastZone(
                         target.pos.x,
                         target.pos.y,
-                        this.area * (this.owner as any).stats.area,
+                        this.area * this.owner.stats.area,
                         result.damage,
                         (pos, amount) => this.onDamage(pos, amount, result.isCrit),
                         0
@@ -141,7 +142,7 @@ export class MindBlastWeapon extends Weapon {
                     this.onSpawn(zone);
                 }
 
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+                this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
             }
         }
     }

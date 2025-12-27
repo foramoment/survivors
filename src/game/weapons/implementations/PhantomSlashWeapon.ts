@@ -5,7 +5,8 @@
  * Evolved: Dimensional Blade - Creates rift zones that slow enemies
  */
 import { Weapon } from '../../Weapon';
-import { type Vector2 } from '../../core/Utils';
+import type { Player } from '../../entities/Player';
+import type { Vector2 } from '../../core/Utils';
 import { Zone } from '../base';
 import { damageSystem } from '../../core/DamageSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
@@ -111,7 +112,7 @@ export class PhantomSlashWeapon extends Weapon {
         countScaling: 1,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -119,7 +120,7 @@ export class PhantomSlashWeapon extends Weapon {
     }
 
     update(dt: number) {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
         if (this.cooldown <= 0) {
             const targets = [...this.findAllEnemies()];
@@ -155,7 +156,7 @@ export class PhantomSlashWeapon extends Weapon {
                     }
                 }
                 const cdMultiplier = isEvolved ? 1.3 : 1.0;
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown * cdMultiplier;
+                this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
             }
         }
     }

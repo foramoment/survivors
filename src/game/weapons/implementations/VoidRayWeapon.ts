@@ -5,6 +5,7 @@
  * Evolved: Void Cannon - Double damage, wider beam
  */
 import { Weapon } from '../../Weapon';
+import type { Player } from '../../entities/Player';
 import { VoidRayBeam } from '../base';
 
 export class VoidRayWeapon extends Weapon {
@@ -20,7 +21,7 @@ export class VoidRayWeapon extends Weapon {
         duration: 0.5,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -28,7 +29,7 @@ export class VoidRayWeapon extends Weapon {
     }
 
     update(dt: number) {
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
 
         if (this.cooldown <= 0) {
@@ -36,7 +37,7 @@ export class VoidRayWeapon extends Weapon {
 
             if (target) {
                 const isEvolved = this.evolved;
-                const result = (this.owner as any).getDamage(this.damage);
+                const result = this.owner.getDamage(this.damage);
                 const damage = result.damage * (isEvolved ? 2 : 1);
                 const isCrit = result.isCrit;
 
@@ -49,7 +50,7 @@ export class VoidRayWeapon extends Weapon {
                 );
                 this.onSpawn(beam);
 
-                this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown;
+                this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
             }
         }
     }

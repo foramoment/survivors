@@ -1,4 +1,4 @@
-import { type Vector2 } from './Utils';
+import type { Vector2 } from './Utils';
 
 /**
  * Spatial Hash Grid for efficient spatial queries

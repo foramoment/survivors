@@ -3,6 +3,7 @@
  * Fireballs that orbit around the player.
  */
 import { Weapon } from '../../Weapon';
+import type { Player } from '../../entities/Player';
 import { OrbitingProjectile } from '../base';
 
 export class SpinningEmberWeapon extends Weapon {
@@ -21,7 +22,7 @@ export class SpinningEmberWeapon extends Weapon {
         countScaling: 1,
     };
 
-    constructor(owner: any) {
+    constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
@@ -30,11 +31,11 @@ export class SpinningEmberWeapon extends Weapon {
     update(dt: number) {
         this.projectiles = this.projectiles.filter(p => !p.isDead);
 
-        const speedBoost = (this.owner as any).weaponSpeedBoost || 1;
+        const speedBoost = this.owner.weaponSpeedBoost || 1;
         this.cooldown -= dt * speedBoost;
         if (this.cooldown <= 0) {
             const count = (this.stats.count || 2) + Math.floor((this.level - 1) * (this.stats.countScaling || 1));
-            const duration = this.stats.duration * (this.owner as any).stats.duration;
+            const duration = this.stats.duration * this.owner.stats.duration;
 
             for (let i = 0; i < count; i++) {
                 const angle = (Math.PI * 2 / count) * i;
@@ -43,7 +44,7 @@ export class SpinningEmberWeapon extends Weapon {
                     this.stats.area,
                     this.stats.speed,
                     duration,
-                    (this.owner as any).getDamage(this.damage).damage,
+                    this.owner.getDamage(this.damage).damage,
                     '🔥'
                 );
                 proj.angle = angle;
@@ -51,7 +52,7 @@ export class SpinningEmberWeapon extends Weapon {
                 this.projectiles.push(proj);
             }
 
-            this.cooldown = this.baseCooldown * (this.owner as any).stats.cooldown + duration;
+            this.cooldown = this.baseCooldown * this.owner.stats.cooldown + duration;
         }
     }
 }
