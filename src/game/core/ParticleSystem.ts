@@ -609,7 +609,9 @@ export class ParticleSystem {
 
 
     update(dt: number) {
-        for (let i = this.particles.length - 1; i >= 0; i--) {
+        // Swap & Pop pattern — O(n) without allocations
+        let i = 0;
+        while (i < this.particles.length) {
             const p = this.particles[i];
 
             p.x += p.vx * dt;
@@ -628,7 +630,12 @@ export class ParticleSystem {
             p.alpha = lifeRatio;
 
             if (p.life <= 0) {
-                this.particles.splice(i, 1);
+                // Swap with last element and pop — O(1) removal
+                this.particles[i] = this.particles[this.particles.length - 1];
+                this.particles.pop();
+                // Don't increment i — need to check swapped element
+            } else {
+                i++;
             }
         }
     }

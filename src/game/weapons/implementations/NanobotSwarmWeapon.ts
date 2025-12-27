@@ -29,8 +29,7 @@ export class NanobotSwarmWeapon extends Weapon {
     }
 
     update(dt: number) {
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        this.cooldown -= dt;
 
         if (this.activeCloud && this.activeCloud.isDead) {
             this.activeCloud = null;
@@ -39,14 +38,13 @@ export class NanobotSwarmWeapon extends Weapon {
         if (this.cooldown <= 0 && !this.activeCloud) {
             const radius = 60 + this.level * 10 * this.owner.stats.area;
             const baseInterval = Math.max(0.1, 0.5 - this.owner.stats.tick);
-            const boostedInterval = baseInterval / speedBoost;
 
             const cloud = new NanobotCloud(
                 this.owner,
                 radius,
                 this.duration * this.owner.stats.duration,
                 this.owner.getDamage(this.damage).damage,
-                Math.max(0.05, boostedInterval)
+                Math.max(0.05, baseInterval)
             );
             this.onSpawn(cloud);
             this.activeCloud = cloud;

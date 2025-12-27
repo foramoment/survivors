@@ -1,34 +1,26 @@
 import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
 
-export type CrystalType = 'blue' | 'green' | 'red' | 'purple' | 'power';
-
-export interface CrystalTypeData {
-    emoji: string;
-    value: number;
-    color: string;
-}
-
-export const CRYSTAL_TYPES: Record<CrystalType, CrystalTypeData> = {
-    blue: { emoji: '💎', value: 1, color: 'rgba(100, 200, 255, 0.6)' },
-    green: { emoji: '💠', value: 5, color: 'rgba(100, 255, 100, 0.6)' },
-    red: { emoji: '🔷', value: 20, color: 'rgba(255, 100, 100, 0.6)' },
-    purple: { emoji: '🔷', value: 100, color: 'rgba(200, 100, 255, 0.6)' },
-    power: { emoji: '⭐', value: 0, color: 'rgba(255, 215, 0, 0.8)' } // Special power crystal
-};
-
 export class XPCrystal extends Entity {
     value: number;
-    lifetime: number = 30; // Despawn after 30 seconds
+    lifetime: number = 30;
     pulseTimer: number = 0;
-    type: CrystalType;
-    isPowerCrystal: boolean = false;
+    private fontSize: number;
 
-    constructor(x: number, y: number, type: CrystalType = 'blue') {
-        super(x, y, 8);
-        this.type = type;
-        this.value = CRYSTAL_TYPES[type].value;
-        this.isPowerCrystal = type === 'power';
+    constructor(x: number, y: number, value: number) {
+        // Dynamic radius based on value (6-12px)
+        const baseRadius = 6 + Math.min(value / 10, 6);
+        super(x, y, baseRadius);
+        this.value = value;
+        // Dynamic font size (12-22px)
+        this.fontSize = 12 + Math.min(value / 6, 10);
+    }
+
+    private getGlowColor(): string {
+        // HSL gradient: cyan (200) → red (0) based on value
+        const t = Math.min(this.value / 60, 1);
+        const hue = 200 - t * 200;
+        return `hsla(${hue}, 100%, 60%, 0.7)`;
     }
 
     update(dt: number, playerPos?: Vector2, magnetRange?: number) {
@@ -60,32 +52,26 @@ export class XPCrystal extends Entity {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        const crystalData = CRYSTAL_TYPES[this.type];
+        const glowColor = this.getGlowColor();
 
         // Pulsing glow effect
         const pulse = 0.8 + 0.2 * Math.sin(this.pulseTimer * 6);
-        const glowSize = this.radius * pulse * (this.isPowerCrystal ? 3 : 2);
+        const glowSize = this.radius * pulse * 2;
 
         // Outer glow
         const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, glowSize);
-        gradient.addColorStop(0, crystalData.color);
-        gradient.addColorStop(1, crystalData.color.replace(/[\d.]+\)$/, '0)'));
+        gradient.addColorStop(0, glowColor);
+        gradient.addColorStop(1, glowColor.replace(/[\d.]+\)$/, '0)'));
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(0, 0, glowSize, 0, Math.PI * 2);
         ctx.fill();
 
-        // Power crystal rotation
-        if (this.isPowerCrystal) {
-            ctx.rotate(this.pulseTimer * 2);
-        }
-
         // Crystal emoji
-        const fontSize = this.isPowerCrystal ? 24 : 16;
-        ctx.font = `${fontSize}px Arial`;
+        ctx.font = `${this.fontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(crystalData.emoji, 0, 0);
+        ctx.fillText('💎', 0, 0);
 
         ctx.restore();
     }

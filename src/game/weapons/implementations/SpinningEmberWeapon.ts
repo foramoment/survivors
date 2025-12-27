@@ -31,8 +31,7 @@ export class SpinningEmberWeapon extends Weapon {
     update(dt: number) {
         this.projectiles = this.projectiles.filter(p => !p.isDead);
 
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        this.cooldown -= dt;
         if (this.cooldown <= 0) {
             const count = (this.stats.count || 2) + Math.floor((this.level - 1) * (this.stats.countScaling || 1));
             const duration = this.stats.duration * this.owner.stats.duration;

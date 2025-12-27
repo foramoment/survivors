@@ -49,7 +49,6 @@ const createMockOwner = (overrides: Partial<any> = {}) => ({
         ...overrides.stats
     },
     getDamage: (d: number) => ({ damage: d, isCrit: false }),
-    weaponSpeedBoost: 1,
     ...overrides
 });
 

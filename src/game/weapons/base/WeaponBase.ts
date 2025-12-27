@@ -29,8 +29,7 @@ export abstract class ProjectileWeapon extends Weapon {
     abstract pierce: number;
 
     update(dt: number) {
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        this.cooldown -= dt;
 
         if (this.cooldown <= 0) {
             const target = this.findClosestEnemy();
@@ -85,8 +84,7 @@ export abstract class ZoneWeapon extends Weapon {
     abstract interval: number;
 
     update(dt: number) {
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        this.cooldown -= dt;
         if (this.cooldown <= 0) {
             this.spawnZone();
             this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
@@ -94,9 +92,7 @@ export abstract class ZoneWeapon extends Weapon {
     }
 
     spawnZone() {
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
         const baseInterval = Math.max(0.1, this.interval - this.owner.stats.tick);
-        const boostedInterval = baseInterval / speedBoost;
 
         const { damage } = this.owner.getDamage(this.damage);
 
@@ -106,7 +102,7 @@ export abstract class ZoneWeapon extends Weapon {
             this.area * this.owner.stats.area,
             this.duration * this.owner.stats.duration,
             damage,
-            Math.max(0.01, boostedInterval),
+            Math.max(0.01, baseInterval),
             this.zoneEmoji
         );
         this.onSpawn(zone);

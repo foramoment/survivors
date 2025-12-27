@@ -17,10 +17,6 @@ export class Player extends Entity {
     invulnerabilityTimer: number = 0;
     invulnerabilityDuration: number = 0.5;
 
-    // Weapon speed boost system
-    weaponSpeedBoost: number = 1;
-    weaponSpeedBoostTimer: number = 0;
-
     // Knockback system
     knockback: Vector2 = { x: 0, y: 0 };
 
@@ -107,14 +103,6 @@ export class Player extends Entity {
         // Update invulnerability timer
         if (this.invulnerabilityTimer > 0) {
             this.invulnerabilityTimer -= dt;
-        }
-
-        // Update weapon speed boost timer
-        if (this.weaponSpeedBoostTimer > 0) {
-            this.weaponSpeedBoostTimer -= dt;
-            if (this.weaponSpeedBoostTimer <= 0) {
-                this.weaponSpeedBoost = 1;
-            }
         }
     }
 
@@ -207,11 +195,6 @@ export class Player extends Entity {
         }
 
         this.onLevelUp();
-    }
-
-    activateWeaponSpeedBoost(duration: number = 10, multiplier: number = 10) {
-        this.weaponSpeedBoost = multiplier;
-        this.weaponSpeedBoostTimer = duration;
     }
 
     getDamage(baseDamage: number): { damage: number, isCrit: boolean } {

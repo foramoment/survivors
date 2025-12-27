@@ -117,8 +117,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
     }
 
     update(dt: number) {
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        this.cooldown -= dt;
 
         if (this.cooldown <= 0) {
             const target = this.findClosestEnemy();

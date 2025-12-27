@@ -51,8 +51,7 @@ const createMockOwner = () => ({
         damage: 1, cooldown: 1, area: 1, speed: 1, duration: 1,
         amount: 1, moveSpeed: 1, magnet: 1, luck: 1
     },
-    getDamage: (d: number) => ({ damage: d, isCrit: false }),
-    weaponSpeedBoost: 1
+    getDamage: (d: number) => ({ damage: d, isCrit: false })
 });
 
 // Mock enemy

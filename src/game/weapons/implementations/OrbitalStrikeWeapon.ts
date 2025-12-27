@@ -142,8 +142,7 @@ export class OrbitalStrikeWeapon extends Weapon {
             return;
         }
 
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        this.cooldown -= dt;
 
         if (this.cooldown <= 0) {
             // Calculate damage once with crit

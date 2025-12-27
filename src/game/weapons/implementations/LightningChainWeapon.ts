@@ -4,9 +4,8 @@
  * 
  * Evolved: Thunderstorm - Infinite chain with split chance
  */
-import { ProjectileWeapon, Beam } from '../base';
+import { ProjectileWeapon, Beam, ChainLightning } from '../base';
 import type { Player } from '../../entities/Player';
-import { ChainLightning } from '../WeaponTypes';
 import { distance, type Vector2 } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
@@ -227,8 +226,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
     update(dt: number) {
         const isEvolved = this.evolved;
 
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        this.cooldown -= dt;
 
         if (this.cooldown <= 0) {
             const target = this.findClosestEnemy();

@@ -36,8 +36,7 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
     }
 
     update(dt: number) {
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        this.cooldown -= dt;
 
         for (let i = this.pendingDiscs.length - 1; i >= 0; i--) {
             this.pendingDiscs[i].delay -= dt;

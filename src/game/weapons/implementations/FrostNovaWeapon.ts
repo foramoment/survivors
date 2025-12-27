@@ -125,8 +125,7 @@ export class FrostNovaWeapon extends Weapon {
     }
 
     update(dt: number) {
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
-        this.cooldown -= dt * speedBoost;
+        this.cooldown -= dt;
         if (this.cooldown <= 0) {
             const range = 400;
             const offsetX = (Math.random() - 0.5) * 2 * range;

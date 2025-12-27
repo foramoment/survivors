@@ -99,8 +99,7 @@ export class Engine {
                     xpToLevel: this.gameManager.player.nextLevelXp,
                     level: this.gameManager.player.level,
                     gameTime: this.gameManager.gameTime,
-                    killCount: this.gameManager.killCount,
-                    powerBoostActive: this.gameManager.player.weaponSpeedBoostTimer > 0
+                    killCount: this.gameManager.killCount
                 });
             }
         }

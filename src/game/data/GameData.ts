@@ -3,7 +3,7 @@ import {
     SporeCloudWeapon, SingularityOrbWeapon, OrbitalStrikeWeapon, MindBlastWeapon,
     ChronoDiscWeapon, AcidPoolWeapon, LightningChainWeapon, SpinningEmberWeapon,
     FrostNovaWeapon, FanOfKnivesWeapon
-} from '../weapons/Implementations';
+} from '../weapons/implementations';
 
 export const CLASSES = [
     { name: "Void Walker", emoji: "🌑", bonus: "Speed +10%", weaponId: 'void_ray', hp: 90, stats: { moveSpeed: 1.1 } },

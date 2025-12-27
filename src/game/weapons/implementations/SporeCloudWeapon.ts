@@ -29,9 +29,7 @@ export class SporeCloudWeapon extends ZoneWeapon {
     }
 
     spawnZone() {
-        const speedBoost = this.owner.weaponSpeedBoost || 1;
         const baseInterval = Math.max(0.1, this.interval - this.owner.stats.tick);
-        const boostedInterval = baseInterval / speedBoost;
 
         const { damage } = this.owner.getDamage(this.damage);
 
@@ -41,7 +39,7 @@ export class SporeCloudWeapon extends ZoneWeapon {
             this.area * this.owner.stats.area,
             this.duration * this.owner.stats.duration,
             damage,
-            Math.max(0.01, boostedInterval)
+            Math.max(0.01, baseInterval)
         );
         this.onSpawn(zone);
     }
