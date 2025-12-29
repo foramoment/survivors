@@ -113,7 +113,7 @@ export class BouncingProjectile extends Projectile {
             x: newTarget.x - this.pos.x,
             y: newTarget.y - this.pos.y
         });
-        const speed = Math.sqrt(this.velocity.x ** 2 + this.velocity.y ** 2);
+        const speed = Math.hypot(this.velocity.x, this.velocity.y);
         this.velocity = { x: dir.x * speed, y: dir.y * speed };
         this.bouncesLeft--;
     }
@@ -190,7 +190,7 @@ export class SingularityProjectile extends Projectile {
         for (const enemy of enemiesInPullRange) {
             const dx = this.pos.x - enemy.pos.x;
             const dy = this.pos.y - enemy.pos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const dist = distance(this.pos, enemy.pos);
 
             if (dist < 200 && dist > 5) {
                 const pullForce = this.pullStrength / dist;

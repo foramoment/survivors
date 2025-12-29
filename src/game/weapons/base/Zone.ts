@@ -188,7 +188,7 @@ export class AcidZone extends Zone {
         ctx.stroke();
 
         for (const bubble of this.bubbles) {
-            const dist = Math.sqrt(bubble.x * bubble.x + bubble.y * bubble.y);
+            const dist = Math.hypot(bubble.x, bubble.y);
             if (dist < this.radius) {
                 ctx.beginPath();
                 ctx.arc(bubble.x, bubble.y, bubble.size, 0, Math.PI * 2);
@@ -234,7 +234,7 @@ export class SporeZone extends Zone {
             spore.x += spore.vx * dt;
             spore.y += spore.vy * dt;
 
-            const dist = Math.sqrt(spore.x * spore.x + spore.y * spore.y);
+            const dist = Math.hypot(spore.x, spore.y);
             if (dist > this.radius) {
                 const angle = Math.random() * Math.PI * 2;
                 spore.x = Math.cos(angle) * this.radius * 0.5;

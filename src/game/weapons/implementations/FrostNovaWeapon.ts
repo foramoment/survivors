@@ -6,7 +6,7 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import type { Vector2 } from '../../core/Utils';
+import { type Vector2, distance } from '../../core/Utils';
 import { LobbedProjectile, FrostZone, Zone } from '../base';
 import { particles } from '../../core/ParticleSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
@@ -33,9 +33,7 @@ export class AbsoluteZeroZone extends Zone {
         const enemiesInFreezeZone = levelSpatialHash.getWithinRadius(this.pos, this.radius);
 
         for (const enemy of enemiesInFreezeZone) {
-            const dx = this.pos.x - enemy.pos.x;
-            const dy = this.pos.y - enemy.pos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const dist = distance(this.pos, enemy.pos);
 
             if (dist < this.radius) {
                 (enemy as any).slowMultiplier = 0; // Complete freeze

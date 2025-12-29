@@ -1,4 +1,4 @@
-import type { Vector2 } from './Utils';
+import { type Vector2, distance } from './Utils';
 
 /**
  * Spatial Hash Grid for efficient spatial queries
@@ -89,9 +89,7 @@ export class SpatialHashGrid<T extends { pos: Vector2; radius: number }> {
     getWithinRadius(pos: Vector2, radius: number): T[] {
         const candidates = this.getNearby(pos, radius);
         return candidates.filter(entity => {
-            const dx = entity.pos.x - pos.x;
-            const dy = entity.pos.y - pos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const dist = distance(entity.pos, pos);
             return dist <= radius + entity.radius;
         });
     }

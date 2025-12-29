@@ -111,7 +111,7 @@ export class ThunderstormLightning extends ChainLightning {
     private drawThunderstormBolt(ctx: CanvasRenderingContext2D, start: Vector2, end: Vector2, alpha: number) {
         const dx = end.x - start.x;
         const dy = end.y - start.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const dist = distance(start, end);
 
         if (dist < 5 || !isFinite(dist) || alpha <= 0) return;
 

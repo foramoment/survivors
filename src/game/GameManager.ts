@@ -3,7 +3,7 @@ import { Enemy } from './entities/Enemy';
 import { XPCrystal } from './entities/XPCrystal';
 import { Entity } from './Entity';
 import { CLASSES, POWERUPS, ENEMIES, WEAPONS } from './data/GameData';
-import { checkCollision, type Vector2 } from './core/Utils';
+import { checkCollision, type Vector2, distance } from './core/Utils';
 import { Projectile, Zone } from './weapons/base';
 import { levelSpatialHash } from './core/SpatialHash';
 import { particles } from './core/ParticleSystem';
@@ -622,7 +622,7 @@ export class GameManager {
                 // Calculate direction from enemy to player
                 const dx = this.player.pos.x - e.pos.x;
                 const dy = this.player.pos.y - e.pos.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dist = distance(this.player.pos, e.pos);
 
                 if (dist > 0.001) {
                     const nx = dx / dist;

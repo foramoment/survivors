@@ -74,9 +74,9 @@ export class Joystick {
 
         const dx = x - this.origin.x;
         const dy = y - this.origin.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const dist = Math.hypot(dx, dy);
 
-        if (distance > this.maxRadius) {
+        if (dist > this.maxRadius) {
             const angle = Math.atan2(dy, dx);
             this.currentPos.x = this.origin.x + Math.cos(angle) * this.maxRadius;
             this.currentPos.y = this.origin.y + Math.sin(angle) * this.maxRadius;

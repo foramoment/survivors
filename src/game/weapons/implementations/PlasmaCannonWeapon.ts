@@ -7,7 +7,7 @@
 import { ProjectileWeapon, PlasmaProjectile, Zone, type ProjectileParams } from '../base';
 import type { Player } from '../../entities/Player';
 import { Entity } from '../../Entity';
-import type { Vector2 } from '../../core/Utils';
+import { type Vector2, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
 
@@ -34,7 +34,7 @@ export class FusionCoreSingularity extends Zone {
         for (const enemy of enemiesInSingularity) {
             const dx = this.pos.x - enemy.pos.x;
             const dy = this.pos.y - enemy.pos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const dist = distance(this.pos, enemy.pos);
 
             if (dist < this.radius * 1.5 && dist > 5) {
                 const pullForce = this.pullStrength / dist;

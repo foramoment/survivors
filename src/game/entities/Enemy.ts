@@ -1,5 +1,5 @@
 import { Entity } from '../Entity';
-import { type Vector2, normalize } from '../core/Utils';
+import { type Vector2, normalize, distance } from '../core/Utils';
 
 export class Enemy extends Entity {
     hp: number;
@@ -56,7 +56,7 @@ export class Enemy extends Entity {
     addSeparationFrom(other: Enemy, separationStrength: number = 150) {
         const dx = this.pos.x - other.pos.x;
         const dy = this.pos.y - other.pos.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const dist = distance(this.pos, other.pos);
         const minDist = this.radius + other.radius;
 
         if (dist < minDist && dist > 0.001) {

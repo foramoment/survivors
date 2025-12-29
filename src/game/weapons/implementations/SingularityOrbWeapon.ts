@@ -21,7 +21,7 @@ export class BlackHoleProjectile extends SingularityProjectile {
     private darkLightningTimer: number = 0;
     private darkLightningInterval: number = 0.5;
     private darkLightnings: { start: Vector2; end: Vector2; alpha: number }[] = [];
-    onDeath?: (x: number, y: number) => void;
+    onDeathCallback?: (x: number, y: number) => void;
 
     constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number) {
         super(x, y, velocity, duration, damage, pierce);
@@ -48,8 +48,8 @@ export class BlackHoleProjectile extends SingularityProjectile {
         }
 
         // On death, trigger black hole zone
-        if (this.isDead && this.onDeath) {
-            this.onDeath(this.pos.x, this.pos.y);
+        if (this.isDead && this.onDeathCallback) {
+            this.onDeathCallback(this.pos.x, this.pos.y);
         }
     }
 
@@ -137,7 +137,7 @@ export class BlackHoleProjectile extends SingularityProjectile {
     private drawDarkLightning(ctx: CanvasRenderingContext2D, start: Vector2, end: Vector2, alpha: number) {
         const dx = end.x - start.x;
         const dy = end.y - start.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const dist = distance(start, end);
         if (dist < 5) return;
 
         ctx.save();
@@ -200,7 +200,7 @@ export class BlackHoleZone extends Zone {
         for (const enemy of enemiesInPullRange) {
             const dx = this.pos.x - enemy.pos.x;
             const dy = this.pos.y - enemy.pos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const dist = distance(this.pos, enemy.pos);
 
             if (dist < this.radius * 2 && dist > 5) {
                 const pullForce = this.pullStrength / dist;
@@ -331,7 +331,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
                 this.pierce
             );
 
-            proj.onDeath = (x: number, y: number) => {
+            proj.onDeathCallback = (x: number, y: number) => {
                 const zone = new BlackHoleZone(x, y, 100, 3.0, damage * 0.2);
                 this.activeBlackHole = zone;
                 this.onSpawn(zone);

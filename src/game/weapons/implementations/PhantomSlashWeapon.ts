@@ -6,7 +6,7 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import type { Vector2 } from '../../core/Utils';
+import { type Vector2, distance } from '../../core/Utils';
 import { Zone } from '../base';
 import { damageSystem } from '../../core/DamageSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
@@ -33,9 +33,7 @@ export class DimensionalRiftZone extends Zone {
         const enemiesInRift = levelSpatialHash.getWithinRadius(this.pos, this.radius);
 
         for (const enemy of enemiesInRift) {
-            const dx = this.pos.x - enemy.pos.x;
-            const dy = this.pos.y - enemy.pos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const dist = distance(this.pos, enemy.pos);
             if (dist < this.radius) {
                 (enemy as any).slowMultiplier = Math.min((enemy as any).slowMultiplier || 1, 0.5);
                 (enemy as any).slowDuration = 0.5;
