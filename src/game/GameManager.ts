@@ -3,13 +3,14 @@ import { Enemy } from './entities/Enemy';
 import { XPCrystal } from './entities/XPCrystal';
 import { Entity } from './Entity';
 import { CLASSES, POWERUPS, ENEMIES, WEAPONS } from './data/GameData';
-import { checkCollision, type Vector2, distance } from './core/Utils';
-import { Projectile, Zone, BouncingProjectile } from './weapons/base';
+import { checkCollision, type Vector2 } from './core/Utils';
+import { Projectile, Zone } from './weapons/base';
 import { levelSpatialHash } from './core/SpatialHash';
 import { particles } from './core/ParticleSystem';
 import { stateMachine, type GameState } from './core/StateMachine';
 import { damageSystem } from './core/DamageSystem';
 import { debugOverlay } from './core/DebugOverlay';
+import { collisionSystem } from './core/CollisionSystem';
 
 export class GameManager {
     canvas: HTMLCanvasElement;
@@ -606,72 +607,8 @@ export class GameManager {
             }
         }
 
-        // Collisions
-        for (const p of this.projectiles) {
-            if (p instanceof Projectile && !p.canCollide) continue;
-
-            for (const e of this.enemies) {
-                if (checkCollision(p, e)) {
-                    if (p instanceof BouncingProjectile) {
-                        // Handle bouncing projectile
-                        if (p.canHit(e)) {
-                            // Use DamageSystem for consistent damage handling
-                            damageSystem.dealRawDamage(e, p.damage, e.pos);
-                            p.markHit(e);
-
-                            // Emit hit particles based on emoji
-                            const hitColor = this.getProjectileColor(p.emoji);
-                            particles.emitHit(e.pos.x, e.pos.y, hitColor);
-
-                            // Try to bounce to another enemy
-                            if (p.bouncesLeft > 0) {
-                                let nearestEnemy: Enemy | null = null;
-                                let minDist = p.maxBounceRange;
-
-                                for (const target of this.enemies) {
-                                    if (p.canHit(target)) {
-                                        const d = distance(p.pos, target.pos);
-                                        if (d < minDist) {
-                                            minDist = d;
-                                            nearestEnemy = target;
-                                        }
-                                    }
-                                }
-
-                                if (nearestEnemy) {
-                                    p.bounce(nearestEnemy.pos);
-                                } else {
-                                    p.isDead = true; // No more targets
-                                }
-                            } else {
-                                p.isDead = true; // No bounces left
-                            }
-                        }
-                    } else if (p instanceof Projectile) {
-                        // Use DamageSystem for consistent damage handling
-                        damageSystem.dealRawDamage(e, p.damage, e.pos);
-
-                        // Emit hit particles based on emoji
-                        const hitColor = this.getProjectileColor(p.emoji);
-                        particles.emitHit(e.pos.x, e.pos.y, hitColor);
-
-                        if (p.pierce !== undefined) {
-                            p.pierce--;
-                            if (p.pierce < 0) p.isDead = true;
-                        }
-                    } else if (p instanceof Zone) {
-                        p.onOverlap(e);
-                        if (p.timer >= p.interval) {
-                            // Use DamageSystem for consistent damage handling
-                            damageSystem.dealRawDamage(e, p.damage, e.pos);
-                        }
-                    }
-                }
-            }
-            if (p instanceof Zone && p.timer >= p.interval) {
-                p.timer = 0;
-            }
-        }
+        // Collisions - delegated to CollisionSystem
+        collisionSystem.processProjectileCollisions(this.projectiles);
 
         // Update enemies (Move) AFTER collisions have potentially applied slows
         this.enemies.forEach(e => e.update(dt, this.player!.pos));

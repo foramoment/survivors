@@ -133,7 +133,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
     protected createProjectile(params: ProjectileParams): Entity {
         return new PlasmaProjectile(
             params.x, params.y, params.velocity,
-            params.duration, params.damage, 1
+            params.duration, params.damage, params.pierce
         );
     }
 

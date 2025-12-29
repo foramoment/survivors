@@ -13,8 +13,8 @@ export class NanobotSwarmWeapon extends Weapon {
     private activeCloud: NanobotCloud | null = null;
 
     readonly stats = {
-        damage: 0.8,
-        cooldown: 0.5,
+        damage: 5,
+        cooldown: 4,
         area: 1.0,
         speed: 0,
         duration: 5,
@@ -29,10 +29,14 @@ export class NanobotSwarmWeapon extends Weapon {
     }
 
     update(dt: number) {
-        this.cooldown -= dt;
-
+        // Check if the active cloud has expired
         if (this.activeCloud && this.activeCloud.isDead) {
             this.activeCloud = null;
+        }
+
+        // Cooldown only ticks when there's no active cloud
+        if (!this.activeCloud) {
+            this.cooldown -= dt;
         }
 
         if (this.cooldown <= 0 && !this.activeCloud) {

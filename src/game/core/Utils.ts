@@ -3,23 +3,17 @@ export interface Vector2 {
     y: number;
 }
 
-export const distance = (a: Vector2, b: Vector2): number => {
-    return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
-};
+export const distance = (a: Vector2, b: Vector2): number => Math.hypot(b.x - a.x, b.y - a.y);
 
 export const normalize = (v: Vector2): Vector2 => {
-    const len = Math.sqrt(v.x * v.x + v.y * v.y);
-    if (len === 0) return { x: 0, y: 0 };
-    return { x: v.x / len, y: v.y / len };
+    const len = Math.hypot(v.x, v.y);
+    return len === 0 ? { x: 0, y: 0 } : { x: v.x / len, y: v.y / len };
 };
 
 export const checkCollision = (
     a: { pos: Vector2; radius: number },
     b: { pos: Vector2; radius: number }
-): boolean => {
-    return distance(a.pos, b.pos) < a.radius + b.radius;
-};
+): boolean => distance(a.pos, b.pos) < a.radius + b.radius;
 
-export const randomRange = (min: number, max: number): number => {
-    return Math.random() * (max - min) + min;
-};
+export const randomRange = (min: number, max: number): number =>
+    Math.random() * (max - min) + min;

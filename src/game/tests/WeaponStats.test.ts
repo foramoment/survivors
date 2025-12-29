@@ -39,8 +39,8 @@ const EXPECTED_STATS: Record<string, any> = {
         duration: 3,
     },
     nanobot_swarm: {
-        damage: 0.8,
-        cooldown: 0.5,
+        damage: 5,
+        cooldown: 4,
         area: 1.0,
         speed: 0,
         duration: 5,

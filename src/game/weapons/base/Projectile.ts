@@ -10,6 +10,9 @@ import { levelSpatialHash } from '../../core/SpatialHash';
 // ============================================
 // PROJECTILE - Base class for all flying entities
 // ============================================
+
+import { type HitResult } from '../../core/CollisionSystem';
+
 export class Projectile extends Entity {
     velocity: Vector2;
     duration: number;
@@ -31,7 +34,9 @@ export class Projectile extends Entity {
         this.pos.x += this.velocity.x * dt;
         this.pos.y += this.velocity.y * dt;
         this.duration -= dt;
-        if (this.duration <= 0) this.isDead = true;
+        if (this.duration <= 0) {
+            this.kill();
+        }
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
@@ -42,6 +47,41 @@ export class Projectile extends Entity {
         ctx.textBaseline = 'middle';
         ctx.fillText(this.emoji, 0, 0);
         ctx.restore();
+    }
+
+    /**
+     * Handle a collision with an enemy.
+     * Override in subclasses for custom behavior (bouncing, piercing, etc.)
+     * @returns HitResult with damage and whether to continue checking
+     */
+    handleHit(_enemy: Entity): HitResult {
+        this.pierce--;
+        if (this.pierce < 0) {
+            this.kill();
+        }
+        return {
+            damage: this.damage,
+            continueChecking: !this.isDead
+        };
+    }
+
+    /**
+     * Kill the projectile, triggering onDeath hook.
+     * Safe to call multiple times.
+     */
+    kill(): void {
+        if (!this.isDead) {
+            this.isDead = true;
+            this.onDeath();
+        }
+    }
+
+    /**
+     * Hook called when projectile dies.
+     * Override in subclasses for explosion effects, spawning zones, etc.
+     */
+    protected onDeath(): void {
+        // Base implementation does nothing
     }
 }
 
@@ -76,6 +116,49 @@ export class BouncingProjectile extends Projectile {
         const speed = Math.sqrt(this.velocity.x ** 2 + this.velocity.y ** 2);
         this.velocity = { x: dir.x * speed, y: dir.y * speed };
         this.bouncesLeft--;
+    }
+
+    /**
+     * Override handleHit for bouncing behavior.
+     * Returns 0 damage if enemy was already hit.
+     */
+    handleHit(enemy: Entity): HitResult {
+        // Skip if already hit this enemy
+        if (!this.canHit(enemy)) {
+            return { damage: 0, continueChecking: true };
+        }
+
+        this.markHit(enemy);
+
+        // Try to bounce to next target
+        if (this.bouncesLeft > 0) {
+            const nearbyEnemies = levelSpatialHash.getWithinRadius(this.pos, this.maxBounceRange);
+            let nearestEnemy: Entity | null = null;
+            let minDist = this.maxBounceRange;
+
+            for (const target of nearbyEnemies) {
+                if (this.canHit(target)) {
+                    const d = distance(this.pos, target.pos);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearestEnemy = target;
+                    }
+                }
+            }
+
+            if (nearestEnemy) {
+                this.bounce(nearestEnemy.pos);
+            } else {
+                this.kill(); // No more targets
+            }
+        } else {
+            this.kill(); // No bounces left
+        }
+
+        return {
+            damage: this.damage,
+            continueChecking: false // Don't check more enemies this frame
+        };
     }
 }
 
@@ -173,7 +256,6 @@ export class PlasmaProjectile extends Projectile {
     }
 
     update(dt: number) {
-        const wasAlive = !this.isDead;
         super.update(dt);
 
         this.particleTimer += dt;
@@ -181,8 +263,10 @@ export class PlasmaProjectile extends Projectile {
             this.particleTimer = 0;
             particles.emitPlasmaEnergy(this.pos.x, this.pos.y);
         }
+    }
 
-        if (wasAlive && this.isDead && this.onExplosion) {
+    protected onDeath(): void {
+        if (this.onExplosion) {
             this.onExplosion(this.pos.x, this.pos.y);
         }
     }

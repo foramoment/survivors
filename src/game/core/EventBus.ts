@@ -25,6 +25,7 @@ export type GameEvent =
     | { type: 'PLAYER_DAMAGED'; amount: number; source: any }
     | { type: 'WEAPON_FIRED'; weapon: any }
     | { type: 'PROJECTILE_HIT'; projectile: any; enemy: any }
+    | { type: 'PROJECTILE_DIED'; projectile: any; pos: Vector2; reason: 'pierce' | 'duration' | 'collision' }
     | { type: 'ZONE_TICK'; zone: any; enemies: any[] }
     | { type: 'LEVEL_UP'; player: any; newLevel: number }
     | { type: 'XP_COLLECTED'; crystal: any; value: number }
