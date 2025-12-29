@@ -24,7 +24,8 @@ export {
     SporeZone,
     NanobotCloud,
     DelayedExplosionZone,
-    MindBlastZone
+    MindBlastZone,
+    PlasmaExplosionZone
 } from './Zone';
 
 // Beam types

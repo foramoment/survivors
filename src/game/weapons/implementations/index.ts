@@ -17,4 +17,4 @@ export { AcidPoolWeapon } from './AcidPoolWeapon';
 export { LightningChainWeapon } from './LightningChainWeapon';
 export { SpinningEmberWeapon } from './SpinningEmberWeapon';
 export { FrostNovaWeapon } from './FrostNovaWeapon';
-export { FanOfKnivesWeapon } from './FanOfKnivesWeapon';
+export { PlasmaGrenadeWeapon } from './PlasmaGrenadeWeapon';

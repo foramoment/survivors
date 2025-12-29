@@ -12,7 +12,7 @@ import { AcidPoolWeapon } from '../weapons/implementations/AcidPoolWeapon';
 import { LightningChainWeapon } from '../weapons/implementations/LightningChainWeapon';
 import { SpinningEmberWeapon } from '../weapons/implementations/SpinningEmberWeapon';
 import { FrostNovaWeapon } from '../weapons/implementations/FrostNovaWeapon';
-import { FanOfKnivesWeapon } from '../weapons/implementations/FanOfKnivesWeapon';
+import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWeapon';
 
 const EXPECTED_STATS: Record<string, any> = {
     void_ray: {
@@ -55,7 +55,7 @@ const EXPECTED_STATS: Record<string, any> = {
     singularity_orb: {
         damage: 50,
         cooldown: 4.0,
-        area: 600,
+        area: 125,  // speed * duration = 50 * 2.5
         speed: 50,
         duration: 2.5,
         pierce: 999,
@@ -115,15 +115,12 @@ const EXPECTED_STATS: Record<string, any> = {
         speed: 0,
         duration: 3.0,
     },
-    fan_of_knives: {
-        damage: 12,
-        cooldown: 1.5,
-        area: 0,
-        speed: 700,
-        duration: 1.5,
-        pierce: 2,
-        count: 3,
-        countScaling: 0.5,
+    plasma_grenade: {
+        damage: 25,
+        cooldown: 2.5,
+        area: 70,
+        speed: 0,
+        duration: 0.8,
     },
 };
 
@@ -245,9 +242,9 @@ describe('Weapon Stats Safety Net', () => {
         expect(weapon.area).toBe(expected.area);
     });
 
-    it('Fan of Knives Stats', () => {
-        const weapon = new FanOfKnivesWeapon(mockOwner);
-        const expected = EXPECTED_STATS.fan_of_knives;
+    it('Plasma Grenade Stats', () => {
+        const weapon = new PlasmaGrenadeWeapon(mockOwner);
+        const expected = EXPECTED_STATS.plasma_grenade;
         expect(weapon.damage).toBe(expected.damage);
         expect(weapon.baseCooldown).toBe(expected.cooldown);
         expect(weapon.area).toBe(expected.area);

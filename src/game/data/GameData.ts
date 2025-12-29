@@ -2,7 +2,7 @@ import {
     VoidRayWeapon, PhantomSlashWeapon, PlasmaCannonWeapon, NanobotSwarmWeapon,
     SporeCloudWeapon, SingularityOrbWeapon, OrbitalStrikeWeapon, MindBlastWeapon,
     ChronoDiscWeapon, AcidPoolWeapon, LightningChainWeapon, SpinningEmberWeapon,
-    FrostNovaWeapon, FanOfKnivesWeapon
+    FrostNovaWeapon, PlasmaGrenadeWeapon
 } from '../weapons/implementations';
 
 export const CLASSES = [
@@ -19,7 +19,7 @@ export const CLASSES = [
     { name: "Storm Mage", emoji: "⚡", bonus: "Might +15%", weaponId: 'lightning_chain', hp: 70, stats: { might: 1.15 } },
     { name: "Berserker", emoji: "🔥", bonus: "HP +50%, Armor -2, Might +10%", weaponId: 'spinning_ember', hp: 150, stats: { armor: -2, might: 1.1 } },
     { name: "Ice Mage", emoji: "🧊", bonus: "Area +15%, Cooldown -10%", weaponId: 'frost_nova', hp: 85, stats: { area: 1.15, cooldown: 0.9 } },
-    { name: "Shadow Assassin", emoji: "🥷", bonus: "Crit +15%, Move Speed +15%", weaponId: 'fan_of_knives', hp: 80, stats: { critChance: 0.2, moveSpeed: 1.15 } },
+    { name: "Demolitions Expert", emoji: "💣", bonus: "Area +20%, Might +10%", weaponId: 'plasma_grenade', hp: 100, stats: { area: 1.2, might: 1.1 } },
 ];
 
 export const POWERUPS = [
@@ -200,15 +200,15 @@ export const WEAPONS = [
         }
     },
     {
-        id: 'fan_of_knives',
-        name: "Fan of Knives",
-        emoji: "🗡️",
-        description: "Fires a spread of knives",
-        class: FanOfKnivesWeapon,
+        id: 'plasma_grenade',
+        name: "Plasma Grenade",
+        emoji: "💣",
+        description: "Throws plasma grenades that explode on impact",
+        class: PlasmaGrenadeWeapon,
         evolution: {
-            name: "Void Blades",
-            emoji: "🌑",
-            description: "Daggers split into shadow clones"
+            name: "Supernova Blast",
+            emoji: "💥",
+            description: "Chain explosions for massive area damage"
         }
     },
 ];

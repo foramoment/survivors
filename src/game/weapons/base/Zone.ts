@@ -750,5 +750,114 @@ export class MindBlastZone extends Zone {
     }
 }
 
+// ============================================
+// PLASMA EXPLOSION ZONE - Instant explosion with chain potential
+// ============================================
+export class PlasmaExplosionZone extends Zone {
+    private flashAlpha: number = 1.0;
+    private shockwaveRadius: number = 0;
+    private shockwaveAlpha: number = 1.0;
+    private damageDealt: boolean = false;
+    isEvolved: boolean;
+    onChainExplosion?: (x: number, y: number) => void;
+
+    constructor(x: number, y: number, radius: number, damage: number, isEvolved: boolean = false) {
+        // Short duration for visual effect only
+        super(x, y, radius, 0.6, damage, Number.MAX_VALUE, '');
+        this.isEvolved = isEvolved;
+    }
+
+    update(dt: number) {
+        // Deal damage immediately on first frame
+        if (!this.damageDealt) {
+            this.damageDealt = true;
+            const enemiesInBlast = levelSpatialHash.getWithinRadius(this.pos, this.radius);
+
+            for (const enemy of enemiesInBlast) {
+                const dist = distance(this.pos, enemy.pos);
+                if (dist <= this.radius) {
+                    damageSystem.dealRawDamage(enemy, this.damage, enemy.pos);
+
+                    // Evolved: trigger chain explosions on hit enemies
+                    if (this.isEvolved && this.onChainExplosion && Math.random() < 0.5) {
+                        this.onChainExplosion(enemy.pos.x, enemy.pos.y);
+                    }
+                }
+            }
+        }
+
+        // Visual fade out
+        this.flashAlpha -= dt * 3;
+        this.shockwaveRadius += dt * this.radius * 4;
+        this.shockwaveAlpha -= dt * 2.5;
+
+        if (this.flashAlpha <= 0 && this.shockwaveAlpha <= 0) {
+            this.isDead = true;
+        }
+
+        this.duration -= dt;
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+
+        // Shockwave ring
+        if (this.shockwaveAlpha > 0) {
+            ctx.beginPath();
+            ctx.arc(0, 0, this.shockwaveRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = this.isEvolved
+                ? `rgba(255, 150, 50, ${this.shockwaveAlpha})`
+                : `rgba(100, 255, 100, ${this.shockwaveAlpha})`;
+            ctx.lineWidth = this.isEvolved ? 8 : 5;
+            ctx.shadowColor = this.isEvolved ? '#ff6600' : '#00ff00';
+            ctx.shadowBlur = 15;
+            ctx.stroke();
+        }
+
+        // Explosion core
+        if (this.flashAlpha > 0) {
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * this.flashAlpha);
+            if (this.isEvolved) {
+                gradient.addColorStop(0, `rgba(255, 255, 200, ${this.flashAlpha})`);
+                gradient.addColorStop(0.3, `rgba(255, 150, 50, ${this.flashAlpha * 0.8})`);
+                gradient.addColorStop(0.6, `rgba(255, 80, 0, ${this.flashAlpha * 0.5})`);
+                gradient.addColorStop(1, `rgba(200, 50, 0, 0)`);
+            } else {
+                gradient.addColorStop(0, `rgba(200, 255, 200, ${this.flashAlpha})`);
+                gradient.addColorStop(0.3, `rgba(100, 255, 100, ${this.flashAlpha * 0.8})`);
+                gradient.addColorStop(0.6, `rgba(50, 200, 50, ${this.flashAlpha * 0.5})`);
+                gradient.addColorStop(1, `rgba(0, 150, 0, 0)`);
+            }
+
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * this.flashAlpha, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Central flash
+            if (this.flashAlpha > 0.5) {
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * 0.3 * this.flashAlpha, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.flashAlpha})`;
+                ctx.fill();
+            }
+
+            // Emoji at center during flash
+            if (this.flashAlpha > 0.7) {
+                ctx.font = `${this.radius * 0.5}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.globalAlpha = this.flashAlpha;
+                ctx.fillText(this.isEvolved ? '💥' : '💣', 0, 0);
+            }
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    }
+}
+
 // Re-export distance for use in zones
 export { distance };
+

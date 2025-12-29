@@ -129,7 +129,7 @@ Weapon (abstract)
 | `SingularityProjectile` | Чёрная дыра, тянет врагов  |
 | `PlasmaProjectile`      | Взрывается при смерти      |
 | `OrbitingProjectile`    | Вращается вокруг владельца |
-| `KnifeProjectile`       | Нож с тенью                |
+| `LobbedProjectile`      | Летит по дуге к цели       |
 
 ### Типы зон (`weapons/base/Zone.ts`)
 
@@ -402,6 +402,8 @@ const dist = Math.sqrt(dx * dx + dy * dy);
 3. **Эволюция = level >= 6** — проверяй `this.evolved`, не `this.level === 6`
 4. **Статы оружия в конструкторе** — копируй из `this.stats` в свойства
 5. **onSpawn/onDamage** — используй колбэки, не напрямую GameManager
+6. **Язык игры — английский** — весь код, комментарии и строки на английском
+7. **Коммиты на английском** — сообщения коммитов всегда на английском языке
 
 ---
 
