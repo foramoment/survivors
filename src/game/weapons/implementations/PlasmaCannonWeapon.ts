@@ -20,8 +20,8 @@ export class FusionCoreSingularity extends Zone {
     private rotationAngle: number = 0;
     pullStrength: number = 180;
 
-    constructor(x: number, y: number, damage: number) {
-        super(x, y, 80, 2.0, damage, 0.2, ''); // 80 radius, 2s duration
+    constructor(x: number, y: number, radius: number, duration: number, damage: number) {
+        super(x, y, radius, duration, damage, 0.2, '');
     }
 
     update(dt: number) {
@@ -102,9 +102,9 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
     readonly stats = {
         damage: 40,
         cooldown: 2.5,
-        area: 150,
-        speed: 350,
-        duration: 3,
+        area: 80,      // Explosion radius (FusionCoreSingularity)
+        speed: 200,
+        duration: 1.5,
     };
 
     constructor(owner: Player) {
@@ -112,7 +112,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
         this.speed = this.stats.speed;
-        this.area = this.stats.area;
+        this.area = this.stats.area;  // Explosion radius
         this.duration = this.stats.duration;
     }
 
@@ -120,7 +120,9 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         this.cooldown -= dt;
 
         if (this.cooldown <= 0) {
-            const target = this.findClosestEnemy();
+            // Search range = projectile flight distance
+            const searchRange = this.speed * this.duration * this.owner.stats.duration;
+            const target = this.findClosestEnemy(searchRange);
 
             if (target) {
                 this.fire(target);
@@ -141,8 +143,10 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         if (this.evolved) {
             const plasma = proj as PlasmaProjectile;
             const { damage } = this.owner.getDamage(this.damage);
+            const pullRadius = this.area * this.owner.stats.area;
+            const pullDuration = 2.0 * this.owner.stats.duration;
             plasma.onExplosion = (x: number, y: number) => {
-                const pullZone = new FusionCoreSingularity(x, y, damage * 0.15);
+                const pullZone = new FusionCoreSingularity(x, y, pullRadius, pullDuration, damage * 0.15);
                 this.onSpawn(pullZone);
             };
         }

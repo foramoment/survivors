@@ -152,7 +152,7 @@ describe('PlasmaCannonWeapon', () => {
     it('should initialize with correct stats', () => {
         expect(weapon.damage).toBe(40);
         expect(weapon.baseCooldown).toBe(2.5);
-        expect(weapon.speed).toBe(350);
+        expect(weapon.speed).toBe(200);
     });
 
     it('should fire PlasmaProjectile when enemy in range', () => {

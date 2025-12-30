@@ -288,7 +288,8 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
         this.speed = this.stats.speed;
-        this.area = this.stats.area;
+        // Search range = projectile flight distance
+        this.area = this.stats.speed * this.stats.duration;
         this.duration = this.stats.duration;
     }
 

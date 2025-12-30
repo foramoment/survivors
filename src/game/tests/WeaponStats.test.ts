@@ -34,9 +34,9 @@ const EXPECTED_STATS: Record<string, any> = {
     plasma_cannon: {
         damage: 40,
         cooldown: 2.5,
-        area: 150,
-        speed: 300,
-        duration: 3,
+        area: 80,   // Explosion radius
+        speed: 200,
+        duration: 1.5,
     },
     nanobot_swarm: {
         damage: 5,
