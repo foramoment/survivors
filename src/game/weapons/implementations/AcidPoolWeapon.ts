@@ -41,6 +41,7 @@ export class AcidPoolWeapon extends Weapon {
                     0.8,
                     '🧪'
                 );
+                lob.source = this;
 
                 lob.onLand = (x, y) => {
                     particles.emitPoison(x, y);
@@ -48,9 +49,10 @@ export class AcidPoolWeapon extends Weapon {
                         x, y,
                         this.area * this.owner.stats.area,
                         this.stats.duration * this.owner.stats.duration,
-                        this.owner.getDamage(this.damage).damage,
+                        this.damage,
                         0.5
                     );
+                    zone.source = this;
                     this.onSpawn(zone);
                 };
 

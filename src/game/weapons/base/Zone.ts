@@ -3,6 +3,7 @@
  * Extracted from WeaponTypes.ts for better AI context management.
  */
 import { Entity } from '../../Entity';
+import type { Weapon } from '../../Weapon';
 import { type Vector2, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
@@ -18,6 +19,7 @@ export class Zone extends Entity {
     timer: number = 0;
     emoji: string;
     slowEffect: number = 0;
+    source?: Weapon;
 
     constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number, emoji: string, slowEffect: number = 0) {
         super(x, y, radius);
@@ -342,7 +344,6 @@ export class DelayedExplosionZone extends Zone {
     delay: number;
     initialDelay: number;
     exploded: boolean = false;
-    onDamageCallback?: (pos: Vector2, amount: number) => void;
     isAtomic: boolean = false;
 
     private beamWidth: number = 0;
@@ -351,11 +352,10 @@ export class DelayedExplosionZone extends Zone {
     private shockwaveAlpha: number = 0;
     private particlesEmitted: boolean = false;
 
-    constructor(x: number, y: number, radius: number, delay: number, damage: number, emoji: string, onDamage?: (pos: Vector2, amount: number) => void, isAtomic: boolean = false) {
+    constructor(x: number, y: number, radius: number, delay: number, damage: number, emoji: string, isAtomic: boolean = false) {
         super(x, y, radius, delay + 0.8, damage, Number.MAX_VALUE, emoji);
         this.delay = delay;
         this.initialDelay = delay;
-        this.onDamageCallback = onDamage;
         this.isAtomic = isAtomic;
     }
 
@@ -400,7 +400,12 @@ export class DelayedExplosionZone extends Zone {
         for (const enemy of enemiesInBlast) {
             if (distance(this.pos, enemy.pos) <= this.radius) {
                 // Use DamageSystem for consistent damage handling
-                damageSystem.dealRawDamage(enemy, this.damage, enemy.pos);
+                damageSystem.dealDamage({
+                    baseDamage: this.damage,
+                    source: this.source,
+                    target: enemy,
+                    position: enemy.pos
+                });
             }
         }
     }
@@ -612,16 +617,14 @@ export class DelayedExplosionZone extends Zone {
 export class MindBlastZone extends Zone {
     stage: 'warning' | 'charge' | 'blast' | 'fade' = 'warning';
     stageTimer: number = 0;
-    onDamageCallback?: (pos: Vector2, amount: number) => void;
     stunDuration: number = 0;
     private rings: { radius: number; alpha: number }[] = [];
     private chargeParticleTimer: number = 0;
     private blastTriggered: boolean = false;
 
-    constructor(x: number, y: number, radius: number, damage: number, onDamage?: (pos: Vector2, amount: number) => void, stunDuration: number = 0) {
+    constructor(x: number, y: number, radius: number, damage: number, stunDuration: number = 0) {
         super(x, y, radius, 2.5, damage, 999, '');
         this.interval = 999;
-        this.onDamageCallback = onDamage;
         this.stunDuration = stunDuration;
     }
 
@@ -658,7 +661,12 @@ export class MindBlastZone extends Zone {
                 enemiesInBlast.forEach(e => {
                     if (distance(this.pos, e.pos) <= this.radius) {
                         // Use DamageSystem for consistent damage handling
-                        damageSystem.dealRawDamage(e, this.damage, e.pos);
+                        damageSystem.dealDamage({
+                            baseDamage: this.damage,
+                            source: this.source,
+                            target: e,
+                            position: e.pos
+                        });
                         particles.emitHit(e.pos.x, e.pos.y, '#ff00ff');
 
                         if (this.stunDuration > 0) {
@@ -776,7 +784,12 @@ export class PlasmaExplosionZone extends Zone {
             for (const enemy of enemiesInBlast) {
                 const dist = distance(this.pos, enemy.pos);
                 if (dist <= this.radius) {
-                    damageSystem.dealRawDamage(enemy, this.damage, enemy.pos);
+                    damageSystem.dealDamage({
+                        baseDamage: this.damage,
+                        source: this.source,
+                        target: enemy,
+                        position: enemy.pos
+                    });
 
                     // Evolved: trigger chain explosions on hit enemies
                     if (this.isEvolved && this.onChainExplosion && Math.random() < 0.5) {

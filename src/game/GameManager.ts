@@ -178,7 +178,6 @@ export class GameManager {
             const weapon: any = new weaponData.class(this.player);
             weapon.weaponId = weaponId;
             weapon.onSpawn = (entity: Entity) => this.spawnEntity(entity);
-            weapon.onDamage = (pos: Vector2, amount: number, isCrit: boolean) => this.spawnDamageNumber(pos, amount, isCrit);
             this.player.weapons.push(weapon);
             this.weaponLevels.set(weaponId, 1);
         }
@@ -529,7 +528,6 @@ export class GameManager {
             weapon.damage *= 2;
             weapon.area *= 1.3;
             weapon.onSpawn = (entity: Entity) => this.spawnEntity(entity);
-            weapon.onDamage = (pos: Vector2, amount: number, isCrit: boolean) => this.spawnDamageNumber(pos, amount, isCrit);
             this.player.weapons.push(weapon);
             this.weaponLevels.set(weaponId, 6);
         }

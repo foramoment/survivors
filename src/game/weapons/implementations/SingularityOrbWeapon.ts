@@ -74,8 +74,12 @@ export class BlackHoleProjectile extends SingularityProjectile {
                 end: { ...closest.pos },
                 alpha: 1
             });
-            // Deal damage via DamageSystem
-            damageSystem.dealRawDamage(closest, this.damage * 0.3, closest.pos);
+            damageSystem.dealDamage({
+                baseDamage: this.damage * 0.3,
+                source: this.source,
+                target: closest,
+                position: closest.pos
+            });
             particles.emitHit(closest.pos.x, closest.pos.y, '#8800ff');
         }
     }
@@ -319,7 +323,6 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
 
     fire(target: Entity) {
         const velocity = this.calculateVelocityToTarget(target);
-        const { damage } = this.owner.getDamage(this.damage);
         const isEvolved = this.evolved;
 
         if (isEvolved) {
@@ -328,12 +331,14 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
                 this.owner.pos.y,
                 velocity,
                 this.duration * this.owner.stats.duration,
-                damage,
+                this.damage,
                 this.pierce
             );
+            proj.source = this;
 
             proj.onDeathCallback = (x: number, y: number) => {
-                const zone = new BlackHoleZone(x, y, 100, 3.0, damage * 0.2);
+                const zone = new BlackHoleZone(x, y, 100, 3.0, this.damage * 0.2);
+                zone.source = this;
                 this.activeBlackHole = zone;
                 this.onSpawn(zone);
             };
@@ -346,10 +351,11 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
                 this.owner.pos.y,
                 velocity,
                 this.duration * this.owner.stats.duration,
-                damage,
+                this.damage,
                 this.pierce
             );
             proj.pullStrength = 80;
+            proj.source = this;
             this.onSpawn(proj);
         }
     }

@@ -36,17 +36,15 @@ export class VoidRayWeapon extends Weapon {
 
             if (target) {
                 const isEvolved = this.evolved;
-                const result = this.owner.getDamage(this.damage);
-                const damage = result.damage * (isEvolved ? 2 : 1);
-                const isCrit = result.isCrit;
+                const damage = this.damage * (isEvolved ? 2 : 1);
 
                 const beam = new VoidRayBeam(
                     this.owner,
                     target,
                     damage,
-                    isEvolved,
-                    (pos, amount) => this.onDamage(pos, amount, isCrit)
+                    isEvolved
                 );
+                beam.source = this;
                 this.onSpawn(beam);
 
                 this.cooldown = this.baseCooldown * this.owner.stats.cooldown;

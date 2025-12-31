@@ -6,7 +6,6 @@
  */
 import { ProjectileWeapon, PlasmaProjectile, Zone, type ProjectileParams } from '../base';
 import type { Player } from '../../entities/Player';
-import { Entity } from '../../Entity';
 import { type Vector2, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
@@ -38,8 +37,8 @@ export class FusionCoreSingularity extends Zone {
 
             if (dist < this.radius * 1.5 && dist > 5) {
                 const pullForce = this.pullStrength / dist;
-                (enemy as any).pos.x += (dx / dist) * pullForce * dt;
-                (enemy as any).pos.y += (dy / dist) * pullForce * dt;
+                enemy.pos.x += (dx / dist) * pullForce * dt;
+                enemy.pos.y += (dy / dist) * pullForce * dt;
             }
         }
 
@@ -132,21 +131,20 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         }
     }
 
-    protected createProjectile(params: ProjectileParams): Entity {
+    protected createProjectile(params: ProjectileParams): PlasmaProjectile {
         return new PlasmaProjectile(
             params.x, params.y, params.velocity,
             params.duration, params.damage, params.pierce
         );
     }
 
-    protected onProjectileCreated(proj: Entity): void {
+    protected onProjectileCreated(proj: PlasmaProjectile): void {
         if (this.evolved) {
-            const plasma = proj as PlasmaProjectile;
-            const { damage } = this.owner.getDamage(this.damage);
             const pullRadius = this.area * this.owner.stats.area;
             const pullDuration = 2.0 * this.owner.stats.duration;
-            plasma.onExplosion = (x: number, y: number) => {
-                const pullZone = new FusionCoreSingularity(x, y, pullRadius, pullDuration, damage * 0.15);
+            proj.onExplosion = (x: number, y: number) => {
+                const pullZone = new FusionCoreSingularity(x, y, pullRadius, pullDuration, this.damage * 0.15);
+                pullZone.source = this;
                 this.onSpawn(pullZone);
             };
         }

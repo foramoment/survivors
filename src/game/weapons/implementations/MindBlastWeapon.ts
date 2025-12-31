@@ -21,10 +21,9 @@ export class PsychicStormZone extends Zone {
     stunDuration: number;
     private hasStunned: Set<any> = new Set();
 
-    constructor(x: number, y: number, radius: number, damage: number, stunDuration: number = 2.0, _onDamage?: (pos: Vector2, amount: number) => void) {
+    constructor(x: number, y: number, radius: number, damage: number, stunDuration: number = 2.0) {
         super(x, y, radius, 0.8, damage, 0.1, '', 0);
         this.stunDuration = stunDuration;
-        // Note: onDamage callback preserved for API compatibility but handled by Zone base class
     }
 
     update(dt: number) {
@@ -115,27 +114,25 @@ export class MindBlastWeapon extends Weapon {
             if (targets.length > 0) {
                 const target = targets[0];
                 const isEvolved = this.evolved;
-                const result = this.owner.getDamage(this.damage);
 
                 if (isEvolved) {
                     const zone = new PsychicStormZone(
                         target.pos.x,
                         target.pos.y,
                         this.area * this.owner.stats.area,
-                        result.damage,
-                        2.0,
-                        (pos, amount) => this.onDamage(pos, amount, result.isCrit)
+                        this.damage,
+                        2.0
                     );
+                    zone.source = this;
                     this.onSpawn(zone);
                 } else {
                     const zone = new MindBlastZone(
                         target.pos.x,
                         target.pos.y,
                         this.area * this.owner.stats.area,
-                        result.damage,
-                        (pos, amount) => this.onDamage(pos, amount, result.isCrit),
-                        0
+                        this.damage
                     );
+                    zone.source = this;
                     this.onSpawn(zone);
                 }
 

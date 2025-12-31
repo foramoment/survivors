@@ -42,17 +42,17 @@ export abstract class ProjectileWeapon extends Weapon {
 
     fire(target: Entity) {
         const velocity = this.calculateVelocityToTarget(target);
-        const { damage } = this.owner.getDamage(this.damage);
 
         const proj = this.createProjectile({
             x: this.owner.pos.x,
             y: this.owner.pos.y,
             velocity,
             duration: this.duration * this.owner.stats.duration,
-            damage,
+            damage: this.damage,
             pierce: this.pierce,
             emoji: this.projectileEmoji
         });
+        proj.source = this;
 
         this.onProjectileCreated(proj);
         this.onSpawn(proj);
@@ -62,7 +62,7 @@ export abstract class ProjectileWeapon extends Weapon {
      * Factory method for creating projectiles.
      * Override to create different projectile types (BouncingProjectile, PlasmaProjectile, etc.)
      */
-    protected createProjectile(params: ProjectileParams): Entity {
+    protected createProjectile(params: ProjectileParams): Projectile {
         return new Projectile(
             params.x, params.y, params.velocity,
             params.duration, params.damage, params.pierce, params.emoji
@@ -73,7 +73,7 @@ export abstract class ProjectileWeapon extends Weapon {
      * Hook called after projectile is created but before spawning.
      * Override to add evolved behavior or callbacks.
      */
-    protected onProjectileCreated(_proj: Entity): void { }
+    protected onProjectileCreated(_proj: Projectile): void { }
 }
 
 // ============================================
@@ -94,17 +94,16 @@ export abstract class ZoneWeapon extends Weapon {
     spawnZone() {
         const baseInterval = Math.max(0.1, this.interval - this.owner.stats.tick);
 
-        const { damage } = this.owner.getDamage(this.damage);
-
         const zone = new Zone(
             this.owner.pos.x,
             this.owner.pos.y,
             this.area * this.owner.stats.area,
             this.duration * this.owner.stats.duration,
-            damage,
+            this.damage,
             Math.max(0.01, baseInterval),
             this.zoneEmoji
         );
+        zone.source = this;
         this.onSpawn(zone);
     }
 }

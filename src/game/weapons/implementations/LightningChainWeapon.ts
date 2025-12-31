@@ -54,8 +54,12 @@ export class ThunderstormLightning extends ChainLightning {
                 alpha: 1
             });
 
-            // Deal damage via DamageSystem
-            damageSystem.dealRawDamage(target, split.damage, target.pos);
+            damageSystem.dealDamage({
+                baseDamage: split.damage,
+                source: this.source,
+                target: target,
+                position: target.pos
+            });
             this.onHit(target, split.damage);
             split.hitEnemies.add(target);
 
@@ -242,8 +246,7 @@ export class LightningChainWeapon extends ProjectileWeapon {
     fire(target: any) {
         const isEvolved = this.evolved;
 
-        // Use DamageSystem for initial hit
-        const result = damageSystem.dealDamage({
+        damageSystem.dealDamage({
             baseDamage: this.damage,
             source: this,
             target: target,
@@ -260,17 +263,17 @@ export class LightningChainWeapon extends ProjectileWeapon {
 
         let chain: ChainLightning | ThunderstormLightning;
         if (isEvolved) {
-            chain = new ThunderstormLightning(target.pos.x, target.pos.y, result.finalDamage, bounces, maxChainLength);
+            // Pass base damage, let chain apply modifiers on each hit
+            chain = new ThunderstormLightning(target.pos.x, target.pos.y, this.damage, bounces, maxChainLength);
             (chain as ThunderstormLightning).splitChance = 0.1;
         } else {
-            chain = new ChainLightning(target.pos.x, target.pos.y, result.finalDamage, bounces, maxChainLength);
+            chain = new ChainLightning(target.pos.x, target.pos.y, this.damage, bounces, maxChainLength);
         }
 
         chain.hitEnemies.add(target);
-        // Chain hits use DamageSystem too
         chain.onHit = (t: any, d: number) => {
             damageSystem.dealDamage({
-                baseDamage: d / (this.owner.stats?.might || 1), // Undo might since DamageSystem applies it
+                baseDamage: d,
                 source: this,
                 target: t,
                 position: t.pos

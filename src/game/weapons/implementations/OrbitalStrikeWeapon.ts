@@ -20,8 +20,8 @@ export class AtomicBombZone extends DelayedExplosionZone {
     private atomicMushroomHeight: number = 0;
     private atomicExploded: boolean = false;
 
-    constructor(x: number, y: number, radius: number, damage: number, onDamage?: (pos: Vector2, amount: number) => void) {
-        super(x, y, radius, 1.2, damage, '☢️', onDamage, true);
+    constructor(x: number, y: number, radius: number, damage: number) {
+        super(x, y, radius, 1.2, damage, '☢️', true);
     }
 
     update(dt: number) {
@@ -145,18 +145,14 @@ export class OrbitalStrikeWeapon extends Weapon {
         this.cooldown -= dt;
 
         if (this.cooldown <= 0) {
-            // Calculate damage once with crit
-            const atomicResult = this.owner.getDamage(this.damage * 8);
-            const normalResult = this.owner.getDamage(this.damage);
-
             if (isEvolved) {
                 const atomicBomb = new AtomicBombZone(
                     this.owner.pos.x + (Math.random() - 0.5) * 300,
                     this.owner.pos.y + (Math.random() - 0.5) * 200,
                     300,
-                    atomicResult.damage,
-                    (pos, amount) => this.onDamage(pos, amount, atomicResult.isCrit)
+                    this.damage * 8
                 );
+                atomicBomb.source = this;
                 this.activeAtomicBomb = atomicBomb;
                 this.waitingForExplosion = true;
                 this.onSpawn(atomicBomb);
@@ -171,10 +167,10 @@ export class OrbitalStrikeWeapon extends Weapon {
                     this.owner.pos.y + offsetY,
                     this.area * this.owner.stats.area * (1 + this.level * 0.1),
                     1.0,
-                    normalResult.damage,
-                    '💥',
-                    (pos, amount) => this.onDamage(pos, amount, normalResult.isCrit)
+                    this.damage,
+                    '💥'
                 );
+                zone.source = this;
                 this.onSpawn(zone);
                 this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
             }

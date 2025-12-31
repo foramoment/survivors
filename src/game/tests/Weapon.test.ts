@@ -241,10 +241,6 @@ describe('Weapon Base Class', () => {
             expect(() => weapon.onSpawn({} as any)).not.toThrow();
         });
 
-        it('should have default no-op onDamage callback', () => {
-            expect(() => weapon.onDamage({ x: 0, y: 0 }, 100)).not.toThrow();
-        });
-
         it('should allow setting custom onSpawn callback', () => {
             let spawned = false;
             weapon.onSpawn = () => { spawned = true; };

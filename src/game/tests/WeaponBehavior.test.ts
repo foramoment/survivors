@@ -87,6 +87,7 @@ describe('VoidRayWeapon', () => {
 
         expect(spawnedEntities).toHaveLength(1);
         expect(spawnedEntities[0]).toBeInstanceOf(VoidRayBeam);
+        expect((spawnedEntities[0] as any).source).toBe(weapon);
     });
 
     it('should NOT fire when no enemy in range', () => {
@@ -164,6 +165,7 @@ describe('PlasmaCannonWeapon', () => {
 
         expect(spawnedEntities).toHaveLength(1);
         expect(spawnedEntities[0]).toBeInstanceOf(PlasmaProjectile);
+        expect((spawnedEntities[0] as any).source).toBe(weapon);
     });
 
     it('should NOT create FusionCoreSingularity when NOT evolved', () => {
@@ -234,6 +236,7 @@ describe('AcidPoolWeapon', () => {
         expect(spawnedEntities).toHaveLength(1);
         // LobbedProjectile has onLand callback
         expect(spawnedEntities[0].onLand).toBeDefined();
+        expect((spawnedEntities[0] as any).source).toBe(weapon);
     });
 
     it('should create AcidZone on land', () => {
@@ -249,6 +252,7 @@ describe('AcidPoolWeapon', () => {
         // AcidZone should be spawned
         expect(spawnedEntities.length).toBe(2);
         expect(spawnedEntities[1]).toBeInstanceOf(AcidZone);
+        expect((spawnedEntities[1] as any).source).toBe(weapon);
     });
 
     it('should create AcidZone with correct area', () => {

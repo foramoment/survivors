@@ -33,7 +33,6 @@ export abstract class Weapon {
 
     // Callbacks
     onSpawn: (entity: Entity) => void = () => { };
-    onDamage: (pos: Vector2, amount: number, isCrit?: boolean) => void = () => { };
 
     constructor(owner: Player) {
         this.owner = owner;

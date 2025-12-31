@@ -63,14 +63,12 @@ export class VoidRayBeam extends Projectile {
     color: string = '#bd00ff';
     isEvolved: boolean = false;
     damageDealt: boolean = false;
-    onDamageCallback: (pos: Vector2, amount: number) => void;
     targetLastPos: Vector2;
 
-    constructor(owner: any, target: any, damage: number, isEvolved: boolean, onDamage: (pos: Vector2, amount: number) => void) {
+    constructor(owner: any, target: any, damage: number, isEvolved: boolean) {
         super(owner.pos.x, owner.pos.y, { x: 0, y: 0 }, 2, damage, 0, '');
         this.owner = owner;
         this.target = target;
-        this.onDamageCallback = onDamage;
         this.canCollide = false;
         this.isEvolved = isEvolved;
         this.targetLastPos = { x: target.pos.x, y: target.pos.y };
@@ -92,8 +90,12 @@ export class VoidRayBeam extends Projectile {
                 this.stage = 'fire';
                 this.timer = 0;
                 if (this.target && !this.target.isDead) {
-                    // Use DamageSystem for consistent damage handling
-                    damageSystem.dealRawDamage(this.target, this.damage, this.target.pos);
+                    damageSystem.dealDamage({
+                        baseDamage: this.damage,
+                        source: this,
+                        target: this.target,
+                        position: this.target.pos
+                    });
                     particles.emitHit(this.target.pos.x, this.target.pos.y, this.color);
                 }
             }

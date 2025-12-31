@@ -3,6 +3,7 @@
  * Extracted from WeaponTypes.ts for better AI context management.
  */
 import { Entity } from '../../Entity';
+import type { Weapon } from '../../Weapon';
 import { type Vector2, normalize, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
@@ -20,6 +21,7 @@ export class Projectile extends Entity {
     pierce: number;
     emoji: string;
     canCollide: boolean = true;
+    source?: Weapon;
 
     constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number, emoji: string) {
         super(x, y, 5);
@@ -194,8 +196,8 @@ export class SingularityProjectile extends Projectile {
 
             if (dist < 200 && dist > 5) {
                 const pullForce = this.pullStrength / dist;
-                (enemy as any).pos.x += (dx / dist) * pullForce * dt;
-                (enemy as any).pos.y += (dy / dist) * pullForce * dt;
+                enemy.pos.x += (dx / dist) * pullForce * dt;
+                enemy.pos.y += (dy / dist) * pullForce * dt;
             }
         }
     }

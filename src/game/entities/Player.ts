@@ -32,8 +32,8 @@ export class Player extends Entity {
         growth: 1,
         armor: 0,
         regen: 0,
-        critChance: 0.05,
-        critDamage: 1.5,
+        critChance: 0,
+        critDamage: 2,
         tick: 0
     };
 
@@ -195,14 +195,5 @@ export class Player extends Entity {
         }
 
         this.onLevelUp();
-    }
-
-    getDamage(baseDamage: number): { damage: number, isCrit: boolean } {
-        const isCrit = Math.random() < this.stats.critChance;
-        const multiplier = this.stats.might * (isCrit ? this.stats.critDamage : 1);
-        return {
-            damage: baseDamage * multiplier,
-            isCrit: isCrit
-        };
     }
 }

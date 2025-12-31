@@ -47,9 +47,10 @@ export class NanobotSwarmWeapon extends Weapon {
                 this.owner,
                 radius,
                 this.duration * this.owner.stats.duration,
-                this.owner.getDamage(this.damage).damage,
+                this.damage,
                 Math.max(0.05, baseInterval)
             );
+            cloud.source = this;
             this.onSpawn(cloud);
             this.activeCloud = cloud;
 

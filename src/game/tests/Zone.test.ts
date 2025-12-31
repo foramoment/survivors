@@ -30,7 +30,8 @@ vi.mock('../core/SpatialHash', () => ({
 
 vi.mock('../core/DamageSystem', () => ({
     damageSystem: {
-        dealRawDamage: vi.fn()
+        dealRawDamage: vi.fn(),
+        dealDamage: vi.fn()
     }
 }));
 
@@ -174,11 +175,11 @@ describe('DelayedExplosionZone', () => {
         const zone = new DelayedExplosionZone(0, 0, 100, 0.5, 50, '💥');
         zone.update(0.6); // Trigger explosion
 
-        expect(damageSystem.dealRawDamage).toHaveBeenCalledWith(
-            enemy,
-            50,
-            enemy.pos
-        );
+        expect(damageSystem.dealDamage).toHaveBeenCalledWith(expect.objectContaining({
+            baseDamage: 50,
+            target: enemy,
+            position: enemy.pos
+        }));
     });
 
     it('should NOT damage enemies outside blast radius', () => {
@@ -188,7 +189,7 @@ describe('DelayedExplosionZone', () => {
         const zone = new DelayedExplosionZone(0, 0, 100, 0.5, 50, '💥');
         zone.update(0.6);
 
-        expect(damageSystem.dealRawDamage).not.toHaveBeenCalled();
+        expect(damageSystem.dealDamage).not.toHaveBeenCalled();
     });
 
     it('should die after explosion animation', () => {
@@ -231,18 +232,18 @@ describe('MindBlastZone', () => {
         zone.update(0.5); // charge -> blast (stage changes)
         zone.update(0.01); // blast logic runs
 
-        expect(damageSystem.dealRawDamage).toHaveBeenCalledWith(
-            enemy,
-            50,
-            enemy.pos
-        );
+        expect(damageSystem.dealDamage).toHaveBeenCalledWith(expect.objectContaining({
+            baseDamage: 50,
+            target: enemy,
+            position: enemy.pos
+        }));
     });
 
     it('should apply stun if stunDuration > 0', () => {
         const enemy = { pos: { x: 50, y: 0 }, stunTimer: 0 };
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
 
-        const zone = new MindBlastZone(0, 0, 100, 50, undefined, 1.5);
+        const zone = new MindBlastZone(0, 0, 100, 50, 1.5);
 
         zone.update(0.6); // warning -> charge (stageTimer = 0.6)
         expect(zone.stage).toBe('charge');
@@ -261,7 +262,7 @@ describe('MindBlastZone', () => {
         const enemy = { pos: { x: 50, y: 0 }, stunTimer: 0 };
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
 
-        const zone = new MindBlastZone(0, 0, 100, 50, undefined, 0);
+        const zone = new MindBlastZone(0, 0, 100, 50, 0);
 
         zone.update(0.6); // warning -> charge
         zone.update(0.5); // charge -> blast
@@ -281,7 +282,7 @@ describe('MindBlastZone', () => {
         zone.update(0.01); // blast logic runs (first damage)
         zone.update(0.5); // Still in blast stage
 
-        expect(damageSystem.dealRawDamage).toHaveBeenCalledTimes(1);
+        expect(damageSystem.dealDamage).toHaveBeenCalledTimes(1);
     });
 
     it('should die after fade stage', () => {

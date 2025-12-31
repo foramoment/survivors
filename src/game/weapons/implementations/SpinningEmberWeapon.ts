@@ -43,10 +43,11 @@ export class SpinningEmberWeapon extends Weapon {
                     this.stats.area,
                     this.stats.speed,
                     duration,
-                    this.owner.getDamage(this.damage).damage,
+                    this.damage,
                     '🔥'
                 );
                 proj.angle = angle;
+                proj.source = this;
                 this.onSpawn(proj);
                 this.projectiles.push(proj);
             }

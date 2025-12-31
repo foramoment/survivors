@@ -53,7 +53,7 @@ class DamageSystemClass {
 
         // Calculate crit
         const isCrit = Math.random() < player.stats.critChance;
-        const critMultiplier = isCrit ? player.stats.critDamage : 1;
+        const critMultiplier = isCrit ? player.stats.critDamage : 2;
 
         // Calculate final damage
         const finalDamage = baseDamage * player.stats.might * critMultiplier;
@@ -61,13 +61,7 @@ class DamageSystemClass {
         return this.applyDamage(finalDamage, target, position, isCrit);
     }
 
-    /**
-     * Deal raw damage without any modifiers.
-     * Use this for zones/effects with pre-calculated damage.
-     */
-    dealRawDamage(target: any, damage: number, position: Vector2, isCrit: boolean = false): DamageResult {
-        return this.applyDamage(damage, target, position, isCrit);
-    }
+
 
     /**
      * Internal method to apply damage and emit events
@@ -123,7 +117,11 @@ class DamageSystemClass {
         if (source?.owner?.stats) {
             return source.owner;
         }
-        // Try source.owner.owner (projectile -> weapon -> player)
+        // Try source.source (projectile/zone -> weapon)
+        if (source?.source?.owner?.stats) {
+            return source.source.owner;
+        }
+        // Try source.owner.owner (legacy projectile -> weapon -> player)
         if (source?.owner?.owner?.stats) {
             return source.owner.owner;
         }

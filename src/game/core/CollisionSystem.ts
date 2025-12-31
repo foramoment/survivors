@@ -73,7 +73,12 @@ export class CollisionSystem {
 
                 // Apply damage via DamageSystem
                 if (hitResult.damage > 0) {
-                    damageSystem.dealRawDamage(enemy, hitResult.damage, enemy.pos);
+                    damageSystem.dealDamage({
+                        baseDamage: hitResult.damage,
+                        source: projectile.source,
+                        target: enemy,
+                        position: enemy.pos
+                    });
                 }
 
                 // Check if projectile should stop (e.g., BouncingProjectile hit same enemy)
@@ -100,7 +105,12 @@ export class CollisionSystem {
 
                 // Apply damage on tick
                 if (zone.timer >= zone.interval) {
-                    damageSystem.dealRawDamage(enemy, zone.damage, enemy.pos);
+                    damageSystem.dealDamage({
+                        baseDamage: zone.damage,
+                        source: zone.source,
+                        target: enemy,
+                        position: enemy.pos
+                    });
                 }
             }
         }

@@ -137,6 +137,7 @@ export class FrostNovaWeapon extends Weapon {
                 0.6,
                 '❄️'
             );
+            lob.source = this;
 
             lob.onLand = (x, y) => {
                 const isEvolved = this.evolved;
@@ -146,19 +147,21 @@ export class FrostNovaWeapon extends Weapon {
                     const zone = new AbsoluteZeroZone(
                         x, y,
                         this.area * this.owner.stats.area,
-                        this.owner.getDamage(this.damage).damage,
+                        this.damage,
                         this.stats.duration * this.owner.stats.duration
                     );
+                    zone.source = this;
                     this.onSpawn(zone);
                 } else {
                     const zone = new FrostZone(
                         x, y,
                         this.area * this.owner.stats.area,
                         this.stats.duration * this.owner.stats.duration,
-                        this.owner.getDamage(this.damage).damage,
+                        this.damage,
                         0.5,
                         0.5
                     );
+                    zone.source = this;
                     this.onSpawn(zone);
                 }
             };

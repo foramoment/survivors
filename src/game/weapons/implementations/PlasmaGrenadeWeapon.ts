@@ -59,16 +59,16 @@ export class PlasmaGrenadeWeapon extends Weapon {
 
     private createExplosion(x: number, y: number) {
         const explosionRadius = this.area * this.owner.stats.area;
-        const explosionDamage = this.owner.getDamage(this.damage).damage;
 
         // Create plasma explosion zone
         const zone = new PlasmaExplosionZone(
             x,
             y,
             explosionRadius,
-            explosionDamage,
+            this.damage,
             this.evolved
         );
+        zone.source = this;
 
         // Emit explosion particles
         particles.emitExplosion(x, y, explosionRadius);
@@ -83,9 +83,10 @@ export class PlasmaGrenadeWeapon extends Weapon {
                     targetX,
                     targetY,
                     explosionRadius * 0.5,
-                    explosionDamage * 0.5,
+                    this.damage * 0.5,
                     false  // no further chains
                 );
+                chainZone.source = this;
                 this.onSpawn(chainZone);
             };
         }

@@ -75,11 +75,12 @@ export class ChronoDiscWeapon extends ProjectileWeapon {
             this.owner.pos.y,
             velocity,
             this.duration * this.owner.stats.duration,
-            this.owner.getDamage(this.damage).damage,
+            this.damage,
             bounces,
             this.projectileEmoji,
             this.area
         );
+        projectile.source = this;
 
         this.onSpawn(projectile);
     }
