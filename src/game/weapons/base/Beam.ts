@@ -65,6 +65,9 @@ export class VoidRayBeam extends Projectile {
     damageDealt: boolean = false;
     targetLastPos: Vector2;
 
+    // Callback for evolved EMP explosion
+    onVoidExplosion?: (x: number, y: number, damage: number) => void;
+
     constructor(owner: any, target: any, damage: number, isEvolved: boolean) {
         super(owner.pos.x, owner.pos.y, { x: 0, y: 0 }, 2, damage, 0, '');
         this.owner = owner;
@@ -97,6 +100,11 @@ export class VoidRayBeam extends Projectile {
                         position: this.target.pos
                     });
                     particles.emitHit(this.target.pos.x, this.target.pos.y, this.color);
+
+                    // Evolved: trigger EMP explosion at target
+                    if (this.isEvolved && this.onVoidExplosion) {
+                        this.onVoidExplosion(this.targetLastPos.x, this.targetLastPos.y, this.damage * 0.5);
+                    }
                 }
             }
         } else if (this.stage === 'fire') {

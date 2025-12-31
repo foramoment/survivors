@@ -354,7 +354,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
                 this.damage,
                 this.pierce
             );
-            proj.pullStrength = 80;
+            proj.pullStrength = 200;
             proj.source = this;
             this.onSpawn(proj);
         }

@@ -18,7 +18,7 @@ const EXPECTED_STATS: Record<string, any> = {
     void_ray: {
         damage: 25,
         cooldown: 2.0,
-        area: 1,
+        area: 100, // EMP explosion radius when evolved
         speed: 0,
         duration: 0.5,
     },
@@ -47,10 +47,10 @@ const EXPECTED_STATS: Record<string, any> = {
     },
     spore_cloud: {
         damage: 10,
-        cooldown: 2,
+        cooldown: 4,
         area: 50,
         speed: 0,
-        duration: 5,
+        duration: 2,
     },
     singularity_orb: {
         damage: 50,
