@@ -22,6 +22,7 @@ export type ScreenId =
     | 'game_over'
     | 'options'
     | 'particle_debug'
+    | 'status_debug'
     | 'level_select';
 
 class ScreenManagerClass {

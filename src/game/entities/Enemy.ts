@@ -1,5 +1,6 @@
 import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
+import type { StatusEffect } from '../status/StatusEffect';
 
 export class Enemy extends Entity {
     hp: number;
@@ -19,6 +20,9 @@ export class Enemy extends Entity {
 
     // Separation force accumulator (reset each frame)
     separationForce: Vector2 = { x: 0, y: 0 };
+
+    // Status effects
+    effects: StatusEffect[] = [];
 
     constructor(x: number, y: number, type: EnemyType, isElite: boolean = false) {
         super(x, y, 12);
@@ -48,6 +52,29 @@ export class Enemy extends Entity {
      */
     resetForces() {
         this.separationForce = { x: 0, y: 0 };
+    }
+
+    /**
+     * Apply a status effect to this enemy
+     */
+    applyEffect(effect: StatusEffect) {
+        this.effects.push(effect);
+        effect.onApply?.(this);
+    }
+
+    /**
+     * Update all active status effects
+     */
+    updateEffects(dt: number) {
+        for (let i = this.effects.length - 1; i >= 0; i--) {
+            const effect = this.effects[i];
+            effect.update(dt, this);
+
+            if (effect.duration <= 0) {
+                effect.onRemove?.(this);
+                this.effects.splice(i, 1);
+            }
+        }
     }
 
     /**

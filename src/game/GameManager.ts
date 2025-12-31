@@ -579,6 +579,7 @@ export class GameManager {
         this.enemies.forEach(e => {
             e.speedMultiplier = 1;
             e.resetForces();
+            e.updateEffects(dt);  // Process status effects
         });
 
         // === ENEMY SEPARATION USING SPATIAL HASH ===

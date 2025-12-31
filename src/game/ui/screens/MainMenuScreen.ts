@@ -60,6 +60,14 @@ export class MainMenuScreen extends BaseScreen {
         debugBtn.style.opacity = '0.7';
         buttonContainer.appendChild(debugBtn);
 
+        // Status Effect Debug button (dev)
+        const statusDebugBtn = this.createButton('🧪 Status Debug', () => {
+            screenManager.goto('status_debug');
+        });
+        statusDebugBtn.style.fontSize = '0.9em';
+        statusDebugBtn.style.opacity = '0.7';
+        buttonContainer.appendChild(statusDebugBtn);
+
         screen.appendChild(buttonContainer);
         this.uiLayer.appendChild(screen);
     }

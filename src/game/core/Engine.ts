@@ -16,6 +16,7 @@ import { GameScreen } from '../ui/screens/GameScreen';
 import { OptionsScreen } from '../ui/screens/OptionsScreen';
 import { GameOverScreen } from '../ui/screens/GameOverScreen';
 import { ParticleDebugScreen } from '../ui/screens/ParticleDebugScreen';
+import { StatusDebugScreen } from '../ui/screens/StatusDebugScreen';
 
 export class Engine {
     canvas: HTMLCanvasElement;
@@ -62,6 +63,9 @@ export class Engine {
 
         // Particle Debug
         screenManager.register('particle_debug', new ParticleDebugScreen(this.canvas, this.ctx));
+
+        // Status Effect Debug
+        screenManager.register('status_debug', new StatusDebugScreen(this.canvas, this.ctx));
     }
 
     resize() {
