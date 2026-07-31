@@ -12,7 +12,7 @@
  *   damageSystem.dealDamage({ baseDamage: 10, source: weapon, target: enemy, position: enemy.pos })
  *   
  *   // From zone with pre-calculated damage (no modifiers):
- *   damageSystem.dealRawDamage(enemy, 50, enemy.pos)
+ *   damageSystem.dealDamage({ baseDamage: 50, source: null, target: enemy, position: enemy.pos, skipModifiers: true })
  */
 import type { Vector2 } from './Utils';
 import { events } from './EventBus';

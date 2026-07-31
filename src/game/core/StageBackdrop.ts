@@ -102,11 +102,18 @@ export class StageBackdrop {
     private time = 0;
     private lastCam: Vector2 | null = null;
 
+    /**
+     * 0 = lights on, 1 = pitch black. Driven by the station's power-failure
+     * arena event; it kills the colour wash and drops a darkness layer.
+     */
+    blackout = 0;
+
     // Cached lighting gradients (rebuilt on resize / stage change)
     private gradientKey = '';
     private edgeGradient: CanvasGradient | null = null;
     private beaconLeft: CanvasGradient | null = null;
     private beaconRight: CanvasGradient | null = null;
+    private darkGradient: CanvasGradient | null = null;
 
     setStage(stage: StageConfig) {
         if (this.theme === stage.theme) return;
@@ -336,20 +343,33 @@ export class StageBackdrop {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.shadowBlur = 0;
 
-        if (v.lightAlpha > 0) {
-            ctx.globalAlpha = Math.min(0.5, v.lightAlpha * intensity);
+        const lit = 1 - this.blackout;
+        if (v.lightAlpha > 0 && lit > 0) {
+            ctx.globalAlpha = Math.min(0.5, v.lightAlpha * intensity) * lit;
             ctx.fillStyle = v.light;
             ctx.fillRect(0, 0, width, height);
         }
 
-        // Rotating emergency beacons on stages with failing power
-        if (animated && v.flicker > 0.5 && this.beaconLeft && this.beaconRight) {
-            const strobe = (phase: number) => Math.pow(Math.max(0, Math.sin(t * 1.5 + phase)), 3);
-            ctx.globalAlpha = 0.5 * strobe(0);
+        // Rotating emergency beacons on stages with failing power — during a
+        // blackout they are the only light left, so they burn brighter.
+        if (animated && (v.flicker > 0.5 || this.blackout > 0) && this.beaconLeft && this.beaconRight) {
+            const speed = this.blackout > 0 ? 2.6 : 1.5;
+            const strength = 0.5 + this.blackout * 0.5;
+            const strobe = (phase: number) => Math.pow(Math.max(0, Math.sin(t * speed + phase)), 3);
+            ctx.globalAlpha = strength * strobe(0);
             ctx.fillStyle = this.beaconLeft;
             ctx.fillRect(0, 0, width, height);
-            ctx.globalAlpha = 0.5 * strobe(Math.PI);
+            ctx.globalAlpha = strength * strobe(Math.PI);
             ctx.fillStyle = this.beaconRight;
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        // Darkness falls off from the middle of the screen: the player's suit
+        // lamp is the only thing still working, so they can still see the
+        // enemies right on top of them.
+        if (this.blackout > 0 && this.darkGradient) {
+            ctx.globalAlpha = this.blackout;
+            ctx.fillStyle = this.darkGradient;
             ctx.fillRect(0, 0, width, height);
         }
 
@@ -385,6 +405,15 @@ export class StageBackdrop {
         right.addColorStop(0, 'rgba(255, 46, 46, 0.55)');
         right.addColorStop(1, 'rgba(255, 46, 46, 0)');
         this.beaconRight = right;
+
+        const dark = ctx.createRadialGradient(
+            width / 2, height / 2, 0,
+            width / 2, height / 2, Math.min(width, height) * 0.55
+        );
+        dark.addColorStop(0, 'rgba(0, 0, 0, 0.12)');
+        dark.addColorStop(0.35, 'rgba(0, 0, 0, 0.5)');
+        dark.addColorStop(1, 'rgba(0, 0, 0, 0.82)');
+        this.darkGradient = dark;
     }
 
     /** #rrggbb + alpha → rgba(); anything else is passed through untouched */

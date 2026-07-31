@@ -15,6 +15,7 @@ import { difficultyDirector } from './core/DifficultyDirector';
 import { sprites } from './core/SpriteFactory';
 import { stageBackdrop } from './core/StageBackdrop';
 import { propField } from './core/PropField';
+import { arenaEvents, type ArenaContext } from './core/ArenaEvents';
 import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
@@ -147,6 +148,8 @@ export class GameManager {
         stageBackdrop.setStage(this.currentStage);
         propField.setStage(this.currentStage);
         propField.reset();
+        arenaEvents.reset();
+        stageBackdrop.blackout = 0;
         this.finalBoss = null;
         this.finalBossSpawned = false;
         // Reset progression tracking BEFORE adding the starting weapon
@@ -700,8 +703,14 @@ export class GameManager {
                 juice.flash('#ff2244', 0.28, 0.45);
                 juice.pulseVignette(0.8);
                 juice.addTrauma(0.35);
+            } else if (event.type === 'arena') {
+                arenaEvents.trigger(this.currentStage.event, this.arenaContext());
             }
         }
+
+        // Stage hazard: telegraphs, impacts and the station blackout
+        arenaEvents.update(dt, this.arenaContext());
+        stageBackdrop.blackout = arenaEvents.blackoutAmount;
 
         const spawnCount = difficultyDirector.takeSpawnCount(this.enemies.length);
         for (let i = 0; i < spawnCount; i++) {
@@ -731,8 +740,10 @@ export class GameManager {
         this.player.weapons.forEach(w => w.update(dt));
 
         // Reset enemy stats and forces before updates/collisions
+        // (enemies hunt faster while a blackout is running)
+        const hazardSpeed = arenaEvents.enemySpeedMultiplier;
         this.enemies.forEach(e => {
-            e.speedMultiplier = 1;
+            e.speedMultiplier = hazardSpeed;
             e.resetForces();
         });
 
@@ -954,12 +965,13 @@ export class GameManager {
         });
     }
 
-    spawnEnemy(options: { boss?: boolean; final?: boolean; angle?: number } = {}) {
+    spawnEnemy(options: { boss?: boolean; final?: boolean; angle?: number; at?: Vector2 } = {}) {
         if (!this.player) return;
         const angle = options.angle ?? Math.random() * Math.PI * 2;
         const dist = Math.max(this.canvas.width, this.canvas.height) / 2 + 100;
-        const x = this.player.pos.x + Math.cos(angle) * dist;
-        const y = this.player.pos.y + Math.sin(angle) * dist;
+        // Arena hazards (rifts) spawn at a fixed point instead of off-screen
+        const x = options.at ? options.at.x : this.player.pos.x + Math.cos(angle) * dist;
+        const y = options.at ? options.at.y : this.player.pos.y + Math.sin(angle) * dist;
 
         // Wave lasts 60 seconds; enemy mix shifts 90%/10% → 10%/90%
         const WAVE_DURATION = 60;
@@ -1002,6 +1014,31 @@ export class GameManager {
         }
 
         this.enemies.push(enemy);
+    }
+
+    /** Everything the arena hazards need from the run, in one object */
+    private arenaContext(): ArenaContext {
+        return {
+            playerPos: this.player!.pos,
+            damagePlayer: (fraction: number) => this.hazardDamage(fraction),
+            spawnAt: (x: number, y: number) => this.spawnEnemy({ at: { x, y } }),
+            viewWidth: this.canvas.width,
+            viewHeight: this.canvas.height,
+            gameTime: this.gameTime,
+        };
+    }
+
+    /**
+     * Environmental damage as a fraction of max HP — hazards should sting at
+     * every point of the run, so they don't use flat numbers.
+     */
+    private hazardDamage(fraction: number) {
+        if (!this.player) return;
+        this.player.takeDamage(this.player.maxHp * fraction);
+        audio.play('hurt');
+        juice.addTrauma(0.35);
+        juice.flash('#ff5a1e', 0.2, 0.25);
+        juice.pulseVignette(0.6);
     }
 
     /** Trigger screen shake (magnitude in px, duration in seconds) */
@@ -1095,6 +1132,7 @@ export class GameManager {
 
         this.drawBackground(ctx, camera);
         propField.draw(ctx, camera, this.canvas.width, this.canvas.height);
+        arenaEvents.drawWorld(ctx, camera);
 
         this.projectiles.forEach(p => {
             if (p instanceof Zone) p.draw(ctx, camera);
@@ -1123,6 +1161,7 @@ export class GameManager {
 
         // Stage lighting sits above the world but below the HUD and juice flashes
         stageBackdrop.drawLighting(ctx, this.canvas.width, this.canvas.height);
+        arenaEvents.drawBanner(ctx, this.canvas.width, this.canvas.height);
 
         // Draw debug overlay (FPS, stats)
         debugOverlay.draw(ctx);

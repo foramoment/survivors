@@ -19,6 +19,7 @@ src/game/
 │   ├── SpriteFactory.ts  # 🎨 Процедурные пиксельные спрайты (враги/игрок/фон) — БЕЗ ассетов
 │   ├── StageBackdrop.ts  # 🌠 Параллакс арены (небула/звёзды/пол/пыль) + свет стейджа
 │   ├── PropField.ts      # 🪨 Препятствия: чанковая генерация, коллизии, отрисовка
+│   ├── ArenaEvents.ts    # ☄️ События арены: метеориты, блэкаут, разломы
 │   ├── PixelFont.ts      # 🔤 Битмап-шрифт 5×7 в коде (титры, damage numbers)
 │   ├── AudioSystem.ts    # 🔊 Процедурный чиптюн Web Audio (SFX + генеративная музыка)
 │   ├── JuiceSystem.ts    # 💥 Game feel: тряска, hit-stop, вспышки, zoom, ударные волны
@@ -60,8 +61,8 @@ src/game/
 // С модификаторами (crit + might):
 damageSystem.dealDamage({ baseDamage: 10, source: weapon, target: enemy, position: enemy.pos })
 
-// Без модификаторов (для зон с пре-калькулированным уроном):
-damageSystem.dealRawDamage(enemy, 50, enemy.pos)
+// Без модификаторов (зоны с пре-калькулированным уроном, урон окружения):
+damageSystem.dealDamage({ baseDamage: 50, source: null, target: enemy, position: enemy.pos, skipModifiers: true })
 ```
 
 **Формула урона:**
@@ -311,6 +312,21 @@ propField.resolve(enemy, player.pos, enemy.speed * 0.7, dt); // + скольже
 и стоят. Боссы препятствия игнорируют (проламываются). Снаряды и зоны летят
 поверх: препятствия не блокируют урон.
 
+### События арены (ArenaEvents)
+
+`DifficultyDirector` шлёт `{ type: 'arena' }` раз в 30–60с (первое — на 45с,
+константы в `ArenaSchedule`), `GameManager` превращает это в `stage.event`:
+
+| Kind       | Стейдж     | Что делает                                                     |
+| ---------- | ---------- | -------------------------------------------------------------- |
+| `meteors`  | Asteroids  | Метеориты с наземным телеграфом → урон врагам и 8% HP игроку   |
+| `blackout` | Station    | Свет гаснет на ~10с (`stageBackdrop.blackout`), враги +30% скор. |
+| `rifts`    | Void Nexus | 4 разлома открываются и льют врагов, пока не схлопнутся          |
+
+Правила: **сначала телеграф, потом урон** (баннер + кольцо/спираль), одно
+событие за раз, урон окружения — доля от max HP (`hazardDamage`), чтобы
+хазарды не обесценивались к концу забега.
+
 ### Сепарация врагов
 
 Враги не пересекаются благодаря силам сепарации (SpatialHash):
@@ -500,7 +516,7 @@ const dist = Math.sqrt(dx * dx + dy * dy);
 ### Избегай дублирования
 
 - **Не изобретай велосипед** — проверь `core/Utils.ts` перед написанием утилит
-- **DamageSystem** — весь урон через `damageSystem.dealDamage()` или `dealRawDamage()`
+- **DamageSystem** — весь урон через `damageSystem.dealDamage()` (с `skipModifiers: true` для пре-калькулированного)
 - **SpatialHash** — используй `levelSpatialHash.getNearby()` вместо итерации по всем врагам
 
 ---

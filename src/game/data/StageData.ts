@@ -36,6 +36,9 @@ export interface StageVisuals {
 /** Shape family of a stage's obstacles */
 export type PropStyle = 'rock' | 'crate' | 'crystal';
 
+/** Timed arena hazard the stage runs every 30–60s (see `core/ArenaEvents`) */
+export type ArenaEventKind = 'meteors' | 'blackout' | 'rifts';
+
 /** Obstacles scattered across the arena — these block movement */
 export interface StageProps {
     style: PropStyle;
@@ -57,6 +60,8 @@ export interface StageConfig {
     visuals: StageVisuals;
     /** Obstacle field */
     props: StageProps;
+    /** Recurring arena hazard */
+    event: ArenaEventKind;
     /** Indices into ENEMIES, in wave order (wave N spawns pool[N] → pool[N+1]) */
     enemyPool: number[];
     /** Seconds to survive before the final boss appears */
@@ -89,6 +94,7 @@ export const STAGES: StageConfig[] = [
             pulse: 0.18,
         },
         props: { style: 'rock', density: 1.1, minRadius: 26, maxRadius: 52 },
+        event: 'meteors',
         enemyPool: [0, 1, 2, 3, 4, 5, 6],
         duration: 600, // 10 minutes
         hpScale: 1,
@@ -115,6 +121,7 @@ export const STAGES: StageConfig[] = [
             pulse: 0,
         },
         props: { style: 'crate', density: 1.4, minRadius: 24, maxRadius: 44 },
+        event: 'blackout',
         enemyPool: [1, 3, 4, 6, 7, 8, 9],
         duration: 720, // 12 minutes
         hpScale: 1.4,
@@ -141,6 +148,7 @@ export const STAGES: StageConfig[] = [
             pulse: 0.55,
         },
         props: { style: 'crystal', density: 0.9, minRadius: 22, maxRadius: 40 },
+        event: 'rifts',
         enemyPool: [3, 5, 6, 7, 8, 9, 10],
         duration: 900, // 15 minutes
         hpScale: 1.9,

@@ -14,6 +14,10 @@
  * The director also emits discrete events at wave boundaries (every 60s):
  * - `burst`  — a ring of extra enemies spawned at once
  * - `miniboss` — a single boss-grade enemy of the upcoming wave's type
+ *
+ * and, on its own 30–60s cadence, `arena` — the stage's hazard (meteors,
+ * blackout, rifts). It lives here rather than in a second scheduler so all
+ * timed pressure comes from one place.
  */
 
 export interface DifficultyContext {
@@ -28,7 +32,16 @@ export interface DifficultyContext {
 
 export type DifficultyEvent =
     | { type: 'burst'; count: number; waveIndex: number }
-    | { type: 'miniboss'; waveIndex: number };
+    | { type: 'miniboss'; waveIndex: number }
+    | { type: 'arena' };
+
+/** Cadence of the stage hazard, in seconds */
+export const ArenaSchedule = {
+    /** First hazard lands well after the opening minute is under control */
+    FIRST: 45,
+    MIN: 30,
+    MAX: 60,
+} as const;
 
 export class DifficultyDirector {
     static readonly WAVE_DURATION = 60;
@@ -46,8 +59,11 @@ export class DifficultyDirector {
     private recentKillRate: number = 0;
     private lastWaveIndex: number = 0;
     private events: DifficultyEvent[] = [];
+    /** Seconds until the next arena hazard */
+    private arenaTimer: number = ArenaSchedule.FIRST;
 
     reset() {
+        this.arenaTimer = ArenaSchedule.FIRST;
         this.intensity = 1;
         this.spawnAccumulator = 0;
         this.evalTimer = 0;
@@ -64,6 +80,13 @@ export class DifficultyDirector {
             this.lastWaveIndex = waveIndex;
             this.events.push({ type: 'burst', count: 8 + waveIndex * 4, waveIndex });
             this.events.push({ type: 'miniboss', waveIndex });
+        }
+
+        // Stage hazard on its own cadence, independent of the wave clock
+        this.arenaTimer -= dt;
+        if (this.arenaTimer <= 0) {
+            this.arenaTimer = ArenaSchedule.MIN + Math.random() * (ArenaSchedule.MAX - ArenaSchedule.MIN);
+            this.events.push({ type: 'arena' });
         }
 
         // Adapt intensity once per second
