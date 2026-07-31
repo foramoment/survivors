@@ -1,10 +1,9 @@
 name: Build Android APK
 
+# Manual only. Pushes to main should ship the web build to GitHub Pages fast;
+# the Android/Gradle job takes minutes and is not needed for every commit.
+# Run it from the Actions tab when an APK is actually wanted.
 on:
-  push:
-    branches:
-      - main
-      - master
   workflow_dispatch:
 
 jobs:

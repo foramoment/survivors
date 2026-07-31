@@ -23,7 +23,8 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm install
+      # ci is faster and reproducible; the lockfile is committed
+      - run: npm ci
       - run: npm test
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
