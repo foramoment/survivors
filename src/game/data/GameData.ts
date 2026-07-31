@@ -52,12 +52,12 @@ export const WEAPONS = [
         id: 'void_ray',
         name: "Void Ray",
         emoji: "🔫",
-        description: "Fires beams at enemies",
+        description: "Charged lance that burns through everything in its path",
         class: VoidRayWeapon,
         evolution: {
             name: "Void Cannon",
             emoji: "💜",
-            description: "Massive void beam with AOE explosion"
+            description: "Overshoots the target and collapses the impact point"
         }
     },
     {
@@ -88,24 +88,24 @@ export const WEAPONS = [
         id: 'nanobot_swarm',
         name: "Nanobot Swarm",
         emoji: "🦠",
-        description: "Damaging aura around player",
+        description: "Aura of nanites that grinds down anything close",
         class: NanobotSwarmWeapon,
         evolution: {
-            name: "Nano Plague",
+            name: "Nanite Hive",
             emoji: "☣️",
-            description: "Spreads between enemies, massive area"
+            description: "Drones orbit the aura and lunge at anything close"
         }
     },
     {
         id: 'spore_cloud',
         name: "Spore Cloud",
         emoji: "🍄",
-        description: "Leaves damaging zones",
+        description: "Fungal patch that infects anything walking through it",
         class: SporeCloudWeapon,
         evolution: {
-            name: "Fungal Apocalypse",
+            name: "Fungal Bloom",
             emoji: "🍄‍🟫",
-            description: "Giant toxic zones that last forever"
+            description: "The infection turns contagious and spreads from the dead"
         }
     },
     {
@@ -136,12 +136,12 @@ export const WEAPONS = [
         id: 'mind_blast',
         name: "Mind Blast",
         emoji: "🧠",
-        description: "Explosion at enemy location",
+        description: "Psionic detonation that stuns everything it catches",
         class: MindBlastWeapon,
         evolution: {
-            name: "Psychic Storm",
+            name: "Psychic Cascade",
             emoji: "🌀",
-            description: "Multiple explosions, stuns enemies"
+            description: "The blast jumps from mind to mind, stunning as it goes"
         }
     },
     {
@@ -211,9 +211,9 @@ export const WEAPONS = [
         description: "Throws plasma grenades that explode on impact",
         class: PlasmaGrenadeWeapon,
         evolution: {
-            name: "Supernova Blast",
+            name: "Cluster Bomb",
             emoji: "💥",
-            description: "Chain explosions for massive area damage"
+            description: "Three canisters per throw with chained secondaries"
         }
     },
 ];

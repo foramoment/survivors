@@ -20,6 +20,7 @@ src/game/
 │   ├── StageBackdrop.ts  # 🌠 Параллакс арены (небула/звёзды/пол/пыль) + свет стейджа
 │   ├── PropField.ts      # 🪨 Препятствия: чанковая генерация, коллизии, отрисовка
 │   ├── ArenaEvents.ts    # ☄️ События арены: метеориты, блэкаут, разломы
+│   ├── StatusEffects.ts  # 🍄 Дебаффы на врагах: infection (DoT, заразный) и stun
 │   ├── PixelFont.ts      # 🔤 Битмап-шрифт 5×7 в коде (титры, damage numbers)
 │   ├── AudioSystem.ts    # 🔊 Процедурный чиптюн Web Audio (SFX + генеративная музыка)
 │   ├── JuiceSystem.ts    # 💥 Game feel: тряска, hit-stop, вспышки, zoom, ударные волны
@@ -67,10 +68,37 @@ damageSystem.dealDamage({ baseDamage: 50, source: null, target: enemy, position:
 
 **Формула урона:**
 ```
-finalDamage = baseDamage × might × critMultiplier(если крит)
-critChance = player.stats.critChance (default 5%)
-critDamage = player.stats.critDamage (default 1.5x)
+finalDamage = baseDamage × might × GLOBAL_DAMAGE × (крит ? critDamage : 1)
+GLOBAL_DAMAGE = 2      // см. комментарий в DamageSystem
+critChance    = player.stats.critChance (default 5%)
+critDamage    = player.stats.critDamage (default 1.5x)
 ```
+
+> ⚠️ Раньше здесь было `isCrit ? critDamage : 2` — обычный удар удваивался, а
+> крит на дефолтных 1.5× бил **слабее** обычного. Удвоение вынесено в явную
+> константу `GLOBAL_DAMAGE`, крит умножается сверху: не-крит урон не изменился,
+> ребаланс не потребовался.
+
+### StatusEffects (Singleton)
+**Файл:** `core/StatusEffects.ts`
+
+Дебаффы живут **на враге**, а не на зоне — поэтому продолжают работать после
+того, как враг вышел из облака.
+
+```typescript
+status.infect(enemy, { dps: 8, duration: 4, source: weapon,
+                       contagious: true, spreadRadius: 90 });
+status.stun(enemy, 1.4);
+status.update(dt, enemies);   // тик урона (0.6с), вызывается из GameManager
+status.onEnemyDeath(enemy);   // заразная инфекция прыгает на соседей
+```
+
+- `infection` — DoT через `damageSystem.dealDamage` (значит, might/crit
+  работают). `contagious` = при смерти носителя заражает до 4 соседей,
+  максимум 3 поколения, каждый прыжок слабее — иначе цепочка не сходится.
+- `stun` — враг не двигается (`Enemy.update` выходит рано), но анимируется и
+  получает урон. Боссам Mind Blast даёт только 25% длительности.
+- Индикаторы рисует `Enemy.draw`: споры на орбите + розовое кольцо стана.
 
 ### SpatialHash
 **Файл:** `core/SpatialHash.ts`
@@ -528,9 +556,15 @@ const dist = Math.sqrt(dx * dx + dy * dy);
 3. **Эволюция = level >= 6** — проверяй `this.evolved`, не `this.level === 6`
 4. **Статы оружия в конструкторе** — копируй из `this.stats` в свойства
 5. **onSpawn/onDamage** — используй колбэки, не напрямую GameManager
-6. **Язык игры — английский** — весь код, комментарии и строки на английском
-7. **Коммиты на английском** — сообщения коммитов всегда на английском языке
-8. **Git Flow** — используем conventional commits:
+6. **Пауза (Escape / кнопка `II` в HUD)** — `gameManager.togglePause()`.
+   В состоянии `PAUSED` `Engine.loop` **вообще ничего не делает**: ни
+   `clearRect`, ни отрисовки, ни `juice.update` — на канвасе остаётся
+   последний кадр, поверх него DOM-оверлей. Музыка снимается с планировщика
+   (`audio.pauseMusic()`) и продолжает с того же места. Ничего не рисуй в
+   обход этой проверки.
+7. **Язык игры — английский** — весь код, комментарии и строки на английском
+8. **Коммиты на английском** — сообщения коммитов всегда на английском языке
+9. **Git Flow** — используем conventional commits:
    - `feat:` — новая фича
    - `fix:` — исправление бага  
    - `refactor:` — рефакторинг без изменения поведения

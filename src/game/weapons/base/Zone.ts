@@ -9,6 +9,7 @@ import { particles } from '../../core/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { juice } from '../../core/JuiceSystem';
+import { status } from '../../core/StatusEffects';
 
 // ============================================
 // ZONE - Base class for area damage
@@ -208,72 +209,145 @@ export class AcidZone extends Zone {
 }
 
 // ============================================
-// SPORE ZONE - Floating spore cloud
+// SPORE ZONE - Fungal patch: mushrooms + a breathing spore cloud
 // ============================================
+
+/**
+ * A patch of fungus rather than a coloured circle: pixel mushrooms sprout on
+ * the ground, a cloud of spores breathes above them, and anything standing in
+ * it gets *infected* — the damage keeps ticking after the enemy walks out
+ * (see core/StatusEffects).
+ *
+ * All geometry (mushroom placement, puff offsets) is baked in the constructor;
+ * per frame this is a handful of rects and arcs with no allocation.
+ */
 export class SporeZone extends Zone {
+    /** Damage per second applied as an infection to anything inside */
+    infectDps: number = 0;
+    infectDuration: number = 3;
+    contagious: boolean = false;
+
+    protected puffs: { x: number; y: number; r: number; phase: number; drift: number }[] = [];
+    protected caps: { x: number; y: number; scale: number; variant: number; grow: number }[] = [];
+    protected age: number = 0;
     private particleTimer: number = 0;
-    private spores: { x: number; y: number; vx: number; vy: number; size: number; alpha: number }[] = [];
 
     constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number) {
         super(x, y, radius, duration, damage, interval, '', 0);
-        for (let i = 0; i < 20; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * radius * 0.9;
-            this.spores.push({
+        this.rebuildGeometry();
+    }
+
+    /** Baked once (and again if an evolved zone grows a lot) */
+    protected rebuildGeometry() {
+        this.puffs.length = 0;
+        const puffCount = Math.min(14, 6 + Math.round(this.radius / 22));
+        for (let i = 0; i < puffCount; i++) {
+            const angle = (i / puffCount) * Math.PI * 2 + Math.random() * 0.5;
+            const dist = this.radius * (0.25 + Math.random() * 0.6);
+            this.puffs.push({
                 x: Math.cos(angle) * dist,
-                y: Math.sin(angle) * dist,
-                vx: (Math.random() - 0.5) * 20,
-                vy: (Math.random() - 0.5) * 20 - 10,
-                size: 2 + Math.random() * 4,
-                alpha: 0.3 + Math.random() * 0.5
+                y: Math.sin(angle) * dist * 0.75,
+                r: this.radius * (0.18 + Math.random() * 0.2),
+                phase: Math.random() * Math.PI * 2,
+                drift: 0.6 + Math.random() * 0.8,
+            });
+        }
+
+        this.caps.length = 0;
+        const capCount = Math.min(6, 2 + Math.round(this.radius / 45));
+        for (let i = 0; i < capCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = this.radius * (0.15 + Math.random() * 0.7);
+            this.caps.push({
+                x: Math.cos(angle) * dist,
+                y: Math.sin(angle) * dist * 0.7,
+                scale: 0.7 + Math.random() * 0.7,
+                variant: Math.floor(Math.random() * 3),
+                grow: 0,
             });
         }
     }
 
     update(dt: number) {
         super.update(dt);
+        this.age += dt;
 
-        for (const spore of this.spores) {
-            spore.x += spore.vx * dt;
-            spore.y += spore.vy * dt;
-
-            const dist = Math.hypot(spore.x, spore.y);
-            if (dist > this.radius) {
-                const angle = Math.random() * Math.PI * 2;
-                spore.x = Math.cos(angle) * this.radius * 0.5;
-                spore.y = Math.sin(angle) * this.radius * 0.5;
-            }
+        // Mushrooms pop up one after another instead of all at once
+        for (let i = 0; i < this.caps.length; i++) {
+            const cap = this.caps[i];
+            if (cap.grow < 1 && this.age > i * 0.08) cap.grow = Math.min(1, cap.grow + dt * 4);
         }
 
         this.particleTimer += dt;
-        if (this.particleTimer > 0.2) {
+        if (this.particleTimer > 0.35) {
             this.particleTimer = 0;
             particles.emitSporeCloud(this.pos.x, this.pos.y, this.radius);
         }
+    }
+
+    onOverlap(enemy: any) {
+        super.onOverlap(enemy);
+        if (this.infectDps <= 0) return;
+        status.infect(enemy, {
+            dps: this.infectDps,
+            duration: this.infectDuration,
+            source: this.source,
+            contagious: this.contagious,
+            spreadRadius: this.radius * 0.8,
+        });
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
-        gradient.addColorStop(0, 'rgba(100, 80, 40, 0.4)');
-        gradient.addColorStop(0.6, 'rgba(80, 60, 30, 0.25)');
-        gradient.addColorStop(1, 'rgba(60, 40, 20, 0.05)');
+        const fade = Math.min(1, this.duration / 0.6);
+        const breathe = 1 + Math.sin(this.age * 1.6) * 0.05;
 
+        // Damp ground patch
+        ctx.globalAlpha = 0.3 * fade;
+        ctx.fillStyle = this.contagious ? '#243d10' : '#2a2c14';
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
+        ctx.ellipse(0, 0, this.radius, this.radius * 0.78, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        for (const spore of this.spores) {
+        // Mushrooms
+        ctx.globalAlpha = fade;
+        for (const cap of this.caps) {
+            if (cap.grow <= 0) continue;
+            this.drawMushroom(ctx, cap.x, cap.y, cap.scale * cap.grow, cap.variant);
+        }
+
+        // Spore puffs drifting above the patch
+        for (const puff of this.puffs) {
+            const lift = Math.sin(this.age * puff.drift + puff.phase) * 5;
+            ctx.globalAlpha = (0.18 + 0.1 * Math.sin(this.age * 2 + puff.phase)) * fade;
+            ctx.fillStyle = this.contagious ? '#8fd642' : '#7a8b3a';
             ctx.beginPath();
-            ctx.arc(spore.x, spore.y, spore.size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(150, 120, 60, ${spore.alpha})`;
+            ctx.arc(puff.x, puff.y + lift, puff.r * breathe, 0, Math.PI * 2);
             ctx.fill();
         }
 
+        ctx.globalAlpha = 1;
         ctx.restore();
+    }
+
+    /** Chunky pixel mushroom: stalk, cap, two spots */
+    protected drawMushroom(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, variant: number) {
+        const p = Math.max(2, Math.round(3 * scale));
+        const capColor = this.contagious ? '#9ee83c' : ['#b4552e', '#8a6a2e', '#7a4a6a'][variant];
+        const capShade = this.contagious ? '#5f9418' : ['#7a3218', '#5c451c', '#4e2d47'][variant];
+
+        ctx.fillStyle = '#d8d2b8';
+        ctx.fillRect(x - p / 2, y - p, p, p * 2);
+
+        ctx.fillStyle = capColor;
+        ctx.fillRect(x - p * 2, y - p * 2, p * 4, p);
+        ctx.fillRect(x - p * 1.5, y - p * 3, p * 3, p);
+
+        ctx.fillStyle = capShade;
+        ctx.fillRect(x - p * 2, y - p, p * 4, Math.max(1, p * 0.5));
+        ctx.fillRect(x - p * 0.5, y - p * 3, p, p);
     }
 }
 
@@ -786,6 +860,14 @@ export class PlasmaExplosionZone extends Zone {
     isEvolved: boolean;
     onChainExplosion?: (x: number, y: number) => void;
 
+    /**
+     * Seconds to wait before detonating. Cluster/chain blasts stagger
+     * themselves this way so twenty explosions never resolve in one frame.
+     */
+    detonationDelay: number = 0;
+    /** Fired when a delayed blast actually goes off (particles live here) */
+    onDetonate?: (x: number, y: number, radius: number) => void;
+
     constructor(x: number, y: number, radius: number, damage: number, isEvolved: boolean = false) {
         // Short duration for visual effect only
         super(x, y, radius, 0.6, damage, Number.MAX_VALUE, '');
@@ -793,6 +875,13 @@ export class PlasmaExplosionZone extends Zone {
     }
 
     update(dt: number) {
+        if (this.detonationDelay > 0) {
+            this.detonationDelay -= dt;
+            this.duration += dt; // don't age while waiting to go off
+            if (this.detonationDelay > 0) return;
+            this.onDetonate?.(this.pos.x, this.pos.y, this.radius);
+        }
+
         // Deal damage immediately on first frame
         if (!this.damageDealt) {
             this.damageDealt = true;
@@ -829,6 +918,9 @@ export class PlasmaExplosionZone extends Zone {
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        // Nothing to see until the fuse runs out
+        if (this.detonationDelay > 0) return;
+
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 

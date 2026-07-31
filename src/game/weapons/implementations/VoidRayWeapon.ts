@@ -1,8 +1,14 @@
 /**
  * VOID RAY WEAPON
- * Fires a powerful charging beam at enemies.
- * 
- * Evolved: Void Cannon - Double damage, wider beam + EMP explosion at target
+ *
+ * A charged lance that damages *everything along its line*, not just the enemy
+ * it locked onto (see VoidRayBeam.fire). That, plus a higher base damage, is
+ * what makes it worth a weapon slot.
+ *
+ * Evolved — Void Cannon: the ray overshoots far past the target and the impact
+ * point collapses: enemies are dragged into a singularity for a moment, then
+ * it detonates. The old evolution was a static EMP ring that looked like a
+ * screensaver and did nothing you could see.
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
@@ -12,64 +18,64 @@ import { type Vector2, distance } from '../../core/Utils';
 import { damageSystem } from '../../core/DamageSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { particles } from '../../core/ParticleSystem';
+import { juice } from '../../core/JuiceSystem';
 
 // ============================================
-// VOID EMP EXPLOSION - Expanding ring with electric effect
+// VOID COLLAPSE - pulls everything in, then detonates
 // ============================================
-export class VoidEMPExplosion extends Zone {
-    private ringRadius: number = 0;
-    private ringAlpha: number = 1.0;
-    private sparks: { x: number; y: number; angle: number; length: number }[] = [];
-    private damageDealt: boolean = false;
+export class VoidCollapseZone extends Zone {
+    /** Seconds of pull before the detonation */
+    private static readonly PULL_TIME = 0.55;
+
+    private age: number = 0;
+    private detonated: boolean = false;
     private maxRadius: number;
+    /** Baked spiral arms — recomputing these per frame made the effect boil */
+    private arms: { angle: number; length: number }[] = [];
 
     constructor(x: number, y: number, radius: number, damage: number) {
-        super(x, y, radius, 0.6, damage, Number.MAX_VALUE, '');
+        super(x, y, radius, VoidCollapseZone.PULL_TIME + 0.35, damage, Number.MAX_VALUE, '');
         this.maxRadius = radius;
-
-        // Generate electric sparks
-        for (let i = 0; i < 12; i++) {
-            this.sparks.push({
-                x: 0,
-                y: 0,
-                angle: (i / 12) * Math.PI * 2,
-                length: 20 + Math.random() * 30
+        for (let i = 0; i < 5; i++) {
+            this.arms.push({
+                angle: (i / 5) * Math.PI * 2,
+                length: 0.55 + Math.random() * 0.45,
             });
         }
     }
 
     update(dt: number) {
         super.update(dt);
+        this.age += dt;
 
-        // Expand ring
-        this.ringRadius += dt * this.maxRadius * 3;
-        this.ringAlpha = Math.max(0, 1 - (this.ringRadius / this.maxRadius));
-
-        // Deal damage once at start
-        if (!this.damageDealt) {
-            this.damageDealt = true;
-            const enemiesInBlast = levelSpatialHash.getWithinRadius(this.pos, this.maxRadius);
-
-            for (const enemy of enemiesInBlast) {
-                if (distance(this.pos, enemy.pos) <= this.maxRadius) {
-                    damageSystem.dealDamage({
-                        baseDamage: this.damage,
-                        source: this.source,
-                        target: enemy,
-                        position: enemy.pos
-                    });
-                }
+        if (this.age < VoidCollapseZone.PULL_TIME) {
+            // Drag everything in range toward the centre
+            for (const enemy of levelSpatialHash.getNearby(this.pos, this.maxRadius)) {
+                if (enemy.isDead || enemy.isBoss) continue;
+                const dist = distance(this.pos, enemy.pos);
+                if (dist > this.maxRadius || dist < 1) continue;
+                const pull = (1 - dist / this.maxRadius) * 320 * dt;
+                enemy.pos.x += ((this.pos.x - enemy.pos.x) / dist) * pull;
+                enemy.pos.y += ((this.pos.y - enemy.pos.y) / dist) * pull;
             }
+            return;
         }
 
-        // Update spark positions
-        for (const spark of this.sparks) {
-            spark.x = Math.cos(spark.angle) * this.ringRadius;
-            spark.y = Math.sin(spark.angle) * this.ringRadius;
-        }
-
-        if (this.ringRadius >= this.maxRadius * 1.5) {
-            this.isDead = true;
+        if (!this.detonated) {
+            this.detonated = true;
+            for (const enemy of levelSpatialHash.getNearby(this.pos, this.maxRadius)) {
+                if (enemy.isDead) continue;
+                if (distance(this.pos, enemy.pos) > this.maxRadius) continue;
+                damageSystem.dealDamage({
+                    baseDamage: this.damage,
+                    source: this.source,
+                    target: enemy,
+                    position: enemy.pos,
+                });
+            }
+            particles.emitOrbitalImpact(this.pos.x, this.pos.y, this.maxRadius * 0.6);
+            juice.shockwave(this.pos.x, this.pos.y, this.maxRadius * 1.8, '#d17bff', 0.35, 6);
+            juice.addTrauma(0.2);
         }
     }
 
@@ -77,62 +83,50 @@ export class VoidEMPExplosion extends Zone {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        // EMP ring
-        if (this.ringAlpha > 0) {
-            ctx.beginPath();
-            ctx.arc(0, 0, this.ringRadius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(200, 100, 255, ${this.ringAlpha})`;
-            ctx.lineWidth = 8 * this.ringAlpha;
-            ctx.shadowColor = '#cc66ff';
-            ctx.shadowBlur = 25;
-            ctx.stroke();
+        const pulling = this.age < VoidCollapseZone.PULL_TIME;
 
-            // Inner ring
-            ctx.beginPath();
-            ctx.arc(0, 0, this.ringRadius * 0.9, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255, 200, 255, ${this.ringAlpha * 0.8})`;
-            ctx.lineWidth = 3 * this.ringAlpha;
-            ctx.stroke();
-        }
+        if (pulling) {
+            const t = this.age / VoidCollapseZone.PULL_TIME;
+            const spin = this.age * 6;
 
-        // Electric sparks on ring
-        ctx.shadowBlur = 10;
-        for (const spark of this.sparks) {
-            if (this.ringAlpha < 0.3) continue;
-
-            ctx.beginPath();
-            ctx.moveTo(spark.x, spark.y);
-
-            // Jagged electric line
-            const segments = 3;
-            let px = spark.x;
-            let py = spark.y;
-            for (let i = 0; i < segments; i++) {
-                const t = (i + 1) / segments;
-                const targetX = spark.x + Math.cos(spark.angle) * spark.length * t;
-                const targetY = spark.y + Math.sin(spark.angle) * spark.length * t;
-                const offsetAngle = spark.angle + Math.PI / 2;
-                const offset = (Math.random() - 0.5) * 15;
-                px = targetX + Math.cos(offsetAngle) * offset;
-                py = targetY + Math.sin(offsetAngle) * offset;
-                ctx.lineTo(px, py);
+            // Spiral arms winding into the core
+            ctx.strokeStyle = `rgba(190, 110, 255, ${0.35 + 0.4 * t})`;
+            ctx.lineWidth = 3;
+            for (const arm of this.arms) {
+                ctx.beginPath();
+                for (let i = 0; i <= 12; i++) {
+                    const p = i / 12;
+                    const r = this.maxRadius * arm.length * (1 - p) * (1 - t * 0.5);
+                    const a = arm.angle + spin + p * 2.4;
+                    const x = Math.cos(a) * r;
+                    const y = Math.sin(a) * r;
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
             }
 
-            ctx.strokeStyle = `rgba(255, 255, 255, ${this.ringAlpha})`;
+            // Event horizon
+            const core = 6 + t * 14;
+            ctx.fillStyle = '#0a0012';
+            ctx.beginPath();
+            ctx.arc(0, 0, core, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#e9b6ff';
             ctx.lineWidth = 2;
             ctx.stroke();
-        }
-
-        // Center distortion effect
-        if (this.ringAlpha > 0.5) {
-            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 30);
-            gradient.addColorStop(0, `rgba(255, 200, 255, ${this.ringAlpha * 0.6})`);
-            gradient.addColorStop(0.5, `rgba(180, 100, 255, ${this.ringAlpha * 0.3})`);
-            gradient.addColorStop(1, 'rgba(100, 50, 200, 0)');
-
+        } else {
+            // Detonation: a hard white ring snapping outward
+            const t = (this.age - VoidCollapseZone.PULL_TIME) / 0.35;
+            const alpha = Math.max(0, 1 - t);
+            ctx.strokeStyle = `rgba(255, 240, 255, ${alpha})`;
+            ctx.lineWidth = 10 * alpha;
             ctx.beginPath();
-            ctx.arc(0, 0, 30, 0, Math.PI * 2);
-            ctx.fillStyle = gradient;
+            ctx.arc(0, 0, this.maxRadius * (0.4 + t * 0.9), 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = `rgba(200, 120, 255, ${alpha * 0.5})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.maxRadius * 0.5 * (1 - t), 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -143,12 +137,12 @@ export class VoidEMPExplosion extends Zone {
 export class VoidRayWeapon extends Weapon {
     name = "Void Ray";
     emoji = "🔫";
-    description = "Fires a powerful charging beam.";
+    description = "Charged lance that burns through everything in its path.";
 
     readonly stats = {
-        damage: 25,
+        damage: 40,
         cooldown: 2.0,
-        area: 100, // Used for EMP explosion radius when evolved
+        area: 110, // collapse radius when evolved
         speed: 0,
         duration: 0.5,
     };
@@ -168,31 +162,27 @@ export class VoidRayWeapon extends Weapon {
 
             if (target) {
                 const isEvolved = this.evolved;
-                const damage = this.damage * (isEvolved ? 2 : 1);
-
                 const beam = new VoidRayBeam(
                     this.owner,
                     target,
-                    damage,
+                    this.damage * (isEvolved ? 1.8 : 1),
                     isEvolved
                 );
                 beam.source = this;
 
-                // Evolved: add EMP explosion callback
                 if (isEvolved) {
-                    beam.onVoidExplosion = (x: number, y: number, explosionDamage: number) => {
-                        const empRadius = this.area * this.owner.stats.area;
-                        const emp = new VoidEMPExplosion(x, y, empRadius, explosionDamage);
-                        emp.source = this;
-                        this.onSpawn(emp);
-
-                        // Emit particles
-                        particles.emitHit(x, y, '#cc66ff');
+                    beam.onVoidExplosion = (x: number, y: number, collapseDamage: number) => {
+                        const collapse = new VoidCollapseZone(
+                            x, y,
+                            this.area * this.owner.stats.area,
+                            collapseDamage
+                        );
+                        collapse.source = this;
+                        this.onSpawn(collapse);
                     };
                 }
 
                 this.onSpawn(beam);
-
                 this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
             }
         }

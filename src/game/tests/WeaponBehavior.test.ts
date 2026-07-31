@@ -74,7 +74,7 @@ describe('VoidRayWeapon', () => {
     });
 
     it('should initialize with correct stats from weapon stats object', () => {
-        expect(weapon.damage).toBe(25);
+        expect(weapon.damage).toBe(40);
         expect(weapon.baseCooldown).toBe(2.0);
     });
 

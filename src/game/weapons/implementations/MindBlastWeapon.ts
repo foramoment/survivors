@@ -1,85 +1,109 @@
 /**
  * MIND BLAST WEAPON
- * Psionic storm at enemy location.
- * 
- * Evolved: Psychic Storm - Cascading stun zone
+ *
+ * A psionic detonation on top of an enemy: concentric shockrings snap outward
+ * from the impact, everything caught takes damage and is briefly stunned
+ * (core/StatusEffects — the old code set an `enemy.stunDuration` field that
+ * nothing ever read, so the stun did nothing at all).
+ *
+ * Evolved — Psychic Cascade: the first blast jumps to further targets, one
+ * every 0.18s, each a little weaker. It reads as a thought tearing through the
+ * crowd instead of one static pink circle.
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
 import { type Vector2, distance } from '../../core/Utils';
-import { MindBlastZone, Zone } from '../base';
+import { Zone } from '../base';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { particles } from '../../core/ParticleSystem';
+import { damageSystem } from '../../core/DamageSystem';
+import { status } from '../../core/StatusEffects';
+import { juice } from '../../core/JuiceSystem';
 
 // ============================================
-// EVOLVED MIND BLAST - PSYCHIC STORM
-// Cascading explosions with strong stun
+// PSI BLAST - shockrings + stun, one detonation
 // ============================================
+export class PsiBlastZone extends Zone {
+    private age: number = 0;
+    private detonated: boolean = false;
+    private stunDuration: number;
+    /** Baked spike angles so the star doesn't shimmer frame to frame */
+    private spikes: number[] = [];
+    /** Called once with the enemies this blast caught (evolved cascade) */
+    onCaught?: (hits: any[]) => void;
 
-export class PsychicStormZone extends Zone {
-    private wavePhase: number = 0;
-    stunDuration: number;
-    private hasStunned: Set<any> = new Set();
-
-    constructor(x: number, y: number, radius: number, damage: number, stunDuration: number = 2.0) {
-        super(x, y, radius, 0.8, damage, 0.1, '', 0);
+    constructor(x: number, y: number, radius: number, damage: number, stunDuration: number) {
+        super(x, y, radius, 0.5, damage, Number.MAX_VALUE, '');
         this.stunDuration = stunDuration;
+        const count = 6;
+        for (let i = 0; i < count; i++) {
+            this.spikes.push((i / count) * Math.PI * 2 + Math.random() * 0.3);
+        }
     }
 
     update(dt: number) {
         super.update(dt);
-        this.wavePhase += dt * 8;
+        this.age += dt;
 
-        // Stun enemies in range (only once per enemy)
-        const enemiesInPsiStorm = levelSpatialHash.getWithinRadius(this.pos, this.radius);
+        if (this.detonated) return;
+        this.detonated = true;
 
-        for (const enemy of enemiesInPsiStorm) {
-            if (this.hasStunned.has(enemy)) continue;
+        const caught: any[] = [];
+        for (const enemy of levelSpatialHash.getNearby(this.pos, this.radius)) {
+            if (enemy.isDead) continue;
+            if (distance(this.pos, enemy.pos) > this.radius + enemy.radius) continue;
 
-            const dist = distance(this.pos, enemy.pos);
-
-            if (dist < this.radius) {
-                (enemy as any).stunDuration = Math.max((enemy as any).stunDuration || 0, this.stunDuration);
-                this.hasStunned.add(enemy);
-                particles.emitHit(enemy.pos.x, enemy.pos.y, '#ff00ff');
-            }
+            damageSystem.dealDamage({
+                baseDamage: this.damage,
+                source: this.source,
+                target: enemy,
+                position: enemy.pos,
+            });
+            // Bosses shrug most of it off — a permanently stunned boss is no boss
+            status.stun(enemy, enemy.isBoss ? this.stunDuration * 0.25 : this.stunDuration);
+            caught.push(enemy);
         }
+
+        particles.emitPsiWave(this.pos.x, this.pos.y, this.radius);
+        this.onCaught?.(caught);
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        const t = Math.min(1, this.age / 0.5);
+        const alpha = 1 - t;
+        if (alpha <= 0) return;
+
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        const fade = Math.min(1, this.duration / 0.4);
-
-        // Expanding brain waves
-        for (let i = 0; i < 4; i++) {
-            const waveRadius = this.radius * (0.3 + i * 0.25) * (1 + Math.sin(this.wavePhase + i) * 0.1);
+        // Three rings chasing each other outward
+        for (let i = 0; i < 3; i++) {
+            const phase = Math.max(0, t - i * 0.12) / (1 - i * 0.12);
+            if (phase <= 0) continue;
+            const r = this.radius * phase;
+            ctx.strokeStyle = `rgba(255, 140, 240, ${alpha * (0.9 - i * 0.25)})`;
+            ctx.lineWidth = 5 - i * 1.5;
             ctx.beginPath();
-            ctx.arc(0, 0, waveRadius, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255, 100, 200, ${(0.6 - i * 0.12) * fade})`;
-            ctx.lineWidth = 4 - i;
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
             ctx.stroke();
         }
 
-        // Core psionic energy
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * 0.4);
-        gradient.addColorStop(0, `rgba(255, 150, 255, ${0.9 * fade})`);
-        gradient.addColorStop(0.5, `rgba(200, 50, 200, ${0.6 * fade})`);
-        gradient.addColorStop(1, `rgba(150, 0, 150, 0)`);
-
+        // Psi star: hard spikes shooting out of the impact point
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.4, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.shadowColor = '#ff00ff';
-        ctx.shadowBlur = 25 * fade;
-        ctx.fill();
+        for (const angle of this.spikes) {
+            const inner = this.radius * 0.12;
+            const outer = this.radius * (0.35 + t * 0.75);
+            ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+            ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+        }
+        ctx.stroke();
 
-        // Brain emoji
-        ctx.font = `${32 * fade}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🧠', 0, 0);
+        // Collapsing core
+        ctx.fillStyle = `rgba(196, 107, 255, ${alpha * 0.85})`;
+        const core = this.radius * 0.22 * (1 - t);
+        ctx.fillRect(-core, -core, core * 2, core * 2);
 
         ctx.restore();
     }
@@ -88,7 +112,7 @@ export class PsychicStormZone extends Zone {
 export class MindBlastWeapon extends Weapon {
     name = "Mind Blast";
     emoji = "🧠";
-    description = "Psionic storm at enemy location.";
+    description = "Psionic detonation that stuns everything it catches.";
 
     readonly stats = {
         damage: 20,
@@ -97,6 +121,9 @@ export class MindBlastWeapon extends Weapon {
         speed: 0,
         duration: 0.5,
     };
+
+    /** Pending cascade jumps: {x, y, damage, delay} */
+    private cascade: { x: number, y: number, damage: number, delay: number, hops: number }[] = [];
 
     constructor(owner: Player) {
         super(owner);
@@ -108,36 +135,61 @@ export class MindBlastWeapon extends Weapon {
     update(dt: number) {
         this.cooldown -= dt;
 
+        // Cascade hops resolve on their own timers so a chain never lands in
+        // a single frame
+        for (let i = this.cascade.length - 1; i >= 0; i--) {
+            const hop = this.cascade[i];
+            hop.delay -= dt;
+            if (hop.delay > 0) continue;
+            this.cascade.splice(i, 1);
+            this.detonate(hop.x, hop.y, hop.damage, hop.hops);
+        }
+
         if (this.cooldown <= 0) {
             const targets = this.findRandomEnemies(1, 600);
-
             if (targets.length > 0) {
                 const target = targets[0];
-                const isEvolved = this.evolved;
-
-                if (isEvolved) {
-                    const zone = new PsychicStormZone(
-                        target.pos.x,
-                        target.pos.y,
-                        this.area * this.owner.stats.area,
-                        this.damage,
-                        2.0
-                    );
-                    zone.source = this;
-                    this.onSpawn(zone);
-                } else {
-                    const zone = new MindBlastZone(
-                        target.pos.x,
-                        target.pos.y,
-                        this.area * this.owner.stats.area,
-                        this.damage
-                    );
-                    zone.source = this;
-                    this.onSpawn(zone);
-                }
-
+                this.detonate(target.pos.x, target.pos.y, this.damage, this.evolved ? 3 : 0);
+                juice.addTrauma(0.08);
                 this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
             }
         }
+    }
+
+    private detonate(x: number, y: number, damage: number, hopsLeft: number) {
+        const radius = this.area * this.owner.stats.area;
+        const zone = new PsiBlastZone(x, y, radius, damage, this.evolved ? 1.4 : 0.7);
+        zone.source = this;
+
+        if (hopsLeft > 0) {
+            zone.onCaught = (hits: any[]) => {
+                // Jump to the nearest enemy that this blast did NOT already hit
+                const next = this.findJumpTarget({ x, y }, radius, hits);
+                if (!next) return;
+                this.cascade.push({
+                    x: next.pos.x,
+                    y: next.pos.y,
+                    damage: damage * 0.8,
+                    delay: 0.18,
+                    hops: hopsLeft - 1,
+                });
+            };
+        }
+
+        this.onSpawn(zone);
+    }
+
+    private findJumpTarget(from: Vector2, radius: number, exclude: any[]): any | null {
+        let best: any = null;
+        let bestDist = radius * 3;
+        for (const enemy of levelSpatialHash.getNearby(from, radius * 3)) {
+            if (enemy.isDead || exclude.includes(enemy)) continue;
+            const dist = distance(from, enemy.pos);
+            if (dist > radius * 0.8 && dist < bestDist) {
+                bestDist = dist;
+                best = enemy;
+            }
+        }
+        return best;
     }
 }

@@ -1,6 +1,7 @@
 import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
 import { sprites } from '../core/SpriteFactory';
+import type { Infection } from '../core/StatusEffects';
 
 export class Enemy extends Entity {
     hp: number;
@@ -25,6 +26,11 @@ export class Enemy extends Entity {
 
     // Separation force accumulator (reset each frame)
     separationForce: Vector2 = { x: 0, y: 0 };
+
+    // Status effects — owned by core/StatusEffects, stored here so lookups are free
+    infection: Infection | null = null;
+    /** Seconds of stun left; while > 0 the enemy cannot move */
+    stunTimer: number = 0;
 
     constructor(x: number, y: number, type: EnemyType, isElite: boolean = false) {
         super(x, y, 12);
@@ -108,6 +114,18 @@ export class Enemy extends Entity {
     update(dt: number, playerPos?: Vector2) {
         this.animTimer += dt;
         if (this.hitFlash > 0) this.hitFlash -= dt;
+
+        // Stunned: still animates and takes damage, but goes nowhere. Knockback
+        // already in flight is allowed to finish playing out.
+        if (this.stunTimer > 0) {
+            this.stunTimer -= dt;
+            this.pos.x += this.knockback.x * dt;
+            this.pos.y += this.knockback.y * dt;
+            this.knockback.x *= 0.9;
+            this.knockback.y *= 0.9;
+            return;
+        }
+
         if (!playerPos) return;
         this.facingLeft = playerPos.x < this.pos.x;
 
@@ -173,6 +191,30 @@ export class Enemy extends Entity {
         if (this.facingLeft) ctx.scale(-1, 1);
         ctx.drawImage(sprite, -size / 2, -size / 2 + bob, size, size);
         if (this.facingLeft) ctx.scale(-1, 1);
+
+        // Status markers: spores orbiting an infected host, psi ring on a stun.
+        // Both are a handful of rects — cheap enough for a screen full of enemies.
+        if (this.infection) {
+            ctx.fillStyle = this.infection.contagious ? '#b6ff4d' : '#8fd642';
+            for (let i = 0; i < 3; i++) {
+                const a = this.animTimer * 2.4 + (i / 3) * Math.PI * 2;
+                const r = this.radius * 0.9;
+                ctx.fillRect(
+                    Math.round(Math.cos(a) * r) - 1,
+                    Math.round(Math.sin(a) * r * 0.7) - 1,
+                    3, 3
+                );
+            }
+        }
+
+        if (this.stunTimer > 0) {
+            ctx.strokeStyle = '#ff8cf0';
+            ctx.lineWidth = 2;
+            const wobble = Math.sin(this.animTimer * 14) * 2;
+            ctx.beginPath();
+            ctx.ellipse(0, -this.radius - 6, this.radius * 0.7 + wobble, 4, 0, 0, Math.PI * 2);
+            ctx.stroke();
+        }
 
         // Boss HP bar above the sprite
         if (this.isBoss) {

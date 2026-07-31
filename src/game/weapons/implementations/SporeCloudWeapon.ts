@@ -1,77 +1,62 @@
 /**
  * SPORE CLOUD WEAPON
- * Leaves damaging zone at player position.
- * 
- * Evolved: Fungal Apocalypse - Longer lasting zones that grow over time
+ *
+ * Drops a fungal patch under the player: light contact damage, but everything
+ * that walks through gets *infected* and keeps taking damage after it leaves
+ * (core/StatusEffects). The zone is the delivery mechanism, the infection is
+ * the weapon.
+ *
+ * Evolved — Fungal Bloom: the infection turns contagious. An infected host
+ * that dies bursts and infects its neighbours (up to three generations), so a
+ * single patch can roll through a whole pack. The patch also keeps growing and
+ * sprouts more mushrooms as it does.
  */
 import { ZoneWeapon, SporeZone } from '../base';
 import type { Player } from '../../entities/Player';
 import { type Vector2 } from '../../core/Utils';
 
 // ============================================
-// FUNGAL APOCALYPSE ZONE - Growing, long-lasting toxic zone
+// FUNGAL BLOOM ZONE - Growing, contagious patch
 // ============================================
-export class FungalApocalypseZone extends SporeZone {
+export class FungalBloomZone extends SporeZone {
     private baseRadius: number;
-    private growthRate: number = 0.15; // 15% per second
-    private pulseTimer: number = 0;
-    private initialDuration: number;
+    private growthRate: number = 0.12; // +12% of the base radius per second
+    private lastGeometryRadius: number;
 
     constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number) {
         super(x, y, radius, duration, damage, interval);
         this.baseRadius = radius;
-        this.initialDuration = duration;
+        this.lastGeometryRadius = radius;
+        this.contagious = true;
     }
 
     update(dt: number) {
         super.update(dt);
 
-        // Grow radius over time (no cap - grows while duration allows)
-        const elapsedTime = this.initialDuration - this.duration;
-        this.radius = this.baseRadius * (1 + this.growthRate * elapsedTime);
+        this.radius = this.baseRadius * (1 + this.growthRate * this.age);
 
-        // Pulse effect timer
-        this.pulseTimer += dt;
+        // Re-bake the mushrooms/puffs only when the patch has grown enough to
+        // look sparse — not every frame.
+        if (this.radius > this.lastGeometryRadius * 1.35) {
+            this.lastGeometryRadius = this.radius;
+            this.rebuildGeometry();
+        }
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        super.draw(ctx, camera);
+
+        // Spore ring marking the infectious edge
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-
-        const pulse = 0.8 + Math.sin(this.pulseTimer * 3) * 0.2;
-        const growthRatio = this.radius / this.baseRadius;
-
-        // Dark ominous gradient
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
-        gradient.addColorStop(0, `rgba(60, 30, 10, ${0.6 * pulse})`);
-        gradient.addColorStop(0.4, `rgba(80, 50, 20, ${0.4 * pulse})`);
-        gradient.addColorStop(0.7, `rgba(50, 35, 15, ${0.25 * pulse})`);
-        gradient.addColorStop(1, 'rgba(30, 20, 5, 0.05)');
-
+        ctx.globalAlpha = 0.35 + 0.15 * Math.sin(this.age * 3);
+        ctx.strokeStyle = '#b6ff4d';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 8]);
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        // Pulsing glow ring
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.95, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(150, 100, 50, ${0.4 * pulse})`;
-        ctx.lineWidth = 3 + growthRatio;
-        ctx.shadowColor = '#996633';
-        ctx.shadowBlur = 15;
+        ctx.ellipse(0, 0, this.radius, this.radius * 0.78, 0, 0, Math.PI * 2);
         ctx.stroke();
-
-        // Inner toxic glow
-        const innerGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * 0.4);
-        innerGlow.addColorStop(0, `rgba(180, 120, 40, ${0.5 * pulse})`);
-        innerGlow.addColorStop(1, 'rgba(100, 60, 20, 0)');
-
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.4, 0, Math.PI * 2);
-        ctx.fillStyle = innerGlow;
-        ctx.fill();
-
+        ctx.setLineDash([]);
         ctx.restore();
     }
 }
@@ -79,7 +64,7 @@ export class FungalApocalypseZone extends SporeZone {
 export class SporeCloudWeapon extends ZoneWeapon {
     name = "Spore Cloud";
     emoji = "🍄";
-    description = "Leaves damaging zones.";
+    description = "Fungal patch that infects anything walking through it.";
     zoneEmoji = "";
     interval = 1;
 
@@ -88,7 +73,7 @@ export class SporeCloudWeapon extends ZoneWeapon {
         cooldown: 4,
         area: 50,
         speed: 0,
-        duration: 2,
+        duration: 3,
     };
 
     constructor(owner: Player) {
@@ -101,29 +86,33 @@ export class SporeCloudWeapon extends ZoneWeapon {
 
     spawnZone() {
         const baseInterval = Math.max(0.1, this.interval - this.owner.stats.tick);
-        const isEvolved = this.evolved;
+        const radius = this.area * this.owner.stats.area;
 
-        if (isEvolved) {
-            // Fungal Apocalypse: 2.5x longer duration, growing radius
-            const zone = new FungalApocalypseZone(
+        if (this.evolved) {
+            const zone = new FungalBloomZone(
                 this.owner.pos.x,
                 this.owner.pos.y,
-                this.area * this.owner.stats.area,
-                this.stats.duration * this.owner.stats.duration * 2.5, // 2.5x duration
-                this.damage,
-                baseInterval * 0.5
+                radius,
+                this.stats.duration * this.owner.stats.duration * 2,
+                this.damage * 0.6,
+                baseInterval
             );
+            // Contact damage is halved; the infection is where the damage went
+            zone.infectDps = this.damage * 0.75;
+            zone.infectDuration = 5;
             zone.source = this;
             this.onSpawn(zone);
         } else {
             const zone = new SporeZone(
                 this.owner.pos.x,
                 this.owner.pos.y,
-                this.area * this.owner.stats.area,
+                radius,
                 this.duration * this.owner.stats.duration,
-                this.damage,
+                this.damage * 0.6,
                 baseInterval
             );
+            zone.infectDps = this.damage * 0.45;
+            zone.infectDuration = 3;
             zone.source = this;
             this.onSpawn(zone);
         }

@@ -235,6 +235,90 @@ export class ParticleSystem {
      * Lean kinetic impact (~34 particles) — for salvos where several land in
      * the same second and emitOrbitalStrike's ~165 would spike the frame.
      */
+    /**
+     * Grenade blast — the cheap sibling of `emitExplosion` (~28 particles vs
+     * ~75, one glow group vs four). Grenades detonate in clusters, so the
+     * expensive preset used to spike a frame every volley.
+     */
+    emitPlasmaBurst(x: number, y: number, radius: number, evolved: boolean = false) {
+        this.emit({
+            x, y,
+            count: 6,
+            color: evolved ? ['#ffffff', '#ffe9b0'] : ['#ffffff', '#ccffdd'],
+            speed: radius * 2.2,
+            size: 8,
+            sizeEnd: 0,
+            life: 0.16,
+            spread: Math.PI * 2,
+            glow: true,
+            glowSize: 12,
+            shape: 'circle'
+        });
+
+        this.emit({
+            x, y,
+            count: 14,
+            color: evolved ? ['#ff9a2a', '#ffd24d', '#ff5a1e'] : ['#66ff88', '#aaffbb', '#22cc55'],
+            speed: radius * 1.7,
+            speedVariation: 0.7,
+            size: 6,
+            sizeEnd: 0,
+            life: 0.4,
+            lifeVariation: 0.4,
+            spread: Math.PI * 2,
+            shape: 'square'
+        });
+
+        this.emit({
+            x, y,
+            count: 8,
+            color: ['#2a3a2a', '#4a5a4a'],
+            speed: radius * 0.9,
+            size: 10,
+            sizeEnd: 16,
+            life: 0.5,
+            lifeVariation: 0.3,
+            gravity: -40,
+            spread: Math.PI * 2,
+            shape: 'circle'
+        });
+    }
+
+    /** Fungal burst when an infected host pops */
+    emitSporeBurst(x: number, y: number, radius: number) {
+        this.emit({
+            x, y,
+            count: 14,
+            color: ['#b6ff4d', '#7fbf2e', '#d9ff9a'],
+            speed: Math.max(60, radius * 1.4),
+            speedVariation: 0.7,
+            size: 5,
+            sizeEnd: 1,
+            life: 0.7,
+            lifeVariation: 0.4,
+            spread: Math.PI * 2,
+            gravity: -30,
+            shape: 'square'
+        });
+    }
+
+    /** Psionic ring pop — flat, no glow, used per Mind Blast wave */
+    emitPsiWave(x: number, y: number, radius: number) {
+        this.emit({
+            x, y,
+            count: 12,
+            color: ['#ff8cf0', '#c46bff', '#ffffff'],
+            speed: radius * 2,
+            speedVariation: 0.4,
+            size: 5,
+            sizeEnd: 0,
+            life: 0.35,
+            lifeVariation: 0.3,
+            spread: Math.PI * 2,
+            shape: 'square'
+        });
+    }
+
     emitOrbitalImpact(x: number, y: number, radius: number) {
         // Core flash
         this.emit({

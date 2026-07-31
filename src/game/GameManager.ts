@@ -16,6 +16,7 @@ import { sprites } from './core/SpriteFactory';
 import { stageBackdrop } from './core/StageBackdrop';
 import { propField } from './core/PropField';
 import { arenaEvents, type ArenaContext } from './core/ArenaEvents';
+import { status } from './core/StatusEffects';
 import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
@@ -843,6 +844,10 @@ export class GameManager {
         // Collisions - delegated to CollisionSystem
         collisionSystem.processProjectileCollisions(this.projectiles);
 
+        // Damage over time / stuns tick before movement so a lethal tick doesn't
+        // let the enemy take one more step
+        status.update(dt, this.enemies);
+
         // Update enemies (Move) AFTER collisions have potentially applied slows
         this.enemies.forEach(e => e.update(dt, this.player!.pos));
 
@@ -887,6 +892,8 @@ export class GameManager {
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             if (this.enemies[i].isDead) {
                 const enemy = this.enemies[i];
+                // A contagious infection jumps to the neighbours on death
+                status.onEnemyDeath(enemy);
                 // Death burst in the enemy's palette color
                 particles.emitHit(enemy.pos.x, enemy.pos.y, sprites.getEnemyBodyColor(enemy.name));
                 audio.play('enemyDeath');

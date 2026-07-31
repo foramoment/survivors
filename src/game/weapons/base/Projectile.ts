@@ -350,6 +350,13 @@ export class LobbedProjectile extends Projectile {
     height: number = 50;
     onLand: (x: number, y: number) => void = () => { };
 
+    /** Body colour of the canister and its landing marker */
+    color: string = '#3ddc6e';
+    /** Seconds before the throw actually starts (staggered volleys) */
+    delay: number = 0;
+    private spin: number = 0;
+    private progress: number = 0;
+
     constructor(x: number, y: number, target: Vector2, duration: number, emoji: string) {
         super(x, y, { x: 0, y: 0 }, duration, 0, 0, emoji);
         this.startPos = { x, y };
@@ -359,8 +366,15 @@ export class LobbedProjectile extends Projectile {
     }
 
     update(dt: number) {
+        if (this.delay > 0) {
+            this.delay -= dt;
+            return;
+        }
+
         this.duration -= dt;
+        this.spin += dt * 7;
         const t = 1 - (this.duration / this.totalDuration);
+        this.progress = t;
 
         if (t >= 1) {
             this.isDead = true;
@@ -373,6 +387,61 @@ export class LobbedProjectile extends Projectile {
 
         const yOffset = 4 * this.height * t * (1 - t);
         this.pos.y -= yOffset;
+    }
+
+    /**
+     * A thrown object needs three readable parts: where it is, where it will
+     * land, and how long you have. Shadow + marker ring do the last two.
+     */
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        if (this.delay > 0) return;
+
+        const t = this.progress;
+        const groundX = this.startPos.x + (this.targetPos.x - this.startPos.x) * t - camera.x;
+        const groundY = this.startPos.y + (this.targetPos.y - this.startPos.y) * t - camera.y;
+        const lift = 4 * this.height * t * (1 - t);
+
+        ctx.save();
+
+        // Landing marker closing in on the impact point
+        ctx.globalAlpha = 0.35 + 0.35 * t;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(
+            this.targetPos.x - camera.x,
+            this.targetPos.y - camera.y,
+            14 + (1 - t) * 16,
+            0, Math.PI * 2
+        );
+        ctx.stroke();
+
+        // Shadow shrinks as the grenade rises
+        const shadowScale = 1 - lift / (this.height * 2.4);
+        ctx.globalAlpha = 0.35 * shadowScale;
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.ellipse(groundX, groundY, 8 * shadowScale, 4 * shadowScale, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // The canister itself
+        ctx.globalAlpha = 1;
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+        ctx.rotate(this.spin);
+        ctx.imageSmoothingEnabled = false;
+        const sprite = sprites.getGrenadeSprite(this.color);
+        const size = 22;
+        ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+        ctx.restore();
+
+        // Fuse light blinking faster as it gets closer to detonating
+        const blink = Math.sin(t * t * 60) > 0;
+        if (blink) {
+            ctx.save();
+            ctx.fillStyle = '#ffe14d';
+            ctx.fillRect(this.pos.x - camera.x - 2, this.pos.y - camera.y - 10, 4, 4);
+            ctx.restore();
+        }
     }
 }
 

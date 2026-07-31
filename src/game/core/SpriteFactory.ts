@@ -320,6 +320,35 @@ export class SpriteFactory {
         return sprite;
     }
 
+    /**
+     * Lobbed grenade: a chunky canister you can actually see arcing through
+     * the air (it used to render as a generic projectile orb).
+     */
+    getGrenadeSprite(color: string = '#3ddc6e'): HTMLCanvasElement {
+        const key = `grenade:${color}`;
+        let sprite = this.cache.get(key);
+        if (!sprite) {
+            const rows = [
+                '...44...',
+                '..3223..',
+                '.322223.',
+                '32222223',
+                '32222223',
+                '.322223.',
+                '..3223..',
+                '...33...',
+            ];
+            const grid = rows.map(r => [...r].map(ch => (ch === '.' ? 0 : Number(ch))));
+            sprite = this.renderGrid(grid, {
+                2: color,
+                3: this.shade(color, 0.55),
+                4: '#ffe9a0',
+            }, this.shade(color, 0.35), false);
+            this.cache.set(key, sprite);
+        }
+        return sprite;
+    }
+
     /** Darken/lighten a hex or hsl color by multiplying lightness */
     private shade(color: string, factor: number): string {
         if (color.startsWith('#') && (color.length === 7 || color.length === 4)) {

@@ -16,9 +16,9 @@ import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWea
 
 const EXPECTED_STATS: Record<string, any> = {
     void_ray: {
-        damage: 25,
+        damage: 40,
         cooldown: 2.0,
-        area: 100, // EMP explosion radius when evolved
+        area: 110, // collapse radius when evolved
         speed: 0,
         duration: 0.5,
     },
