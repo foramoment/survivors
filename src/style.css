@@ -1,16 +1,43 @@
-:root {
-  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+/* =========================================================================
+   COSMOS SURVIVORS — pixel/CRT UI theme
+   -------------------------------------------------------------------------
+   Design rules:
+     - No rounded corners, no blur-soft shadows. Depth comes from hard
+       offset shadows (box-shadow with 0 blur) like a 16-bit UI.
+     - Borders are drawn with box-shadow steps so they stay crisp at any DPI.
+     - Everything is uppercase monospace with wide letter-spacing.
+     - Motion is snappy: 90-140ms steps, never smooth 300ms fades.
+   ========================================================================= */
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+:root {
+  --px: 3px;
+
+  --c-bg: #05040d;
+  --c-panel: #0d0a1c;
+  --c-panel-hi: #191233;
+  --c-ink: #e8f6ff;
+  --c-dim: #8792b8;
+
+  --c-cyan: #38f2ff;
+  --c-magenta: #ff3fa4;
+  --c-yellow: #ffd23f;
+  --c-green: #6bff8f;
+  --c-red: #ff3b52;
+  --c-violet: #a06bff;
+
+  --font-pixel: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "SFMono-Regular",
+    "DejaVu Sans Mono", "Courier New", monospace;
+
+  font-family: var(--font-pixel);
+  line-height: 1.5;
+  font-weight: 700;
+  color-scheme: dark;
+  color: var(--c-ink);
+  background-color: var(--c-bg);
 
   font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: none;
 }
 
 body {
@@ -20,7 +47,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow: hidden;
-  background: #000;
+  background: var(--c-bg);
 }
 
 #app {
@@ -33,6 +60,23 @@ canvas {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* CRT pass: scanlines + corner vignette over the whole app */
+#app::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  background:
+    repeating-linear-gradient(to bottom,
+      rgba(0, 0, 0, 0.20) 0 1px,
+      rgba(255, 255, 255, 0.015) 1px 2px,
+      rgba(0, 0, 0, 0) 2px 4px),
+    radial-gradient(ellipse at center,
+      rgba(0, 0, 0, 0) 55%,
+      rgba(0, 0, 0, 0.55) 100%);
 }
 
 #ui-layer {
@@ -48,10 +92,13 @@ canvas {
   align-items: center;
 }
 
-/* UI Elements - Enable pointer events for interactive elements */
 .interactive {
   pointer-events: auto;
 }
+
+/* =========================================================================
+   Screens
+   ========================================================================= */
 
 .screen {
   position: absolute;
@@ -59,209 +106,384 @@ canvas {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(5, 4, 13, 0.88);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 10;
-  -webkit-backdrop-filter: blur(5px);
-  backdrop-filter: blur(5px);
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Main menu lets the animated canvas backdrop show through */
+.screen--menu {
+  background: linear-gradient(to bottom,
+      rgba(5, 4, 13, 0) 0%,
+      rgba(5, 4, 13, 0.15) 45%,
+      rgba(5, 4, 13, 0.75) 100%);
+  justify-content: flex-end;
+  padding-bottom: 6vh;
 }
 
 h1 {
-  font-size: 3.2em;
+  font-size: clamp(1.4em, 5vw, 3em);
   line-height: 1.1;
-  background: linear-gradient(to right, #00ffff, #ff00ff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 20px;
-  text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+  letter-spacing: 0.12em;
+  margin: 0 0 18px;
+  color: var(--c-cyan);
+  text-transform: uppercase;
+  text-shadow:
+    var(--px) var(--px) 0 #12002a,
+    0 0 18px rgba(56, 242, 255, 0.55);
 }
+
+h2 {
+  font-size: clamp(1em, 3.2vw, 1.6em);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 0 18px;
+  color: var(--c-ink);
+  text-shadow: var(--px) var(--px) 0 #12002a;
+}
+
+h2.lucky {
+  color: var(--c-yellow);
+  text-shadow: var(--px) var(--px) 0 #3a2000, 0 0 20px rgba(255, 210, 63, 0.7);
+  animation: lucky-pop 0.7s steps(6) infinite alternate;
+}
+
+@keyframes lucky-pop {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.06);
+  }
+}
+
+/* =========================================================================
+   Pixel buttons
+   ========================================================================= */
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+  min-width: min(360px, 80vw);
+}
+
+.menu-buttons--row {
+  flex-direction: row;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pixel-btn {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: clamp(0.85em, 2.4vw, 1.15em);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 14px 28px;
+  cursor: pointer;
+  border: none;
+  border-radius: 0;
+  color: var(--c-cyan);
+  background: var(--c-panel);
+  box-shadow:
+    0 0 0 var(--px) var(--c-cyan),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7);
+  transition: transform 90ms steps(2), background-color 90ms steps(2), color 90ms steps(2);
+}
+
+.pixel-btn:hover,
+.pixel-btn:focus-visible {
+  outline: none;
+  background: var(--c-cyan);
+  color: #05040d;
+  transform: translate(calc(var(--px) * -1), calc(var(--px) * -1));
+  box-shadow:
+    0 0 0 var(--px) var(--c-cyan),
+    calc(var(--px) * 3) calc(var(--px) * 3) 0 rgba(0, 0, 0, 0.75),
+    0 0 26px rgba(56, 242, 255, 0.45);
+}
+
+.pixel-btn:active {
+  transform: translate(var(--px), var(--px));
+  box-shadow: 0 0 0 var(--px) var(--c-cyan);
+}
+
+.pixel-btn--primary {
+  color: var(--c-yellow);
+  box-shadow:
+    0 0 0 var(--px) var(--c-yellow),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7);
+  animation: btn-idle 1.6s steps(2) infinite alternate;
+}
+
+.pixel-btn--primary:hover,
+.pixel-btn--primary:focus-visible {
+  background: var(--c-yellow);
+  color: #1a1200;
+  box-shadow:
+    0 0 0 var(--px) var(--c-yellow),
+    calc(var(--px) * 3) calc(var(--px) * 3) 0 rgba(0, 0, 0, 0.75),
+    0 0 30px rgba(255, 210, 63, 0.5);
+}
+
+@keyframes btn-idle {
+  from {
+    filter: brightness(1);
+  }
+
+  to {
+    filter: brightness(1.35);
+  }
+}
+
+.pixel-btn--ghost {
+  color: var(--c-dim);
+  font-size: 0.8em;
+  box-shadow:
+    0 0 0 var(--px) #3a3f5c,
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.6);
+}
+
+.pixel-btn--ghost:hover {
+  background: #3a3f5c;
+  color: var(--c-ink);
+}
+
+.pixel-btn--danger {
+  color: var(--c-red);
+  box-shadow:
+    0 0 0 var(--px) var(--c-red),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7);
+}
+
+.pixel-btn--danger:hover {
+  background: var(--c-red);
+  color: #1a0006;
+}
+
+/* Legacy button class still used by a few screens */
+.menu-button {
+  font-family: var(--font-pixel);
+}
+
+.menu-footer {
+  margin-top: 22px;
+  font-size: 0.7em;
+  letter-spacing: 0.2em;
+  color: var(--c-dim);
+  text-align: center;
+  opacity: 0.8;
+}
+
+/* =========================================================================
+   Card grids (class select / stage select)
+   ========================================================================= */
 
 .class-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 15px;
-  max-width: 1200px;
-  padding: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  max-width: 1150px;
+  width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  /* 14 classes overflow a laptop screen — scroll the grid, not the page,
+     so the title and Back button always stay visible */
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-cyan) rgba(0, 0, 0, 0.4);
+}
+
+.class-grid::-webkit-scrollbar {
+  width: 10px;
+}
+
+.class-grid::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.class-grid::-webkit-scrollbar-thumb {
+  background: var(--c-cyan);
 }
 
 .class-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 15px;
+  position: relative;
+  background: var(--c-panel);
+  box-shadow:
+    0 0 0 var(--px) #2f3a63,
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.65);
+  padding: 10px 8px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  transition: transform 90ms steps(2), background-color 90ms steps(2);
+  animation: card-rise 260ms steps(5) both;
 }
 
 .class-card:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0, 255, 255, 0.2);
-  border-color: #00ffff;
+  background: var(--c-panel-hi);
+  transform: translate(calc(var(--px) * -1), calc(var(--px) * -1));
+  box-shadow:
+    0 0 0 var(--px) var(--c-cyan),
+    calc(var(--px) * 3) calc(var(--px) * 3) 0 rgba(0, 0, 0, 0.7),
+    0 0 22px rgba(56, 242, 255, 0.35);
+}
+
+@keyframes card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .class-icon {
-  font-size: 3em;
+  font-size: 2.6em;
+  line-height: 1;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6));
 }
 
 .class-name {
-  font-weight: bold;
-  font-size: 1.2em;
-  color: #fff;
+  font-size: 0.95em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-ink);
 }
 
 .class-bonus {
-  font-size: 0.8em;
-  color: #aaa;
+  font-size: 0.72em;
+  letter-spacing: 0.04em;
+  color: var(--c-dim);
 }
 
-/* Developer Mode Checkbox */
+/* =========================================================================
+   Dev mode controls
+   ========================================================================= */
+
 .dev-mode-container {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin-bottom: 30px;
-  padding: 15px 25px;
-  background: rgba(0, 255, 255, 0.05);
-  border: 1px solid rgba(0, 255, 255, 0.2);
-  border-radius: 10px;
-  transition: all 0.3s ease;
+  margin-bottom: 22px;
+  padding: 10px 18px;
+  background: var(--c-panel);
+  box-shadow: 0 0 0 var(--px) #2f3a63;
   cursor: pointer;
 }
 
 .dev-mode-container:hover {
-  background: rgba(0, 255, 255, 0.1);
-  border-color: rgba(0, 255, 255, 0.5);
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+  box-shadow: 0 0 0 var(--px) var(--c-cyan);
 }
 
 .dev-mode-checkbox {
   appearance: none;
-  width: 24px;
-  height: 24px;
-  border: 2px solid #00ffff;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.5);
+  width: 20px;
+  height: 20px;
+  box-shadow: 0 0 0 var(--px) var(--c-cyan);
+  background: #05040d;
   cursor: pointer;
   position: relative;
-  transition: all 0.3s ease;
   flex-shrink: 0;
-}
-
-.dev-mode-checkbox:hover {
-  background: rgba(0, 255, 255, 0.1);
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+  border-radius: 0;
 }
 
 .dev-mode-checkbox:checked {
-  background: linear-gradient(135deg, #00ffff, #00cccc);
-  border-color: #00ffff;
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.3);
+  background: var(--c-cyan);
 }
 
 .dev-mode-checkbox:checked::after {
-  content: '✓';
+  content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #000;
-  font-size: 16px;
-  font-weight: bold;
-  text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+  inset: 4px;
+  background: #05040d;
 }
 
 .dev-mode-label {
-  color: #00ffff;
-  font-size: 1.1em;
-  font-weight: 500;
+  color: var(--c-cyan);
+  font-size: 0.8em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
-  -webkit-user-select: none;
   user-select: none;
-  text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-  transition: all 0.3s ease;
 }
 
-.dev-mode-container:hover .dev-mode-label {
-  text-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
-}
-
-/* Developer Mode Tabs */
 .dev-tabs {
   display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 8px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
   justify-content: center;
 }
 
 .dev-tab {
-  padding: 12px 24px;
-  background: rgba(0, 255, 255, 0.1);
-  border: 2px solid rgba(0, 255, 255, 0.3);
-  border-radius: 8px;
-  color: #00ffff;
-  font-size: 1em;
-  font-weight: 500;
+  font-family: inherit;
+  padding: 9px 18px;
+  background: var(--c-panel);
+  border: none;
+  border-radius: 0;
+  color: var(--c-cyan);
+  font-size: 0.8em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.3s ease;
-  text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+  box-shadow: 0 0 0 var(--px) #2f3a63;
 }
 
 .dev-tab:hover {
-  background: rgba(0, 255, 255, 0.2);
-  border-color: #00ffff;
-  transform: translateY(-2px);
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+  box-shadow: 0 0 0 var(--px) var(--c-cyan);
 }
 
 .dev-tab.active {
-  background: linear-gradient(135deg, #00ffff, #00cccc);
-  color: #000;
-  border-color: #00ffff;
-  font-weight: bold;
-  box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
-  text-shadow: none;
+  background: var(--c-cyan);
+  color: #05040d;
+  box-shadow: 0 0 0 var(--px) var(--c-cyan);
 }
 
-/* Контейнер со скроллом для режима разработчика */
 .dev-upgrade-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
   max-height: calc(100vh - 220px);
+  max-width: 1100px;
   overflow-y: auto;
-  padding: 10px;
+  padding: 8px;
   scrollbar-width: thin;
-  scrollbar-color: #00ffff rgba(0, 0, 0, 0.3);
+  scrollbar-color: var(--c-cyan) rgba(0, 0, 0, 0.4);
 }
 
 .dev-upgrade-grid::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
 }
 
 .dev-upgrade-grid::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .dev-upgrade-grid::-webkit-scrollbar-thumb {
-  background: #00ffff;
-  border-radius: 4px;
+  background: var(--c-cyan);
 }
 
-.dev-upgrade-grid::-webkit-scrollbar-thumb:hover {
-  background: #00dddd;
-}
+/* =========================================================================
+   HUD
+   ========================================================================= */
 
 .hud {
   position: absolute;
@@ -270,33 +492,37 @@ h1 {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  padding: 20px;
+  padding: 16px;
   box-sizing: border-box;
   display: none;
-  /* Hidden by default */
 }
 
 .hud-top {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   width: 100%;
+  gap: 10px;
 }
 
 .bar-container {
-  width: 300px;
-  height: 20px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid #444;
-  border-radius: 10px;
+  width: min(300px, 40vw);
+  height: 18px;
+  background: #12081a;
+  box-shadow: 0 0 0 var(--px) #000, 0 0 0 calc(var(--px) * 2) #3a3f5c;
   overflow: hidden;
   position: relative;
 }
 
+/* Segmented fill — reads as discrete pixel chunks, not a smooth gradient */
 .hp-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ff0000, #ff4444);
   width: 100%;
-  transition: width 0.2s;
+  background:
+    repeating-linear-gradient(90deg,
+      var(--c-red) 0 8px,
+      #c01030 8px 10px);
+  transition: width 120ms steps(4);
 }
 
 .xp-bar-container {
@@ -304,118 +530,349 @@ h1 {
   top: 0;
   left: 0;
   width: 100%;
-  height: 5px;
-  background: #000;
+  height: 6px;
+  background: #0a0616;
 }
 
 .xp-bar-fill {
   height: 100%;
-  background: #00ffff;
+  background:
+    repeating-linear-gradient(90deg,
+      var(--c-cyan) 0 10px,
+      #1aa8c8 10px 12px);
   width: 0%;
-  transition: width 0.2s;
+  box-shadow: 0 0 10px rgba(56, 242, 255, 0.6);
+  transition: width 120ms steps(4);
 }
 
 .stats {
-  color: #fff;
-  font-family: monospace;
-  text-shadow: 1px 1px 0 #000;
+  color: var(--c-ink);
+  font-family: var(--font-pixel);
+  font-size: 0.9em;
+  letter-spacing: 0.1em;
+  text-shadow: 2px 2px 0 #000;
 }
+
+/* =========================================================================
+   Level-up: the panel smashes through the screen
+   ========================================================================= */
 
 .level-up-screen {
-  /* Same as screen but specifically for level up */
+  background: rgba(5, 4, 13, 0.82);
 }
 
-.upgrade-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+.crash-in {
+  animation: crash-zoom 260ms cubic-bezier(0.2, 1.4, 0.35, 1) both;
 }
 
-.upgrade-grid-6 {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-  gap: 20px;
-  max-width: 900px;
-}
+@keyframes crash-zoom {
+  0% {
+    opacity: 0;
+    transform: scale(1.55) rotate(1.4deg);
+    filter: brightness(2.4);
+  }
 
-.upgrade-card {
-  background: rgba(0, 0, 0, 0.8);
-  border: 2px solid #444;
-  padding: 20px;
-  border-radius: 10px;
-  cursor: pointer;
-  width: 200px;
-  text-align: center;
-  transition: all 0.3s ease;
-}
+  45% {
+    opacity: 1;
+    transform: scale(0.97) rotate(-0.6deg);
+    filter: brightness(1.5);
+  }
 
-.upgrade-card:hover {
-  border-color: #ffd700;
-  background: rgba(50, 50, 0, 0.8);
-  transform: scale(1.05);
-}
+  70% {
+    transform: scale(1.02) rotate(0.3deg);
+  }
 
-.upgrade-card.evolution-ready {
-  background: radial-gradient(circle, rgba(138, 43, 226, 0.3) 0%, rgba(75, 0, 130, 0.2) 100%);
-  border: 3px solid #ff00ff;
-  box-shadow: 0 0 20px rgba(255, 0, 255, 0.5), 0 0 40px rgba(138, 43, 226, 0.3);
-  animation: pulse 2s infinite;
-}
-
-.upgrade-card.evolution-ready:hover {
-  border-color: #00ffff;
-  box-shadow: 0 0 30px rgba(0, 255, 255, 0.8), 0 0 60px rgba(138, 43, 226, 0.5);
-  transform: scale(1.1);
-}
-
-@keyframes pulse {
-
-  0%,
   100% {
-    box-shadow: 0 0 20px rgba(255, 0, 255, 0.5), 0 0 40px rgba(138, 43, 226, 0.3);
-  }
-
-  50% {
-    box-shadow: 0 0 30px rgba(255, 0, 255, 0.8), 0 0 60px rgba(138, 43, 226, 0.5);
+    opacity: 1;
+    transform: scale(1) rotate(0);
+    filter: brightness(1);
   }
 }
 
-.level-indicator {
-  font-size: 0.9em;
-  color: #00ffff;
-  font-weight: bold;
-  margin: 5px 0;
-}
-
-.evolution-ready .level-indicator {
-  color: #ff00ff;
-  font-size: 1.2em;
-  text-shadow: 0 0 10px rgba(255, 0, 255, 0.8);
-}
-
-.damage-text {
+/* Fractured-glass overlay generated per level-up (see GameManager) */
+.crack-overlay {
   position: absolute;
-  color: white;
-  font-weight: bold;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  animation: floatUp 0.5s ease-out forwards;
-  text-shadow: 1px 1px 0 #000;
+  z-index: 1;
+  overflow: visible;
+  transform-origin: center;
+  /* Snap outward on impact, then fade like cooling glass */
+  animation: crack-burst 240ms cubic-bezier(0.1, 1.5, 0.4, 1) both,
+    crack-fade 1.5s ease-out 0.35s forwards;
 }
 
-@keyframes floatUp {
+.crack-line {
+  fill: none;
+  stroke: rgba(190, 248, 255, 0.9);
+  stroke-width: 2;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 4px rgba(56, 242, 255, 0.9));
+}
+
+.crack-ring {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+@keyframes crack-burst {
   from {
-    transform: translateY(0);
+    transform: scale(0.55);
+    opacity: 0;
+  }
+
+  40% {
     opacity: 1;
   }
 
   to {
-    transform: translateY(-20px);
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes crack-fade {
+  to {
     opacity: 0;
   }
 }
 
-/* Joystick Styles */
+.upgrade-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  max-width: 760px;
+  position: relative;
+  z-index: 2;
+}
+
+.upgrade-grid-6 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 12px;
+  max-width: 900px;
+  position: relative;
+  z-index: 2;
+}
+
+.upgrade-card {
+  background: var(--c-panel);
+  box-shadow:
+    0 0 0 var(--px) #3a3f5c,
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7);
+  padding: 16px 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 90ms steps(2), background-color 90ms steps(2);
+  /* Slam in from "through" the screen, staggered per card */
+  animation: card-slam 320ms cubic-bezier(0.15, 1.5, 0.4, 1) both;
+}
+
+@keyframes card-slam {
+  0% {
+    opacity: 0;
+    transform: translateY(-90px) scale(1.8) rotate(-6deg);
+    filter: brightness(3);
+  }
+
+  55% {
+    opacity: 1;
+    transform: translateY(6px) scale(0.95) rotate(1.5deg);
+    filter: brightness(1.4);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0);
+    filter: brightness(1);
+  }
+}
+
+.upgrade-card h3 {
+  margin: 8px 0 4px;
+  font-size: 0.95em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-ink);
+}
+
+.upgrade-card p {
+  margin: 6px 0 0;
+  font-size: 0.72em;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--c-dim);
+}
+
+.upgrade-card:hover {
+  background: var(--c-panel-hi);
+  transform: translate(calc(var(--px) * -1), calc(var(--px) * -1));
+  box-shadow:
+    0 0 0 var(--px) var(--c-yellow),
+    calc(var(--px) * 3) calc(var(--px) * 3) 0 rgba(0, 0, 0, 0.75),
+    0 0 24px rgba(255, 210, 63, 0.35);
+}
+
+.upgrade-card.evolution-ready {
+  background: #1b0a2e;
+  box-shadow:
+    0 0 0 var(--px) var(--c-magenta),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7),
+    0 0 26px rgba(255, 63, 164, 0.5);
+  animation: card-slam 320ms cubic-bezier(0.15, 1.5, 0.4, 1) both,
+    evo-pulse 1.2s steps(3) infinite alternate 0.4s;
+}
+
+@keyframes evo-pulse {
+  from {
+    box-shadow:
+      0 0 0 var(--px) var(--c-magenta),
+      calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7),
+      0 0 18px rgba(255, 63, 164, 0.4);
+  }
+
+  to {
+    box-shadow:
+      0 0 0 var(--px) var(--c-violet),
+      calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7),
+      0 0 40px rgba(160, 107, 255, 0.75);
+  }
+}
+
+.upgrade-card.evolution-ready:hover {
+  transform: translate(calc(var(--px) * -1), calc(var(--px) * -1)) scale(1.04);
+}
+
+.level-indicator {
+  font-size: 0.72em;
+  color: var(--c-cyan);
+  letter-spacing: 0.08em;
+  margin: 4px 0;
+}
+
+.evolution-ready .level-indicator {
+  color: var(--c-magenta);
+  font-size: 0.85em;
+  text-shadow: 0 0 10px rgba(255, 63, 164, 0.9);
+}
+
+/* =========================================================================
+   Run result (game over / victory)
+   ========================================================================= */
+
+.result-screen {
+  gap: 6px;
+  animation: crash-zoom 300ms cubic-bezier(0.2, 1.3, 0.35, 1) both;
+}
+
+.result-screen--defeat {
+  background: rgba(30, 2, 10, 0.9);
+}
+
+.result-screen--defeat h1 {
+  color: var(--c-red);
+  text-shadow: var(--px) var(--px) 0 #200, 0 0 22px rgba(255, 59, 82, 0.6);
+}
+
+.result-screen--victory {
+  background: rgba(8, 6, 26, 0.9);
+}
+
+.result-screen--victory h1 {
+  color: var(--c-yellow);
+  text-shadow: var(--px) var(--px) 0 #201400, 0 0 26px rgba(255, 210, 63, 0.7);
+}
+
+.result-subtitle {
+  margin: 0 0 22px;
+  font-size: 0.85em;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-dim);
+}
+
+.result-stats {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.result-stat {
+  min-width: 120px;
+  padding: 12px 16px;
+  background: var(--c-panel);
+  box-shadow: 0 0 0 var(--px) #2f3a63;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.result-stat span {
+  font-size: 0.65em;
+  letter-spacing: 0.14em;
+  color: var(--c-dim);
+}
+
+.result-stat strong {
+  font-size: 1.5em;
+  color: var(--c-ink);
+  text-shadow: 2px 2px 0 #000;
+}
+
+/* =========================================================================
+   Options sliders
+   ========================================================================= */
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--c-cyan);
+  font-size: 0.85em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.option-row input[type="range"] {
+  flex: 1;
+  appearance: none;
+  height: 14px;
+  background: #12081a;
+  box-shadow: 0 0 0 var(--px) #3a3f5c;
+  cursor: pointer;
+}
+
+.option-row input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 22px;
+  background: var(--c-cyan);
+  box-shadow: 0 0 0 2px #05040d;
+  cursor: pointer;
+}
+
+.option-row input[type="range"]::-moz-range-thumb {
+  border: none;
+  border-radius: 0;
+  width: 16px;
+  height: 22px;
+  background: var(--c-cyan);
+  cursor: pointer;
+}
+
+/* =========================================================================
+   Joystick (touch)
+   ========================================================================= */
+
 #joystick-zone {
   position: absolute;
   top: 0;
@@ -423,16 +880,14 @@ h1 {
   width: 50%;
   height: 100%;
   z-index: 5;
-  /* Above canvas but below UI */
 }
 
 .joystick-base {
   position: absolute;
   width: 100px;
   height: 100px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
+  background: rgba(56, 242, 255, 0.06);
+  box-shadow: 0 0 0 var(--px) rgba(56, 242, 255, 0.4);
   display: none;
   pointer-events: none;
   transform: translate(-50%, -50%);
@@ -443,12 +898,11 @@ h1 {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 40px;
-  height: 40px;
-  background: rgba(0, 255, 255, 0.5);
-  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  background: rgba(56, 242, 255, 0.6);
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+  box-shadow: 0 0 12px rgba(56, 242, 255, 0.7);
 }
 
 /* Disable text selection globally for better touch experience */
@@ -458,183 +912,170 @@ h1 {
   user-select: none;
 }
 
-/* Mobile Responsive Styles */
-@media screen and (max-height: 700px),
-screen and (max-width: 900px) {
+/* Respect users who don't want motion */
+@media (prefers-reduced-motion: reduce) {
 
-  /* Smaller title */
-  h1 {
-    font-size: 2em;
-    margin-bottom: 10px;
+  .crash-in,
+  .upgrade-card,
+  .upgrade-card.evolution-ready,
+  .class-card,
+  .result-screen,
+  .pixel-btn--primary,
+  h2.lucky {
+    animation: none !important;
   }
 
-  /* Class Selection Grid */
+  /* Without its fade-out animation the crack would linger — drop it entirely */
+  .crack-overlay {
+    display: none;
+  }
+}
+
+/* =========================================================================
+   Responsive
+   ========================================================================= */
+
+@media screen and (max-height: 700px),
+screen and (max-width: 900px) {
+  :root {
+    --px: 2px;
+  }
+
   .class-grid {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 10px;
-    padding: 10px;
-    max-width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+    gap: 8px;
+    padding: 8px;
   }
 
   .class-card {
-    padding: 8px;
+    padding: 8px 5px;
     gap: 5px;
   }
 
   .class-icon {
-    font-size: 2em;
+    font-size: 1.9em;
   }
 
   .class-name {
-    font-size: 0.9em;
+    font-size: 0.78em;
   }
 
   .class-bonus {
-    font-size: 0.7em;
+    font-size: 0.62em;
   }
 
-  /* Developer Mode Checkbox */
   .dev-mode-container {
-    padding: 8px 15px;
-    margin-bottom: 15px;
+    padding: 7px 12px;
+    margin-bottom: 12px;
   }
 
   .dev-mode-label {
-    font-size: 0.9em;
+    font-size: 0.68em;
   }
 
-  /* Level Up Screen */
   .upgrade-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 8px;
     max-width: 100%;
   }
 
   .upgrade-grid-6 {
     grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 8px;
+    gap: 7px;
     max-width: 100%;
   }
 
   .upgrade-card {
-    width: auto;
-    padding: 10px;
-    min-height: auto;
+    padding: 9px 6px;
   }
 
   .upgrade-card h3 {
-    font-size: 0.9em;
-    margin: 5px 0;
+    font-size: 0.75em;
   }
 
   .upgrade-card p {
-    font-size: 0.75em;
-    margin: 5px 0;
+    font-size: 0.63em;
   }
 
   .upgrade-card>div[style*="font-size: 3em"] {
-    font-size: 2em !important;
+    font-size: 1.8em !important;
   }
 
   .level-indicator {
-    font-size: 0.75em;
+    font-size: 0.63em;
   }
 
-  /* HUD adjustments */
   .hud {
     padding: 10px;
   }
 
   .bar-container {
-    width: 200px;
-    height: 15px;
+    height: 14px;
   }
 
   .stats {
-    font-size: 0.8em;
+    font-size: 0.72em;
   }
 
-  .screen h2 {
-    font-size: 1.5em;
+  .result-stat {
+    min-width: 90px;
+    padding: 9px 12px;
   }
 
-  /* Dev mode tabs responsive */
   .dev-tabs {
-    gap: 6px;
+    gap: 5px;
     margin-bottom: 10px;
   }
 
   .dev-tab {
-    padding: 8px 16px;
-    font-size: 0.85em;
-  }
-
-  .dev-upgrade-grid {
-    gap: 10px;
-    max-height: calc(100vh - 180px);
-    padding: 5px;
-  }
-}
-
-/* Extra small screens (portrait phones) */
-@media screen and (max-height: 500px) {
-  h1 {
-    font-size: 1.5em;
-    margin-bottom: 5px;
-  }
-
-  .class-grid {
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .class-card {
-    padding: 5px;
-  }
-
-  .class-icon {
-    font-size: 1.5em;
-  }
-
-  .class-name {
-    font-size: 0.8em;
-  }
-
-  .class-bonus {
-    font-size: 0.65em;
-  }
-
-  .upgrade-card {
-    padding: 8px;
-  }
-
-  .upgrade-card h3 {
-    font-size: 0.8em;
-  }
-
-  .upgrade-card p {
+    padding: 7px 12px;
     font-size: 0.7em;
   }
 
-  .screen h2 {
-    font-size: 1.2em;
-  }
-
-  /* Dev mode tabs for extra small screens */
-  .dev-tabs {
-    gap: 4px;
-    margin-bottom: 8px;
-  }
-
-  .dev-tab {
-    padding: 6px 12px;
-    font-size: 0.75em;
-  }
-
   .dev-upgrade-grid {
     gap: 8px;
-    max-height: calc(100vh - 150px);
+    max-height: calc(100vh - 170px);
+    padding: 4px;
+  }
+}
+
+@media screen and (max-height: 500px) {
+  .screen--menu {
+    padding-bottom: 3vh;
+  }
+
+  .menu-buttons {
+    gap: 8px;
+  }
+
+  .pixel-btn {
+    padding: 9px 18px;
+  }
+
+  .menu-footer {
+    margin-top: 12px;
+    font-size: 0.6em;
+  }
+
+  .class-grid {
+    grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .class-icon {
+    font-size: 1.4em;
+  }
+
+  .class-name {
+    font-size: 0.7em;
+  }
+
+  .class-bonus {
+    font-size: 0.58em;
+  }
+
+  .upgrade-card {
+    padding: 7px 5px;
   }
 }

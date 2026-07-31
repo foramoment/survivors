@@ -6,6 +6,7 @@
 import { BaseScreen } from '../BaseScreen';
 import { STAGES } from '../../data/StageData';
 import { screenManager } from '../ScreenManager';
+import { audio } from '../../core/AudioSystem';
 
 export interface StageSelectionParams {
     classIndex: number;
@@ -37,7 +38,7 @@ export class StageSelectionScreen extends BaseScreen {
         screen.appendChild(title);
 
         const grid = document.createElement('div');
-        grid.className = 'class-grid';
+        grid.className = 'class-grid interactive';
 
         STAGES.forEach((stage, index) => {
             const minutes = Math.round(stage.duration / 60);
@@ -50,11 +51,21 @@ export class StageSelectionScreen extends BaseScreen {
                 <div class="class-bonus">☠️ Threat ×${stage.hpScale.toFixed(1)}</div>
                 <div class="class-bonus">${stage.description}</div>
             `;
-            card.onclick = () => this.selectStage(index);
+            card.style.animationDelay = `${(index * 0.06).toFixed(3)}s`;
+            card.addEventListener('pointerenter', () => audio.play('uiHover'));
+            card.onclick = () => {
+                audio.play('uiSelect');
+                this.selectStage(index);
+            };
             grid.appendChild(card);
         });
 
         screen.appendChild(grid);
+
+        const back = this.createPixelButton('← BACK', () => screenManager.goto('class_selection'), 'ghost');
+        back.style.marginTop = '22px';
+        screen.appendChild(back);
+
         this.uiLayer.appendChild(screen);
     }
 

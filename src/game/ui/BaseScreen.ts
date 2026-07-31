@@ -12,6 +12,8 @@
  *   - Use this.uiLayer for DOM manipulation
  */
 
+import { audio } from '../core/AudioSystem';
+
 export interface ScreenParams {
     [key: string]: any;
 }
@@ -60,5 +62,28 @@ export abstract class BaseScreen {
      */
     protected clearUI(): void {
         this.uiLayer.innerHTML = '';
+    }
+
+    /**
+     * Chunky pixel-art button shared by every menu screen.
+     * Styling lives in style.css (.pixel-btn); this only wires up behaviour
+     * and the UI blips so all screens sound the same.
+     */
+    protected createPixelButton(
+        text: string,
+        onClick: () => void,
+        variant: 'primary' | 'default' | 'ghost' | 'danger' = 'default'
+    ): HTMLButtonElement {
+        const btn = document.createElement('button');
+        btn.className = `pixel-btn pixel-btn--${variant} interactive`;
+        btn.textContent = text;
+
+        btn.addEventListener('pointerenter', () => audio.play('uiHover'));
+        btn.addEventListener('click', () => {
+            audio.play('uiSelect');
+            onClick();
+        });
+
+        return btn;
     }
 }

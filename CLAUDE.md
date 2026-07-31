@@ -17,7 +17,9 @@ src/game/
 │   ├── SpatialHash.ts    # 🗺️ Оптимизация поиска сущностей O(1)
 │   ├── DifficultyDirector.ts # 🎚️ Адаптивная сложность, спавн, волны, мини-боссы
 │   ├── SpriteFactory.ts  # 🎨 Процедурные пиксельные спрайты (враги/игрок/фон) — БЕЗ ассетов
-│   ├── AudioSystem.ts    # 🔊 Процедурный звук Web Audio (SFX + генеративная музыка)
+│   ├── PixelFont.ts      # 🔤 Битмап-шрифт 5×7 в коде (титры, damage numbers)
+│   ├── AudioSystem.ts    # 🔊 Процедурный чиптюн Web Audio (SFX + генеративная музыка)
+│   ├── JuiceSystem.ts    # 💥 Game feel: тряска, hit-stop, вспышки, zoom, ударные волны
 │   ├── StateMachine.ts   # Состояния игры: PLAYING, LEVEL_UP, PAUSED
 │   ├── EventBus.ts       # Pub/sub система событий
 │   ├── PlayerStats.ts    # Типы и дефолты статов
@@ -38,7 +40,8 @@ src/game/
 │   └── implementations/  # 14 оружий (каждое в своём файле)
 └── ui/
     ├── ScreenManager.ts  # Менеджер экранов
-    ├── BaseScreen.ts     # Базовый класс экрана
+    ├── BaseScreen.ts     # Базовый класс экрана + createPixelButton()
+    ├── MenuBackdrop.ts   # 🌌 Анимированный пиксельный космос под всеми меню
     └── screens/          # MainMenu, ClassSelection, Game и т.д.
 ```
 
@@ -76,6 +79,38 @@ levelSpatialHash.clear();
 levelSpatialHash.insertAll(enemies);
 const nearby = levelSpatialHash.getWithinRadius(pos, radius);
 ```
+
+### JuiceSystem (Singleton)
+**Файл:** `core/JuiceSystem.ts`
+
+Весь «game feel». Косметика, никакой игровой логики.
+
+```typescript
+juice.addTrauma(0.3);                 // тряска: offset = trauma², спад линейный
+juice.hitStop(0.06);                  // заморозка мира на несколько кадров
+juice.slowMo(0.3, 0.5);               // замедление времени
+juice.flash('#ff0022', 0.3, 0.28);    // полноэкранная вспышка
+juice.zoomPunch(0.7);                 // пружинный «удар» камеры
+juice.shockwave(x, y, 300, '#fff');   // расширяющееся кольцо в мире
+juice.pulseVignette(0.8);             // виньетка (опасность/босс)
+```
+
+**Правила:**
+1. `Engine` умножает `dt` на `juice.timeScale`; сам `juice.update()` всегда получает **реальное** время.
+2. Тряска через trauma — все источники делят один бюджет, стакинг невозможен (кап 1.0).
+3. `juice.enabled = false` (Options → Screen FX) полностью отключает эффекты.
+4. Старый `gameManager.shake(magnitude, duration)` сохранён и проксирует в trauma.
+
+### AudioSystem (Singleton)
+**Файл:** `core/AudioSystem.ts`
+
+Чиптюн по схеме NES: PULSE1 (лид, duty + вибрато), PULSE2 (арпеджио),
+TRIANGLE (бас), NOISE (ударные). Тема стейджа сидирует тональность, темп,
+последовательность аккордов и 8-нотный мотив. Секции (INTRO → VERSE → CHORUS →
+BRIDGE → FINALE) выбираются по `setMusicIntensity(0..1)`.
+
+Шина музыки: waveshaper drive → delay с обратной связью → lowpass, который
+открывается с интенсивностью → компрессор. Никаких ассетов и библиотек.
 
 ### ParticleSystem (Singleton)
 **Файл:** `core/ParticleSystem.ts`
@@ -358,6 +393,10 @@ npm test           # Запуск тестов
 npx cap sync       # Синхронизация с Android
 ```
 
+**CI:** пуш в `main` → `deploy-pages.yml` (тесты + сборка + GitHub Pages).
+Сборка Android APK (`android-build.yml`) запускается **только вручную** через
+вкладку Actions — чтобы каждый коммит не ждал Gradle.
+
 ---
 
 ## 📐 Coding Conventions
@@ -385,6 +424,18 @@ const dist = Math.sqrt(dx * dx + dy * dy);
 | Расстояние между двумя `Vector2` | `distance(a, b)`       |
 | Длина вектора (speed, magnitude) | `Math.hypot(v.x, v.y)` |
 | Нормализация вектора             | `normalize(v)`         |
+
+### UI: пиксельная тема
+
+`src/style.css` — единая дизайн-система (токены в `:root`):
+
+- Никаких скруглений и мягких теней. Рамки — `box-shadow: 0 0 0 var(--px) color`,
+  глубина — жёсткие смещённые тени с `blur: 0`.
+- Анимации короткие и «ступенчатые» (`steps()`, 90–300ms), не плавные фейды.
+- Кнопки — только `this.createPixelButton()` из `BaseScreen` (он же вешает
+  звуки `uiHover`/`uiSelect`).
+- Текст на canvas — `drawPixelText()` из `core/PixelFont`, не `ctx.fillText`.
+- Уважай `prefers-reduced-motion` (блок в конце style.css).
 
 ### Избегай дублирования
 

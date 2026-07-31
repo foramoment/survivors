@@ -17,6 +17,8 @@ import { OptionsScreen } from '../ui/screens/OptionsScreen';
 import { GameOverScreen } from '../ui/screens/GameOverScreen';
 import { ParticleDebugScreen } from '../ui/screens/ParticleDebugScreen';
 import { StageSelectionScreen } from '../ui/screens/StageSelectionScreen';
+import { menuBackdrop } from '../ui/MenuBackdrop';
+import { juice } from './JuiceSystem';
 
 export class Engine {
     canvas: HTMLCanvasElement;
@@ -80,17 +82,22 @@ export class Engine {
         // Cap dt to prevent huge jumps if tab is inactive
         const safeDt = Math.min(dt, 0.1);
 
+        // Juice runs on real time so hit-stop and flashes resolve while the
+        // world is frozen; gameplay gets the scaled delta.
+        juice.update(safeDt);
+        const gameDt = safeDt * juice.timeScale;
+
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         // Draw background
-        this.drawBackground();
+        this.drawBackground(safeDt);
 
         // Update and draw current screen
         screenManager.update(safeDt);
 
         // GameManager handles its own update/draw when game is active
         if (screenManager.currentScreenId === 'game') {
-            this.gameManager.update(safeDt);
+            this.gameManager.update(gameDt);
             this.gameManager.draw(this.ctx);
 
             // Update HUD via GameScreen
@@ -110,12 +117,23 @@ export class Engine {
 
         screenManager.draw(this.ctx);
 
+        // Flashes / vignette sit above everything drawn on the canvas
+        juice.drawOverlay(this.ctx, this.canvas.width, this.canvas.height);
+
         requestAnimationFrame((t) => this.loop(t));
     }
 
-    drawBackground() {
-        this.ctx.fillStyle = '#111';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    drawBackground(dt: number) {
+        if (screenManager.currentScreenId === 'game') {
+            // The stage tile pattern covers the screen; this is just a base coat
+            this.ctx.fillStyle = '#111';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            return;
+        }
+
+        // Menus get the animated pixel-space scene
+        menuBackdrop.update(dt, this.canvas.width, this.canvas.height);
+        menuBackdrop.draw(this.ctx, this.canvas.width, this.canvas.height);
     }
 
     /**

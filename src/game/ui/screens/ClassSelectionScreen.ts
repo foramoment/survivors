@@ -1,6 +1,7 @@
 import { BaseScreen } from '../BaseScreen';
 import { CLASSES, WEAPONS } from '../../data/GameData';
 import { screenManager } from '../ScreenManager';
+import { audio } from '../../core/AudioSystem';
 
 export interface ClassSelectionParams {
     devMode?: boolean;
@@ -37,6 +38,10 @@ export class ClassSelectionScreen extends BaseScreen {
         const grid = this.createClassGrid();
         screen.appendChild(grid);
 
+        const back = this.createPixelButton('← BACK', () => screenManager.goto('main_menu'), 'ghost');
+        back.style.marginTop = '22px';
+        screen.appendChild(back);
+
         this.uiLayer.appendChild(screen);
     }
 
@@ -71,7 +76,7 @@ export class ClassSelectionScreen extends BaseScreen {
 
     private createClassGrid(): HTMLElement {
         const grid = document.createElement('div');
-        grid.className = 'class-grid';
+        grid.className = 'class-grid interactive';
 
         CLASSES.forEach((cls, index) => {
             const weaponData = WEAPONS.find(w => w.id === cls.weaponId);
@@ -87,7 +92,13 @@ export class ClassSelectionScreen extends BaseScreen {
                 <div class="class-bonus">${weaponEmoji} ${weaponName}</div>
                 <div class="class-bonus">${cls.bonus}</div>
             `;
-            card.onclick = () => this.selectClass(index);
+            // Staggered entrance so the grid cascades in
+            card.style.animationDelay = `${(index * 0.045).toFixed(3)}s`;
+            card.addEventListener('pointerenter', () => audio.play('uiHover'));
+            card.onclick = () => {
+                audio.play('uiSelect');
+                this.selectClass(index);
+            };
             grid.appendChild(card);
         });
 

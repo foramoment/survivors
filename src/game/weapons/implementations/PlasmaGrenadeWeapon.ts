@@ -7,6 +7,7 @@ import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
 import { LobbedProjectile, PlasmaExplosionZone } from '../base';
 import { particles } from '../../core/ParticleSystem';
+import { juice } from '../../core/JuiceSystem';
 
 export class PlasmaGrenadeWeapon extends Weapon {
     name = "Plasma Grenade";
@@ -72,6 +73,8 @@ export class PlasmaGrenadeWeapon extends Weapon {
 
         // Emit explosion particles
         particles.emitExplosion(x, y, explosionRadius);
+        juice.addTrauma(0.16);
+        juice.shockwave(x, y, explosionRadius * 1.6, '#66ff88', 0.35, 4);
 
         this.onSpawn(zone);
 

@@ -15,7 +15,10 @@ import { difficultyDirector } from './core/DifficultyDirector';
 import { sprites } from './core/SpriteFactory';
 import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
+import { juice } from './core/JuiceSystem';
+import { drawPixelText } from './core/PixelFont';
 import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, POWERUP_STACK_CAP } from './core/UpgradePool';
+import { screenManager } from './ui/ScreenManager';
 
 export class GameManager {
     canvas: HTMLCanvasElement;
@@ -33,14 +36,12 @@ export class GameManager {
     enemies: Enemy[] = [];
     projectiles: (Projectile | Zone)[] = [];
     xpCrystals: XPCrystal[] = [];
-    damageNumbers: { x: number, y: number, text: string, life: number, isCrit?: boolean }[] = [];
+    damageNumbers: { x: number, y: number, vx: number, vy: number, text: string, life: number, maxLife: number, isCrit?: boolean }[] = [];
 
     camera: Vector2 = { x: 0, y: 0 };
 
-    // Screen shake state
-    private shakeTime: number = 0;
-    private shakeDuration: number = 0;
-    private shakeMagnitude: number = 0;
+    /** Real time of the last crit hit-stop, to rate-limit the effect */
+    private lastCritStop: number = 0;
 
     backgroundTheme: string = 'Asteroid Fields';
     private backgroundPattern: CanvasPattern | null = null;
@@ -177,7 +178,8 @@ export class GameManager {
         difficultyDirector.reset();
         this.camera.x = this.player.pos.x - this.canvas.width / 2;
         this.camera.y = this.player.pos.y - this.canvas.height / 2;
-        this.shakeTime = 0;
+        juice.reset();
+        particles.clear();
         audio.startMusic(this.currentStage.theme);
         this.state = 'PLAYING';
 
@@ -239,6 +241,14 @@ export class GameManager {
 
         this.weaponLevels.set(weaponId, 6);
         audio.play('evolve');
+
+        // Evolutions are rare — sell them
+        juice.flash('#ffdd44', 0.45, 0.6);
+        juice.zoomPunch(0.55);
+        if (this.player) {
+            juice.shockwave(this.player.pos.x, this.player.pos.y, 320, '#ffdd44', 0.7, 8);
+            particles.emitExplosion(this.player.pos.x, this.player.pos.y, 80, ['#ffdd44', '#ffffff', '#ff9900']);
+        }
     }
 
     createHUD() {
@@ -288,16 +298,80 @@ export class GameManager {
         }
     }
 
+    /**
+     * Cracked-glass overlay for the level-up slam.
+     * Cracks are generated per level-up (random impact point + branching
+     * fractures), so the break never looks the same twice.
+     */
+    private createImpactOverlay(): HTMLElement {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('class', 'crack-overlay');
+        svg.setAttribute('viewBox', '0 0 100 100');
+        svg.setAttribute('preserveAspectRatio', 'none');
+
+        const ox = 30 + Math.random() * 40;
+        const oy = 30 + Math.random() * 40;
+        const spokes = 7 + Math.floor(Math.random() * 5);
+
+        for (let i = 0; i < spokes; i++) {
+            const baseAngle = (i / spokes) * Math.PI * 2 + Math.random() * 0.4;
+            let x = ox;
+            let y = oy;
+            let points = `${x},${y}`;
+            const segments = 3 + Math.floor(Math.random() * 3);
+            for (let s = 0; s < segments; s++) {
+                const len = 8 + Math.random() * 22;
+                const angle = baseAngle + (Math.random() - 0.5) * 0.7;
+                x += Math.cos(angle) * len;
+                y += Math.sin(angle) * len;
+                points += ` ${x.toFixed(1)},${y.toFixed(1)}`;
+            }
+            const line = document.createElementNS(svgNS, 'polyline');
+            line.setAttribute('points', points);
+            line.setAttribute('class', 'crack-line');
+            line.style.animationDelay = `${(Math.random() * 0.08).toFixed(3)}s`;
+            svg.appendChild(line);
+        }
+
+        // A couple of concentric fracture rings around the impact
+        for (let r = 1; r <= 2; r++) {
+            const ring = document.createElementNS(svgNS, 'circle');
+            ring.setAttribute('cx', ox.toFixed(1));
+            ring.setAttribute('cy', oy.toFixed(1));
+            ring.setAttribute('r', String(r * 7 + Math.random() * 4));
+            ring.setAttribute('class', 'crack-ring');
+            svg.appendChild(ring);
+        }
+
+        return svg as unknown as HTMLElement;
+    }
+
     showLevelUp() {
         this.state = 'LEVEL_UP';
         audio.play('levelup');
+        audio.play('crash');
+
+        // The panel smashes through the screen: flash, freeze, zoom, shake
+        juice.flash('#ffffff', 0.6, 0.35);
+        juice.addTrauma(0.6);
+        juice.zoomPunch(0.8);
+        juice.hitStop(0.08);
+        if (this.player) {
+            juice.shockwave(this.player.pos.x, this.player.pos.y, 260, '#66f7ff', 0.5, 6);
+        }
 
         const screen = document.createElement('div');
-        screen.className = 'screen level-up-screen';
+        screen.className = 'screen level-up-screen crash-in';
+        screen.appendChild(this.createImpactOverlay());
+
+        // Heading is appended (not innerHTML) so the crack overlay survives
+        const heading = document.createElement('h2');
+        screen.appendChild(heading);
 
         // Developer Mode with Tabs
         if (this.devMode) {
-            screen.innerHTML = `<h2>🛠️ DEVELOPER MODE 🛠️</h2>`;
+            heading.textContent = '🛠️ DEVELOPER MODE 🛠️';
 
             // Create tabs
             const tabs = document.createElement('div');
@@ -337,7 +411,8 @@ export class GameManager {
         const isLucky = Math.random() < 0.1;
         const upgradeCount = isLucky ? 6 : 3;
 
-        screen.innerHTML = `<h2>${isLucky ? '✨ LUCKY LEVEL UP! ✨' : 'LEVEL UP!'}</h2>`;
+        heading.textContent = isLucky ? '✨ LUCKY LEVEL UP! ✨' : 'LEVEL UP!';
+        if (isLucky) heading.classList.add('lucky');
 
         const grid = document.createElement('div');
         grid.className = isLucky ? 'upgrade-grid-6' : 'upgrade-grid';
@@ -348,9 +423,13 @@ export class GameManager {
             count: upgradeCount,
         });
 
-        options.forEach(opt => {
+        options.forEach((opt, index) => {
             const card = document.createElement('div');
             card.className = 'upgrade-card interactive';
+            // Staggered slam-in: each card lands just after the panel impact
+            card.style.animationDelay = `${(0.12 + index * 0.06).toFixed(2)}s`;
+            card.addEventListener('pointerenter', () => audio.play('uiHover'));
+            card.addEventListener('click', () => audio.play('uiSelect'), { capture: true });
 
             if (opt.type === 'weapon') {
                 const weaponData = opt.data;
@@ -613,6 +692,9 @@ export class GameManager {
             } else if (event.type === 'miniboss') {
                 this.spawnEnemy({ boss: true });
                 audio.play('bossSpawn');
+                juice.flash('#ff2244', 0.28, 0.45);
+                juice.pulseVignette(0.8);
+                juice.addTrauma(0.35);
             }
         }
 
@@ -625,8 +707,15 @@ export class GameManager {
         if (!this.finalBossSpawned && this.gameTime >= this.currentStage.duration) {
             this.finalBossSpawned = true;
             this.spawnEnemy({ boss: true, final: true });
-            this.shake(10, 0.6);
             audio.play('bossSpawn');
+            juice.addTrauma(0.9);
+            juice.flash('#ff0033', 0.5, 0.7);
+            juice.pulseVignette(1);
+            juice.zoomPunch(-0.9);
+            juice.slowMo(0.35, 0.5);
+            if (this.finalBoss) {
+                juice.shockwave(this.finalBoss.pos.x, this.finalBoss.pos.y, 420, '#ff3355', 0.8, 10);
+            }
         }
 
         this.player.update(dt);
@@ -692,8 +781,12 @@ export class GameManager {
             }
         }
         if (this.player.hp < hpBeforeContact) {
-            this.shake(4, 0.2);
             audio.play('hurt');
+            juice.addTrauma(0.3);
+            juice.hitStop(0.05);
+            juice.flash('#ff0022', 0.3, 0.28);
+            // The redder the vignette, the closer to death — readable at a glance
+            juice.pulseVignette(0.5 + (1 - this.player.hp / this.player.maxHp) * 0.6);
         }
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
@@ -709,7 +802,15 @@ export class GameManager {
                         sprites.getEnemyBodyColor(enemy.name),
                         '#ffffff',
                     ]);
-                    this.shake(8, 0.4);
+                    // Boss deaths get the full treatment: freeze, punch, ring
+                    juice.hitStop(0.12);
+                    juice.addTrauma(0.7);
+                    juice.zoomPunch(0.7);
+                    juice.flash('#ffffff', 0.4, 0.35);
+                    juice.shockwave(enemy.pos.x, enemy.pos.y, enemy.radius * 12, sprites.getEnemyAccentColor(enemy.name), 0.6, 9);
+                } else if (enemy.isElite) {
+                    juice.addTrauma(0.12);
+                    juice.shockwave(enemy.pos.x, enemy.pos.y, enemy.radius * 5, sprites.getEnemyAccentColor(enemy.name), 0.3, 4);
                 }
                 // Drop XP crystals instead of giving XP directly
                 const crystalValue = enemy.xpValue;
@@ -750,36 +851,92 @@ export class GameManager {
         this.camera.x += (targetX - this.camera.x) * followSpeed;
         this.camera.y += (targetY - this.camera.y) * followSpeed;
 
-        if (this.shakeTime > 0) this.shakeTime -= dt;
-
+        this.updateDamageNumbers(dt);
         this.updateParticles(dt);
         this.updateHUD();
+    }
+
+    /** Shared end-of-run panel for both defeat and victory */
+    private showRunSummary(opts: { title: string; subtitle: string; variant: 'defeat' | 'victory' }) {
+        const mins = Math.floor(this.gameTime / 60).toString().padStart(2, '0');
+        const secs = Math.floor(this.gameTime % 60).toString().padStart(2, '0');
+
+        const screen = document.createElement('div');
+        screen.className = `screen result-screen result-screen--${opts.variant}`;
+
+        const title = document.createElement('h1');
+        title.textContent = opts.title;
+        screen.appendChild(title);
+
+        const subtitle = document.createElement('p');
+        subtitle.className = 'result-subtitle';
+        subtitle.textContent = opts.subtitle;
+        screen.appendChild(subtitle);
+
+        const stats = document.createElement('div');
+        stats.className = 'result-stats';
+        stats.innerHTML = `
+            <div class="result-stat"><span>⏱ TIME</span><strong>${mins}:${secs}</strong></div>
+            <div class="result-stat"><span>💀 KILLS</span><strong>${this.killCount}</strong></div>
+            <div class="result-stat"><span>📊 LEVEL</span><strong>${this.player?.level ?? 1}</strong></div>
+        `;
+        screen.appendChild(stats);
+
+        const buttons = document.createElement('div');
+        buttons.className = 'menu-buttons menu-buttons--row';
+
+        const again = document.createElement('button');
+        again.className = 'pixel-btn pixel-btn--primary interactive';
+        again.textContent = '↻ PLAY AGAIN';
+        again.addEventListener('pointerenter', () => audio.play('uiHover'));
+        again.onclick = () => {
+            audio.play('uiSelect');
+            screenManager.goto('class_selection');
+        };
+
+        const menu = document.createElement('button');
+        menu.className = 'pixel-btn interactive';
+        menu.textContent = '⌂ MAIN MENU';
+        menu.addEventListener('pointerenter', () => audio.play('uiHover'));
+        menu.onclick = () => {
+            audio.play('uiBack');
+            screenManager.goto('main_menu');
+        };
+
+        buttons.appendChild(again);
+        buttons.appendChild(menu);
+        screen.appendChild(buttons);
+
+        this.uiLayer.appendChild(screen);
     }
 
     showGameOver() {
         audio.stopMusic();
         audio.play('gameOver');
-        const screen = document.createElement('div');
-        screen.className = 'screen';
-        screen.innerHTML = `
-        <h1>GAME OVER</h1>
-        <h2>${this.currentStage.name} — Time: ${Math.floor(this.gameTime)}s — 💀 ${this.killCount}</h2>
-        <button class="interactive" style="padding: 20px; font-size: 20px; cursor: pointer;" onclick="location.reload()">RESTART</button>
-      `;
-        this.uiLayer.appendChild(screen);
+        juice.flash('#ff0022', 0.5, 0.8);
+        juice.slowMo(0.25, 1.2);
+        juice.pulseVignette(1);
+        if (this.player) {
+            particles.emitExplosion(this.player.pos.x, this.player.pos.y, 90, ['#ff3344', '#ffffff', '#661122']);
+        }
+        this.showRunSummary({
+            title: 'GAME OVER',
+            subtitle: `${this.currentStage.name} — the void wins this time`,
+            variant: 'defeat',
+        });
     }
 
     showVictory() {
         audio.stopMusic();
         audio.play('victory');
-        const screen = document.createElement('div');
-        screen.className = 'screen';
-        screen.innerHTML = `
-        <h1>🏆 VICTORY!</h1>
-        <h2>${this.currentStage.name} cleared — Time: ${Math.floor(this.gameTime)}s — 💀 ${this.killCount}</h2>
-        <button class="interactive" style="padding: 20px; font-size: 20px; cursor: pointer;" onclick="location.reload()">PLAY AGAIN</button>
-      `;
-        this.uiLayer.appendChild(screen);
+        juice.flash('#ffffff', 0.6, 0.9);
+        juice.zoomPunch(0.8);
+        juice.slowMo(0.3, 1);
+        this.showRunSummary({
+            title: '🏆 VICTORY',
+            subtitle: `${this.currentStage.name} cleared`,
+            variant: 'victory',
+        });
     }
 
     spawnEnemy(options: { boss?: boolean; final?: boolean; angle?: number } = {}) {
@@ -834,32 +991,59 @@ export class GameManager {
 
     /** Trigger screen shake (magnitude in px, duration in seconds) */
     shake(magnitude: number, duration: number) {
-        if (magnitude >= this.shakeMagnitude || this.shakeTime <= 0) {
-            this.shakeMagnitude = magnitude;
-            this.shakeDuration = duration;
-            this.shakeTime = duration;
-        }
+        juice.shake(magnitude, duration);
     }
 
     /** Camera with the current shake offset applied (used for rendering only) */
     private getRenderCamera(): Vector2 {
-        if (this.shakeTime <= 0) return this.camera;
-        const falloff = this.shakeTime / this.shakeDuration;
-        const magnitude = this.shakeMagnitude * falloff;
-        return {
-            x: this.camera.x + (Math.random() - 0.5) * 2 * magnitude,
-            y: this.camera.y + (Math.random() - 0.5) * 2 * magnitude,
-        };
+        const offset = juice.getShakeOffset();
+        return { x: this.camera.x + offset.x, y: this.camera.y + offset.y };
     }
 
     spawnDamageNumber(pos: Vector2, amount: number, isCrit: boolean = false) {
+        // Cap the on-screen count — late-game AoE can produce hundreds per second
+        if (this.damageNumbers.length > 90) this.damageNumbers.shift();
+
+        const life = isCrit ? 0.8 : 0.55;
         this.damageNumbers.push({
-            x: pos.x,
+            x: pos.x + (Math.random() - 0.5) * 10,
             y: pos.y,
-            text: Math.floor(amount).toString() + (isCrit ? '!' : ''),
-            life: 0.5,
-            isCrit: isCrit
+            // Arc upward and outward so overlapping hits stay readable
+            vx: (Math.random() - 0.5) * 60,
+            vy: isCrit ? -160 : -110,
+            text: Math.floor(amount).toString(),
+            life,
+            maxLife: life,
+            isCrit,
         });
+
+        if (!isCrit) {
+            audio.play('hit');
+        } else {
+            audio.play('crit');
+            // Micro freeze on crits, at most a few times a second
+            const now = performance.now() / 1000;
+            if (now - this.lastCritStop > 0.35) {
+                this.lastCritStop = now;
+                juice.hitStop(0.035);
+                juice.addTrauma(0.06);
+            }
+        }
+    }
+
+    private updateDamageNumbers(dt: number) {
+        for (let i = this.damageNumbers.length - 1; i >= 0; i--) {
+            const dn = this.damageNumbers[i];
+            dn.life -= dt;
+            if (dn.life <= 0) {
+                this.damageNumbers.splice(i, 1);
+                continue;
+            }
+            dn.x += dn.vx * dt;
+            dn.y += dn.vy * dt;
+            dn.vy += 260 * dt;  // gravity — the numbers arc and settle
+            dn.vx *= 0.94;
+        }
     }
 
     spawnXPCrystal(x: number, y: number, value: number) {
@@ -867,7 +1051,9 @@ export class GameManager {
     }
 
     draw(ctx: CanvasRenderingContext2D) {
-        if (this.state !== 'PLAYING' && this.state !== 'LEVEL_UP') return;
+        // GAME_OVER keeps rendering so the result panel sits on a freeze-frame
+        // of the battlefield instead of a black void.
+        if (this.state !== 'PLAYING' && this.state !== 'LEVEL_UP' && this.state !== 'GAME_OVER') return;
 
         // Reset canvas state at the start of each frame
         ctx.shadowBlur = 0;
@@ -876,6 +1062,19 @@ export class GameManager {
         ctx.setLineDash([]);
 
         const camera = this.getRenderCamera();
+
+        // Camera punch: scale + roll the whole world around the screen centre.
+        // Applied as a canvas transform so every entity inherits it for free.
+        const zoom = juice.getZoom();
+        const roll = juice.getShakeAngle();
+        const transformed = zoom !== 1 || roll !== 0;
+        if (transformed) {
+            ctx.save();
+            ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+            ctx.rotate(roll);
+            ctx.scale(zoom, zoom);
+            ctx.translate(-this.canvas.width / 2, -this.canvas.height / 2);
+        }
 
         this.drawBackground(ctx, camera);
 
@@ -897,34 +1096,41 @@ export class GameManager {
         // Draw particles
         particles.draw(ctx, camera);
 
-        ctx.font = '20px Arial';
-        ctx.fillStyle = 'white';
-        ctx.textAlign = 'center';
-        this.damageNumbers.forEach((dn: any, i) => {
-            const screenX = dn.x - camera.x;
-            const screenY = dn.y - camera.y - (0.5 - dn.life) * 50;
+        // Shockwave rings (explosions, boss deaths)
+        juice.drawWorld(ctx, camera);
 
-            ctx.save();
-            if (dn.isCrit) {
-                ctx.fillStyle = '#ffff00'; // Yellow
-                ctx.font = 'bold 30px Arial';
-                ctx.shadowColor = 'orange';
-                ctx.shadowBlur = 5;
-            } else {
-                ctx.fillStyle = 'white';
-                ctx.font = '20px Arial';
-                ctx.shadowBlur = 0;
-            }
+        this.drawDamageNumbers(ctx, camera);
 
-            ctx.fillText(dn.text, screenX, screenY);
-            ctx.restore();
-
-            dn.life -= 0.016;
-            if (dn.life <= 0) this.damageNumbers.splice(i, 1);
-        });
+        if (transformed) ctx.restore();
 
         // Draw debug overlay (FPS, stats)
         debugOverlay.draw(ctx);
+    }
+
+    /** Pixel-font damage numbers: crits pop bigger, brighter and outlined */
+    private drawDamageNumbers(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        if (this.damageNumbers.length === 0) return;
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        for (const dn of this.damageNumbers) {
+            const t = 1 - dn.life / dn.maxLife;
+            // Punch-in scale for the first 15% of the lifetime
+            const pop = t < 0.15 ? 0.6 + (t / 0.15) * 0.55 : 1.15 - (t - 0.15) * 0.15;
+            const base = dn.isCrit ? 3.4 : 2.2;
+            const scale = Math.max(1, Math.round(base * pop));
+
+            ctx.globalAlpha = t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
+            drawPixelText(ctx, dn.text, dn.x - camera.x, dn.y - camera.y, {
+                scale,
+                align: 'center',
+                spacing: 1,
+                shadow: 1,
+                color: dn.isCrit ? '#ffe14d' : '#ffffff',
+                outline: dn.isCrit ? '#ff4400' : undefined,
+            });
+        }
+        ctx.restore();
     }
 
     drawBackground(ctx: CanvasRenderingContext2D, camera: Vector2) {
@@ -940,10 +1146,16 @@ export class GameManager {
         ctx.shadowColor = 'transparent';
         ctx.globalAlpha = 1;
 
-        // Anchor the pattern to world space so it scrolls with the camera
+        // Anchor the pattern to world space so it scrolls with the camera.
+        // Oversized by 25% so a zoom-out punch never exposes the void.
+        const padX = this.canvas.width * 0.125;
+        const padY = this.canvas.height * 0.125;
         ctx.translate(-camera.x, -camera.y);
         ctx.fillStyle = this.backgroundPattern;
-        ctx.fillRect(camera.x, camera.y, this.canvas.width, this.canvas.height);
+        ctx.fillRect(
+            camera.x - padX, camera.y - padY,
+            this.canvas.width + padX * 2, this.canvas.height + padY * 2
+        );
         ctx.restore();
     }
 
