@@ -67,7 +67,11 @@ export class AudioSystem {
     private nextNoteTime: number = 0;
     private musicStep: number = 0;
     private musicRng: () => number = mulberry32(1);
-    private musicPattern: number[] = [];
+    /** Two alternating 16-step lead patterns (A A B A over the 64-step cycle) */
+    private patternA: number[] = [];
+    private patternB: number[] = [];
+    /** 0..1 — drives tempo, percussion density and lead busyness */
+    private musicIntensity: number = 0;
 
     constructor() {
         this.loadSettings();
@@ -234,8 +238,19 @@ export class AudioSystem {
     // Generative music
     // =========================================================
 
-    /** Minor pentatonic on A */
+    /** A minor pentatonic (A C D E G), one octave */
     private static readonly SCALE = [110, 130.81, 146.83, 164.81, 196];
+    /** Chord progression Am → F → G → Em, one chord per 16-step bar */
+    private static readonly CHORD_ROOTS = [110, 87.31, 98, 82.41];
+    private static readonly CYCLE = 64; // 4 bars × 16 steps
+
+    /**
+     * Set music dynamics (0 = calm intro, 1 = full assault).
+     * Raises tempo (100 → 140 BPM), percussion density and lead busyness.
+     */
+    setMusicIntensity(value: number) {
+        this.musicIntensity = Math.max(0, Math.min(1, value));
+    }
 
     startMusic(theme: string) {
         if (!this.ensureContext()) return;
@@ -243,10 +258,9 @@ export class AudioSystem {
 
         this.musicRng = mulberry32(hashString(theme));
         this.musicStep = 0;
-        // 16-step lead pattern: scale degree or -1 for rest
-        this.musicPattern = Array.from({ length: 16 }, () =>
-            this.musicRng() < 0.4 ? -1 : Math.floor(this.musicRng() * AudioSystem.SCALE.length)
-        );
+        this.musicIntensity = 0;
+        this.patternA = this.makePattern(0.45);
+        this.patternB = this.makePattern(0.3); // busier B-section
         this.nextNoteTime = this.ctx!.currentTime + 0.1;
 
         // Lookahead scheduler (schedules ~0.2s ahead every 50ms)
@@ -260,32 +274,77 @@ export class AudioSystem {
         }
     }
 
+    /** 16-step lead pattern: scale degree or -1 for rest */
+    private makePattern(restChance: number): number[] {
+        return Array.from({ length: 16 }, () =>
+            this.musicRng() < restChance ? -1 : Math.floor(this.musicRng() * AudioSystem.SCALE.length)
+        );
+    }
+
     private scheduleMusic() {
         const ctx = this.ctx;
         if (!ctx || ctx.state !== 'running') return;
 
-        const stepDuration = 60 / 110 / 2; // 110 BPM, eighth notes
+        const heat = this.musicIntensity;
+        const bpm = 100 + 40 * heat;
+        const stepDuration = 60 / bpm / 2; // eighth notes
+
         while (this.nextNoteTime < ctx.currentTime + 0.2) {
-            const step = this.musicStep % 16;
+            const cycleStep = this.musicStep % AudioSystem.CYCLE;
+            const bar = Math.floor(cycleStep / 16); // 0..3
+            const step = cycleStep % 16;
             const when = this.nextNoteTime - ctx.currentTime;
 
-            // Bass on every 4th step
+            const chordRoot = AudioSystem.CHORD_ROOTS[bar];
+            // Bars run A A B A — the B section breaks the loop feel
+            const pattern = bar === 2 ? this.patternB : this.patternA;
+
+            // --- Bass: follows the chord progression ---
             if (step % 4 === 0) {
-                const bassFreq = AudioSystem.SCALE[0] / 2 * (step % 8 === 0 ? 1 : 1.5);
-                this.musicTone(bassFreq, stepDuration * 3.5, 0.16, 'triangle', when);
+                const fifth = step % 8 === 4 && heat > 0.3;
+                this.musicTone(chordRoot / 2 * (fifth ? 1.5 : 1), stepDuration * 3.5, 0.16, 'triangle', when);
+                // Driving octave bass on the off-quarters when things heat up
+            } else if (step % 4 === 2 && heat > 0.55) {
+                this.musicTone(chordRoot / 2, stepDuration * 1.5, 0.1, 'triangle', when);
             }
 
-            // Lead pattern
-            const degree = this.musicPattern[step];
+            // --- Percussion ---
+            // Kick: half notes when calm, four-on-the-floor when hot
+            if (step % 8 === 0 || (heat > 0.4 && step % 4 === 0)) {
+                this.kick(when);
+            }
+            // Snare on backbeats once the fight picks up
+            if (heat > 0.35 && (step === 4 || step === 12)) {
+                this.snare(when, 0.1 + 0.1 * heat);
+            }
+            // Hats on offbeats, denser with intensity
+            if (step % 2 === 1 && this.musicRng() < 0.25 + 0.6 * heat) {
+                this.hat(when, 0.03 + 0.04 * heat);
+            }
+
+            // --- Lead ---
+            const degree = pattern[step];
             if (degree >= 0) {
-                const octave = this.musicRng() < 0.2 ? 4 : 2;
-                this.musicTone(AudioSystem.SCALE[degree] * octave, stepDuration * 1.8, 0.05, 'square', when);
+                // Transpose the pentatonic toward the current chord root
+                const freq = AudioSystem.SCALE[degree] * (chordRoot / 110);
+                const octave = this.musicRng() < 0.15 + 0.25 * heat ? 4 : 2;
+                this.musicTone(freq * octave, stepDuration * 1.8, 0.05, 'square', when);
+                // Fast echo note — gives the line momentum at high intensity
+                if (heat > 0.6 && this.musicRng() < 0.3) {
+                    this.musicTone(freq * octave * 2, stepDuration * 0.9, 0.025, 'square', when + stepDuration / 2);
+                }
             }
 
-            // Evolve the pattern slowly so the loop never repeats exactly
-            if (step === 15 && this.musicRng() < 0.5) {
+            // --- Cycle-end fill and evolution ---
+            if (cycleStep === AudioSystem.CYCLE - 2 && heat > 0.45) {
+                this.snare(when, 0.08);
+                this.snare(when + stepDuration / 2, 0.1);
+            }
+            if (cycleStep === AudioSystem.CYCLE - 1) {
+                // Mutate one step of one pattern so the track never truly loops
+                const target = this.musicRng() < 0.5 ? this.patternA : this.patternB;
                 const idx = Math.floor(this.musicRng() * 16);
-                this.musicPattern[idx] = this.musicRng() < 0.35
+                target[idx] = this.musicRng() < 0.3
                     ? -1
                     : Math.floor(this.musicRng() * AudioSystem.SCALE.length);
             }
@@ -293,6 +352,50 @@ export class AudioSystem {
             this.nextNoteTime += stepDuration;
             this.musicStep++;
         }
+    }
+
+    /** Punchy kick: fast sine pitch drop */
+    private kick(when: number) {
+        const ctx = this.ctx!;
+        const t = ctx.currentTime + Math.max(0, when);
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, t);
+        osc.frequency.exponentialRampToValueAtTime(45, t + 0.1);
+        gain.gain.setValueAtTime(0.35, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        osc.connect(gain);
+        gain.connect(this.musicGain!);
+        osc.start(t);
+        osc.stop(t + 0.13);
+    }
+
+    /** Snare: bandpassed noise burst */
+    private snare(when: number, volume: number) {
+        this.musicNoise(when, 0.12, volume, 'bandpass', 1800);
+    }
+
+    /** Hi-hat: short highpassed noise tick */
+    private hat(when: number, volume: number) {
+        this.musicNoise(when, 0.04, volume, 'highpass', 7000);
+    }
+
+    private musicNoise(when: number, duration: number, volume: number, filterType: BiquadFilterType, freq: number) {
+        const ctx = this.ctx!;
+        const t = ctx.currentTime + Math.max(0, when);
+        const src = ctx.createBufferSource();
+        src.buffer = this.noiseBuffer!;
+        const filter = ctx.createBiquadFilter();
+        filter.type = filterType;
+        filter.frequency.value = freq;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(volume, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.musicGain!);
+        src.start(t, this.musicRng() * 0.5, duration + 0.02);
     }
 
     private musicTone(freq: number, duration: number, volume: number, type: OscillatorType, when: number) {
