@@ -22,24 +22,26 @@ export const CLASSES = [
     { name: "Demolitions Expert", emoji: "💣", bonus: "Area +20%, Might +10%", weaponId: 'plasma_grenade', hp: 100, stats: { area: 1.2, might: 1.1 } },
 ];
 
+// Base values are the FIRST pick; repeat picks stack and grow 25% per stack
+// (see core/UpgradePool.ts getPowerupValue)
 export const POWERUPS = [
     // Basic
-    { name: "Nano-Repair", description: "Regen +0.5/s", type: "regen", value: 0.5, emoji: "❤️" },
-    { name: "Targeting HUD", description: "Crit +5%", type: "critChance", value: 0.05, emoji: "🎯" },
-    { name: "Plasma Core", description: "Might +5%", type: "might", value: 0.05, emoji: "💪" },
-    { name: "Cooling System", description: "Cooldown -5%", type: "cooldown", value: -0.05, emoji: "❄️" },
+    { name: "Nano-Repair", description: "Hull nanites knit you back together", type: "regen", value: 0.7, emoji: "❤️" },
+    { name: "Targeting HUD", description: "Weak-point overlay for your visor", type: "critChance", value: 0.06, emoji: "🎯" },
+    { name: "Plasma Core", description: "Raw damage amplifier", type: "might", value: 0.08, emoji: "💪" },
+    { name: "Cooling System", description: "Weapons fire more often", type: "cooldown", value: -0.06, emoji: "❄️" },
 
     // Creative
-    { name: "Gravity Well", description: "Pull range +20%", type: "magnet", value: 20, emoji: "🧲" },
-    { name: "Chain Reaction", description: "Area +10%", type: "area", value: 0.1, emoji: "💣" },
-    { name: "Vampiric Link", description: "Growth +10%", type: "growth", value: 0.1, emoji: "🧛" },
-    { name: "Temporal Flux", description: "Duration +15%", type: "duration", value: 0.15, emoji: "⏰" },
-    { name: "Berserker Rage", description: "Crit Dmg +25%", type: "critDamage", value: 0.25, emoji: "😡" },
-    { name: "Barrier Field", description: "Max HP +10", type: "maxHp", value: 10, emoji: "🔮" },
-    { name: "Overclock", description: "Speed +10%", type: "speed", value: 0.1, emoji: "⏩" },
-    { name: "Phase Shift", description: "Move Speed +10%", type: "moveSpeed", value: 0.1, emoji: "👻" },
-    { name: "Rapid Tick", description: "Zone tick -0.1s", type: "tick", value: 0.1, emoji: "⏱️" },
-    { name: "Void Shield", description: "Armor +1", type: "armor", value: 1, emoji: "🌌" },
+    { name: "Gravity Well", description: "Crystals fly to you from farther away", type: "magnet", value: 30, emoji: "🧲" },
+    { name: "Chain Reaction", description: "Bigger blasts, wider zones", type: "area", value: 0.12, emoji: "💣" },
+    { name: "Vampiric Link", description: "Drain more XP from every kill", type: "growth", value: 0.12, emoji: "🧛" },
+    { name: "Temporal Flux", description: "Effects linger longer", type: "duration", value: 0.18, emoji: "⏰" },
+    { name: "Berserker Rage", description: "Crits hit like a freight train", type: "critDamage", value: 0.3, emoji: "😡" },
+    { name: "Barrier Field", description: "Reinforced hull plating", type: "maxHp", value: 15, emoji: "🔮" },
+    { name: "Overclock", description: "Projectiles travel faster", type: "speed", value: 0.12, emoji: "⏩" },
+    { name: "Phase Shift", description: "Move faster between phases", type: "moveSpeed", value: 0.1, emoji: "👻" },
+    { name: "Rapid Tick", description: "Zones damage more frequently", type: "tick", value: 0.1, emoji: "⏱️" },
+    { name: "Void Shield", description: "Flat damage reduction", type: "armor", value: 1, emoji: "🌌" },
 ];
 
 export const WEAPONS = [

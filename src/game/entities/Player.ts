@@ -10,7 +10,7 @@ export class Player extends Entity {
     maxHp: number = 100;
     xp: number = 0;
     level: number = 1;
-    nextLevelXp: number = 1;
+    nextLevelXp: number = 4;
 
     weapons: Weapon[] = [];
 
@@ -194,20 +194,12 @@ export class Player extends Entity {
         this.level++;
         this.xp -= this.nextLevelXp;
 
-        // XP curve: Slower progression
-        // level 1→2 = 1, level 2→3 = 2, level 3→4 = 3, level 4→5 = 5, level 5→6 = 8, then 1.15x multiplier
-        if (this.level === 2) {
-            this.nextLevelXp = 2;
-        } else if (this.level === 3) {
-            this.nextLevelXp = 3;
-        } else if (this.level === 4) {
-            this.nextLevelXp = 5;
-        } else if (this.level === 5) {
-            this.nextLevelXp = 8;
-        } else {
-            // Slower scaling after level 5
-            this.nextLevelXp = Math.floor(this.nextLevelXp * 1.15);
-        }
+        // XP curve: gentle-exponential with a flat term.
+        // Old curve (1/2/3/5/8 then ×1.15) spammed level-ups in the first
+        // minute and then compounded past XP income. This one starts at 4 and
+        // grows ~×1.1 + 6 per level: 4, 10, 17, 25, 33, 42, 52, 63, 75, 88 …
+        // — a steady cadence instead of a burst followed by a drought.
+        this.nextLevelXp = Math.floor(this.nextLevelXp * 1.1 + 6);
 
         this.onLevelUp();
     }

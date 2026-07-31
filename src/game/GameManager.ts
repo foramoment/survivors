@@ -15,6 +15,7 @@ import { difficultyDirector } from './core/DifficultyDirector';
 import { sprites } from './core/SpriteFactory';
 import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
+import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, POWERUP_STACK_CAP } from './core/UpgradePool';
 
 export class GameManager {
     canvas: HTMLCanvasElement;
@@ -52,6 +53,8 @@ export class GameManager {
 
     // Track weapon levels: weaponId -> level
     weaponLevels: Map<string, number> = new Map();
+    // Track powerup stacks: powerup name -> times taken
+    powerupLevels: Map<string, number> = new Map();
 
     devMode: boolean = false;
     killCount: number = 0;
@@ -143,6 +146,9 @@ export class GameManager {
         this.backgroundPattern = null;
         this.finalBoss = null;
         this.finalBossSpawned = false;
+        // Reset progression tracking BEFORE adding the starting weapon
+        this.powerupLevels.clear();
+        this.weaponLevels.clear();
 
         const cls = CLASSES[classIndex];
         this.player = new Player(0, 0);
@@ -327,7 +333,7 @@ export class GameManager {
             return;
         }
 
-        // Normal mode (unchanged)
+        // Normal mode: weighted pool biased toward owned weapons (see UpgradePool)
         const isLucky = Math.random() < 0.1;
         const upgradeCount = isLucky ? 6 : 3;
 
@@ -336,36 +342,11 @@ export class GameManager {
         const grid = document.createElement('div');
         grid.className = isLucky ? 'upgrade-grid-6' : 'upgrade-grid';
 
-        // Create pool of all options
-        const allOptions: any[] = [];
-
-        // Add powerups
-        POWERUPS.forEach(p => {
-            allOptions.push({ type: 'powerup', data: p });
+        const options = buildUpgradeOptions({
+            weaponLevels: this.weaponLevels,
+            powerupLevels: this.powerupLevels,
+            count: upgradeCount,
         });
-
-        // Add weapons (excluding evolved weapons)
-        WEAPONS.forEach(w => {
-            const weaponLevel = this.weaponLevels.get(w.id) || 0;
-            const isEvolved = weaponLevel >= 6;
-            if (!isEvolved) {
-                allOptions.push({ type: 'weapon', data: w });
-            }
-        });
-
-        // Pick random unique options (no duplicates)
-        const options = [];
-        const usedIndices = new Set<number>();
-
-        for (let i = 0; i < upgradeCount && usedIndices.size < allOptions.length; i++) {
-            let randomIndex;
-            do {
-                randomIndex = Math.floor(Math.random() * allOptions.length);
-            } while (usedIndices.has(randomIndex));
-
-            usedIndices.add(randomIndex);
-            options.push(allOptions[randomIndex]);
-        }
 
         options.forEach(opt => {
             const card = document.createElement('div');
@@ -400,9 +381,13 @@ export class GameManager {
                 };
             } else {
                 const powerup = opt.data;
+                const stack = this.powerupLevels.get(powerup.name) ?? 0;
+                const bonus = formatPowerupBonus(powerup.type, getPowerupValue(powerup.value, stack));
+                const stackText = stack > 0 ? `lv ${stack} → ${stack + 1}` : 'NEW';
                 card.innerHTML = `
                 <div style="font-size: 3em">${powerup.emoji}</div>
                 <h3>${powerup.name}</h3>
+                <div class="level-indicator">${stackText} · ${bonus}</div>
                 <p>${powerup.description}</p>
               `;
                 card.onclick = () => {
@@ -567,15 +552,23 @@ export class GameManager {
     applyPowerup(opt: any) {
         if (!this.player) return;
 
+        // Stacking: each repeat pick of the same powerup is stronger
+        const stack = this.powerupLevels.get(opt.name) ?? 0;
+        const value = getPowerupValue(opt.value, stack);
+        this.powerupLevels.set(opt.name, Math.min(POWERUP_STACK_CAP, stack + 1));
+
         // Apply stat boost
         if (opt.type in this.player.stats) {
-            (this.player.stats as any)[opt.type] += opt.value;
+            (this.player.stats as any)[opt.type] += value;
         }
+
+        // Stacked negative modifiers must not go degenerate
+        if (this.player.stats.cooldown < 0.25) this.player.stats.cooldown = 0.25;
 
         // Special handling for maxHp
         if (opt.type === 'maxHp') {
-            this.player.maxHp += opt.value;
-            this.player.hp += opt.value;
+            this.player.maxHp += value;
+            this.player.hp += value;
         }
     }
 
@@ -604,6 +597,12 @@ export class GameManager {
             enemyCount: this.enemies.length,
             killCount: this.killCount,
         });
+
+        // Music heats up with run time and adaptive difficulty; boss = max
+        const timeHeat = Math.min(1, this.gameTime / 480);
+        const adaptHeat = (difficultyDirector.intensity - 0.6) / 2.4;
+        const bossActive = this.finalBossSpawned && this.finalBoss !== null && !this.finalBoss.isDead;
+        audio.setMusicIntensity(bossActive ? 1 : 0.15 + 0.55 * timeHeat + 0.3 * adaptHeat);
 
         for (const event of difficultyDirector.consumeEvents()) {
             if (event.type === 'burst') {
