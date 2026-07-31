@@ -93,11 +93,13 @@ const EXPECTED_STATS: Record<string, any> = {
     },
     lightning_chain: {
         damage: 25,
-        cooldown: 1.8,
-        area: 800,
+        cooldown: 1.6,
+        // Strike range, cut down from 800 — the bolt is a close-quarters
+        // crowd clearer now, not a screen-wide laser
+        area: 260,
         speed: 0,
         duration: 0.3,
-        pierce: 5,
+        pierce: 3,
     },
     spinning_ember: {
         damage: 15,

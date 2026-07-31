@@ -1,322 +1,209 @@
 /**
- * LIGHTNING CHAIN WEAPON
- * Lightning that chains between enemies.
- * 
- * Evolved: Thunderstorm - Infinite chain with split chance
+ * LIGHTNING CHAIN WEAPON — "Storm Caller"
+ *
+ * A bolt falls out of the sky onto the nearest enemy and then walks from
+ * target to target, one hop at a time (see ChainLightning). Short reach on
+ * purpose: this is a crowd-clearing weapon for enemies that got close, not a
+ * map-wide nuke.
+ *
+ * Evolved (Thunderstorm): the chain travels noticeably slower and every impact
+ * point drops a static field — a small lingering AoE that keeps zapping. The
+ * evolution is about *coverage over time*, not about hitting the whole screen
+ * at once, which is what made the old version both ugly and a frame-rate
+ * hazard.
  */
-import { ProjectileWeapon, Beam, ChainLightning } from '../base';
+import { Weapon } from '../../Weapon';
+import { ChainLightning, Zone } from '../base';
 import type { Player } from '../../entities/Player';
-import { distance, type Vector2 } from '../../core/Utils';
+import { type Vector2 } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
-import { levelSpatialHash } from '../../core/SpatialHash';
+import { juice } from '../../core/JuiceSystem';
 
 // ============================================
-// EVOLVED LIGHTNING CHAIN - THUNDERSTORM
-// 10% chance per bounce to split into 2 branches
+// STATIC FIELD - lingering AoE left by Thunderstorm
 // ============================================
 
-export class ThunderstormLightning extends ChainLightning {
-    splitChance: number = 0.1;
-    /** Hard cap on queued branches — splits used to snowball unbounded */
-    private static readonly MAX_PENDING_SPLITS = 4;
-    private pendingSplits: { pos: Vector2; damage: number; bounces: number; hitEnemies: Set<any> }[] = [];
+export class StaticFieldZone extends Zone {
+    private arcs: Vector2[][] = [];
+    private arcTimer: number = 0;
+    private spin: number = Math.random() * Math.PI * 2;
+    private maxDuration: number;
+
+    constructor(x: number, y: number, radius: number, damage: number, duration: number = 1.6) {
+        super(x, y, radius, duration, damage, 0.35, '');
+        this.maxDuration = duration;
+        this.rebuildArcs();
+    }
 
     update(dt: number) {
-        // Process pending splits
-        if (this.pendingSplits.length > 0) {
-            const split = this.pendingSplits.shift()!;
-            this.createSplitChain(split);
-        }
-
         super.update(dt);
-    }
+        this.spin += dt * 1.6;
 
-    private createSplitChain(split: { pos: Vector2; damage: number; bounces: number; hitEnemies: Set<any> }) {
-        // Find a new target not in hitEnemies
-        let target: any = null;
-        let minDst = this.range;
-
-        const nearby = levelSpatialHash.getWithinRadius(split.pos, this.range);
-
-        for (const enemy of nearby) {
-            if (split.hitEnemies.has(enemy)) continue;
-            const d = distance(split.pos, enemy.pos);
-            if (d < minDst) {
-                minDst = d;
-                target = enemy;
-            }
-        }
-
-        if (target && split.bounces > 0) {
-            // Add segment
-            this.segments.push({
-                start: { ...split.pos },
-                end: { ...target.pos },
-                alpha: 1
-            });
-
-            damageSystem.dealDamage({
-                baseDamage: split.damage,
-                source: this.source,
-                target: target,
-                position: target.pos
-            });
-            this.onHit(target, split.damage);
-            split.hitEnemies.add(target);
-
-            // Emit particles
-            particles.emitLightning(target.pos.x, target.pos.y);
-
-            // Check for another split (bounded queue)
-            if (Math.random() < this.splitChance
-                && this.pendingSplits.length < ThunderstormLightning.MAX_PENDING_SPLITS) {
-                this.pendingSplits.push({
-                    pos: { ...target.pos },
-                    damage: split.damage * 0.9,
-                    bounces: split.bounces - 1,
-                    hitEnemies: new Set(split.hitEnemies)
-                });
-            }
-
-            // Continue chain
-            if (split.bounces > 1
-                && this.pendingSplits.length < ThunderstormLightning.MAX_PENDING_SPLITS) {
-                this.pendingSplits.push({
-                    pos: { ...target.pos },
-                    damage: split.damage * 0.95,
-                    bounces: split.bounces - 1,
-                    hitEnemies: split.hitEnemies
-                });
-            }
+        // Re-bake the crackle a few times a second instead of every frame
+        this.arcTimer += dt;
+        if (this.arcTimer > 0.07) {
+            this.arcTimer = 0;
+            this.rebuildArcs();
         }
     }
 
-    // Override to add split logic
-    chainToEnemy(enemy: any, currentBounces: number) {
-        // Check for split (bounded queue)
-        if (Math.random() < this.splitChance && currentBounces > 1
-            && this.pendingSplits.length < ThunderstormLightning.MAX_PENDING_SPLITS) {
-            this.pendingSplits.push({
-                pos: { ...enemy.pos },
-                damage: this.damage * 0.9,
-                bounces: Math.floor(currentBounces / 2),
-                hitEnemies: new Set(this.hitEnemies)
-            });
+    private rebuildArcs() {
+        this.arcs = [];
+        for (let i = 0; i < 3; i++) {
+            const a0 = Math.random() * Math.PI * 2;
+            const a1 = a0 + (Math.random() - 0.5) * 2.4;
+            const start = { x: Math.cos(a0) * this.radius * 0.85, y: Math.sin(a0) * this.radius * 0.85 };
+            const end = { x: Math.cos(a1) * this.radius * 0.85, y: Math.sin(a1) * this.radius * 0.85 };
+            const mid = {
+                x: (start.x + end.x) / 2 + (Math.random() - 0.5) * this.radius * 0.7,
+                y: (start.y + end.y) / 2 + (Math.random() - 0.5) * this.radius * 0.7,
+            };
+            this.arcs.push([start, mid, end]);
         }
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        ctx.save();
-        ctx.translate(-camera.x, -camera.y);
-
-        // Same segment cap / cheap-mode strategy as the base class
-        const cheap = this.segments.length > ChainLightning.CHEAP_DRAW_THRESHOLD;
-        const drawn = this.segments.length > ChainLightning.MAX_DRAWN_SEGMENTS
-            ? this.segments.slice(-ChainLightning.MAX_DRAWN_SEGMENTS)
-            : this.segments;
-        for (const seg of drawn) {
-            this.drawThunderstormBolt(ctx, seg.start, seg.end, seg.alpha, cheap);
-        }
-
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = 'transparent';
-        ctx.restore();
-    }
-
-    private drawThunderstormBolt(ctx: CanvasRenderingContext2D, start: Vector2, end: Vector2, alpha: number, cheap: boolean = false) {
-        const dx = end.x - start.x;
-        const dy = end.y - start.y;
-        const dist = distance(start, end);
-
-        if (dist < 5 || !isFinite(dist) || alpha <= 0) return;
+        const fade = Math.max(0, Math.min(1, this.duration / this.maxDuration));
+        if (fade <= 0) return;
 
         ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        // Generate zigzag points
-        const numSegments = cheap
-            ? Math.min(8, Math.max(4, Math.floor(dist / 40)))
-            : Math.min(18, Math.max(5, Math.floor(dist / 25)));
-        const points: Vector2[] = [{ x: start.x, y: start.y }];
-
-        const perpX = -dy / dist;
-        const perpY = dx / dist;
-
-        for (let i = 1; i < numSegments; i++) {
-            const t = i / numSegments;
-            const baseX = start.x + dx * t;
-            const baseY = start.y + dy * t;
-            const offset = (Math.random() - 0.5) * 35 * (1 - Math.abs(t - 0.5) * 1.5);
-            points.push({
-                x: baseX + perpX * offset,
-                y: baseY + perpY * offset
-            });
-        }
-        points.push({ x: end.x, y: end.y });
-
-        if (cheap) {
-            // Single pass, no shadow — long chains
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(points[i].x, points[i].y);
-            }
-            ctx.strokeStyle = `rgba(210, 170, 255, ${alpha * 0.9})`;
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            ctx.restore();
-            return;
-        }
-
-        // Outer glow - purple tint for evolved
+        // Charged ground patch
+        ctx.globalAlpha = 0.18 * fade;
+        ctx.fillStyle = '#4488ff';
         ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.strokeStyle = `rgba(180, 100, 255, ${alpha * 0.4})`;
-        ctx.lineWidth = 14;
-        ctx.shadowColor = '#aa00ff';
-        ctx.shadowBlur = 30;
-        ctx.stroke();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Main bolt - brighter
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.strokeStyle = `rgba(200, 150, 255, ${alpha * 0.9})`;
-        ctx.lineWidth = 5;
-        ctx.shadowColor = '#cc88ff';
-        ctx.shadowBlur = 15;
-        ctx.stroke();
-
-        // Bright core - white/purple
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        // Rotating containment ring
+        ctx.globalAlpha = 0.75 * fade;
+        ctx.strokeStyle = '#8fd8ff';
         ctx.lineWidth = 2;
-        ctx.shadowBlur = 8;
+        ctx.setLineDash([6, 7]);
+        ctx.lineDashOffset = -this.spin * 18;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 0.92, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.setLineDash([]);
 
-        // More branches for evolved
-        if (alpha > 0.3 && dist > 30) {
-            for (let i = 1; i < points.length - 1; i++) {
-                if (Math.random() > 0.4) {
-                    const branchAngle = (Math.random() - 0.5) * Math.PI * 0.7;
-                    const branchLen = 15 + Math.random() * 30;
-                    const angle = Math.atan2(dy, dx) + branchAngle;
-
-                    ctx.beginPath();
-                    ctx.moveTo(points[i].x, points[i].y);
-                    ctx.lineTo(
-                        points[i].x + Math.cos(angle) * branchLen,
-                        points[i].y + Math.sin(angle) * branchLen
-                    );
-                    ctx.strokeStyle = `rgba(200, 150, 255, ${alpha * 0.5})`;
-                    ctx.lineWidth = 1.5;
-                    ctx.shadowBlur = 5;
-                    ctx.stroke();
-                }
-            }
+        // Crackling arcs inside the field
+        ctx.globalAlpha = fade;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        for (const arc of this.arcs) {
+            ctx.beginPath();
+            ctx.moveTo(arc[0].x, arc[0].y);
+            ctx.lineTo(arc[1].x, arc[1].y);
+            ctx.lineTo(arc[2].x, arc[2].y);
+            ctx.stroke();
         }
 
         ctx.restore();
     }
 }
 
-export class LightningChainWeapon extends ProjectileWeapon {
+export class LightningChainWeapon extends Weapon {
     name = "Lightning Chain";
     emoji = "⚡";
-    description = "Lightning that chains between enemies.";
-    projectileEmoji = "⚡";
-    pierce = 3;
+    description = "Calls a bolt down that arcs between nearby enemies.";
 
     readonly stats = {
         damage: 25,
-        cooldown: 1.8,
-        area: 800,
+        cooldown: 1.6,
+        // Strike range. Was 800 — the bolt used to reach clear across the
+        // screen, which is where the "targeting laser" look came from.
+        area: 260,
         speed: 0,
         duration: 0.3,
-        pierce: 5,
+        pierce: 3,
     };
 
     constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
-        this.pierce = this.stats.pierce;
         this.area = this.stats.area;
         this.speed = this.stats.speed;
         this.duration = this.stats.duration;
     }
 
     update(dt: number) {
-        const isEvolved = this.evolved;
-
         this.cooldown -= dt;
+        if (this.cooldown > 0) return;
 
-        if (this.cooldown <= 0) {
-            const target = this.findClosestEnemy();
+        const target = this.findClosestEnemy();
+        if (!target) return;
 
-            if (target) {
-                this.fire(target);
-                const cdMultiplier = isEvolved ? 1.5 : 1.0;
-                this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
-            }
-        }
+        this.fire(target);
+        // Evolved strikes cover far more ground, so they come a little slower
+        const cdMultiplier = this.evolved ? 1.2 : 1.0;
+        this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
     }
 
     fire(target: any) {
         const isEvolved = this.evolved;
+        const areaScale = this.owner.stats.area;
 
+        // First target is hit by the sky bolt itself
         damageSystem.dealDamage({
             baseDamage: this.damage,
             source: this,
-            target: target,
-            position: target.pos
+            target,
+            position: target.pos,
         });
         particles.emitLightning(target.pos.x, target.pos.y);
+        juice.shockwave(target.pos.x, target.pos.y, 46 * areaScale, '#bfe9ff', 0.25, 3);
+        juice.addTrauma(isEvolved ? 0.14 : 0.07);
 
-        const beamColor = isEvolved ? '#aa00ff' : '#ffff00';
-        const beam = new Beam(this.owner.pos, target.pos, 0.1, beamColor, isEvolved ? 3 : 2);
-        this.onSpawn(beam);
+        const chain = new ChainLightning(
+            target.pos.x,
+            target.pos.y,
+            this.damage,
+            // Base chain grows with level; evolved covers a wide arc slowly
+            isEvolved ? 12 : Math.min(10, 3 + this.level),
+            isEvolved ? 1300 : 700,
+        );
+        chain.source = this;
+        chain.hitEnemies.add(target);
+        chain.chainRange = (isEvolved ? 200 : 150) * areaScale;
+        // "Slower bounces" is the whole feel of the evolution
+        chain.hopInterval = isEvolved ? 0.13 : 0.05;
+        chain.damageFalloff = isEvolved ? 0.94 : 0.88;
 
-        // Bounded chain: unbounded (999 bounces / 10000 range) hit every enemy
-        // on the map in one frame and tanked FPS on damage numbers, particles
-        // and glow rendering. 24 bounces still reads as "hits everything nearby".
-        const bounces = isEvolved ? 24 : Math.min(12, this.pierce + this.level);
-        const maxChainLength = isEvolved ? 4000 : this.area;
-
-        let chain: ChainLightning | ThunderstormLightning;
         if (isEvolved) {
-            // Pass base damage, let chain apply modifiers on each hit
-            chain = new ThunderstormLightning(target.pos.x, target.pos.y, this.damage, bounces, maxChainLength);
-            (chain as ThunderstormLightning).splitChance = 0.1;
-        } else {
-            chain = new ChainLightning(target.pos.x, target.pos.y, this.damage, bounces, maxChainLength);
+            chain.colors = ['rgba(170, 90, 255,', 'rgba(215, 165, 255,', 'rgba(255, 255, 255,'];
         }
 
-        chain.hitEnemies.add(target);
-        // Particles only for the first hits of a chain — damage still applies
-        // to every target, but 400 simultaneous particle bursts is a spike
-        let particleBudget = 8;
+        // Particles are budgeted; damage is not
+        let particleBudget = 6;
         chain.onHit = (t: any, d: number) => {
-            damageSystem.dealDamage({
-                baseDamage: d,
-                source: this,
-                target: t,
-                position: t.pos
-            });
+            damageSystem.dealDamage({ baseDamage: d, source: this, target: t, position: t.pos });
             if (particleBudget > 0) {
                 particleBudget--;
                 particles.emitLightning(t.pos.x, t.pos.y);
             }
         };
+
+        if (isEvolved) {
+            // Every other impact leaves an electrified patch. Every hop was
+            // too much: the fields overlapped into one blob and buried the
+            // screen in damage numbers.
+            chain.onArc = (pos: Vector2, hop: number) => {
+                if (hop % 2 !== 0) return;
+                const field = new StaticFieldZone(
+                    pos.x,
+                    pos.y,
+                    44 * areaScale,
+                    this.damage * 0.2,
+                    1.6 * this.owner.stats.duration,
+                );
+                field.source = this;
+                this.onSpawn(field);
+            };
+        }
 
         this.onSpawn(chain);
     }

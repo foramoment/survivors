@@ -1,117 +1,184 @@
 /**
  * ORBITAL STRIKE WEAPON
- * Calls down random explosions.
- * 
- * Evolved: Atomic Bomb - Massive nuclear explosion
+ *
+ * A gun platform in orbit paints a target on the ground, then drops a kinetic
+ * round on it. Three readable beats: paint → fall → impact.
+ *
+ * Evolved (Orbital Barrage): instead of one enormous nuke in a single spot,
+ * the platform walks a salvo of shells across the field on a long cooldown —
+ * more coverage, far less frame cost, and it can't delete a screen of enemies
+ * with a single button-less press.
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
 import type { Vector2 } from '../../core/Utils';
 import { DelayedExplosionZone } from '../base';
 import { particles } from '../../core/ParticleSystem';
+import { juice } from '../../core/JuiceSystem';
 
 // ============================================
-// EVOLVED ORBITAL STRIKE - ATOMIC BOMB
-// Single massive explosion with mushroom cloud
+// ORBITAL STRIKE ZONE - targeting + impact visuals
 // ============================================
 
-export class AtomicBombZone extends DelayedExplosionZone {
-    private atomicShockwaveRadius: number = 0;
-    private atomicMushroomHeight: number = 0;
-    private atomicExploded: boolean = false;
+export class OrbitalStrikeZone extends DelayedExplosionZone {
+    /** Heavier finishing shell of a barrage */
+    heavy: boolean;
+    private spin: number = 0;
+    private postTimer: number = 0;
+    /** Height the round falls from */
+    private static readonly SKY = 900;
 
-    constructor(x: number, y: number, radius: number, damage: number) {
-        super(x, y, radius, 1.2, damage, '☢️', true);
+    constructor(x: number, y: number, radius: number, delay: number, damage: number, heavy: boolean = false) {
+        super(x, y, radius, delay, damage, '', false);
+        this.heavy = heavy;
     }
 
     update(dt: number) {
         super.update(dt);
+        this.spin += dt;
+        if (this.exploded) this.postTimer += dt;
+    }
 
-        // After explosion, expand shockwave
-        if (this.exploded && !this.atomicExploded) {
-            this.atomicExploded = true;
-            // Emit tons of particles
-            for (let i = 0; i < 20; i++) {
-                particles.emitExplosion(
-                    this.pos.x + (Math.random() - 0.5) * this.radius,
-                    this.pos.y + (Math.random() - 0.5) * this.radius
-                );
-            }
-        }
-
-        if (this.atomicExploded) {
-            this.atomicShockwaveRadius += dt * 500;
-            this.atomicMushroomHeight = Math.min(this.radius * 2, this.atomicMushroomHeight + dt * 200);
-        }
+    protected emitImpact() {
+        particles.emitOrbitalImpact(this.pos.x, this.pos.y, this.radius);
+        juice.addTrauma(this.heavy ? 0.34 : 0.18);
+        juice.shockwave(this.pos.x, this.pos.y, this.radius * 1.9,
+            this.heavy ? '#ffcc55' : '#ff9944', 0.35, this.heavy ? 7 : 4);
+        if (this.heavy) juice.hitStop(0.04);
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        // Use base class draw for targeting phase
-        if (!this.exploded) {
-            super.draw(ctx, camera);
-            return;
-        }
-
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+        this.exploded ? this.drawImpact(ctx) : this.drawTargeting(ctx);
+        ctx.restore();
+    }
 
-        const fade = Math.max(0, this.duration / 0.8);
+    /** Phase 1: the reticle closes in on the impact point */
+    private drawTargeting(ctx: CanvasRenderingContext2D) {
+        const progress = Math.max(0, Math.min(1, 1 - this.delay / this.initialDelay));
+        const color = this.heavy ? '#ffcc55' : '#ff5a3c';
 
-        // Shockwave rings
-        for (let i = 0; i < 3; i++) {
-            const ringRadius = this.atomicShockwaveRadius - i * 30;
-            if (ringRadius > 0) {
-                ctx.beginPath();
-                ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(255, 150, 0, ${(0.5 - i * 0.15) * fade})`;
-                ctx.lineWidth = 8 - i * 2;
-                ctx.stroke();
+        // Incoming round: a thin streak that falls from the sky and lands
+        // exactly when the reticle closes
+        const fallEase = progress * progress;
+        const headY = -OrbitalStrikeZone.SKY * (1 - fallEase);
+        ctx.globalAlpha = 0.25 + 0.55 * progress;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, headY - 90 * (1 - fallEase) - 20);
+        ctx.lineTo(0, headY);
+        ctx.stroke();
+
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(-2, headY - 3, 4, 6);
+
+        // Closing ring
+        const ringRadius = this.radius * (1.85 - 0.85 * progress);
+        ctx.globalAlpha = 0.5 + 0.4 * progress;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
+        ctx.lineDashOffset = -this.spin * 30;
+        ctx.beginPath();
+        ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Pixel corner brackets converging on the point
+        const bracket = this.radius * (1.5 - 0.5 * progress);
+        const len = Math.max(6, this.radius * 0.3);
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = 0.9;
+        for (let i = 0; i < 4; i++) {
+            const sx = i % 2 === 0 ? -1 : 1;
+            const sy = i < 2 ? -1 : 1;
+            ctx.beginPath();
+            ctx.moveTo(sx * bracket, sy * bracket - sy * len);
+            ctx.lineTo(sx * bracket, sy * bracket);
+            ctx.lineTo(sx * bracket - sx * len, sy * bracket);
+            ctx.stroke();
+        }
+
+        // Blink faster the closer it gets
+        const blink = Math.sin(progress * progress * 90) > 0;
+        if (blink) {
+            ctx.globalAlpha = 0.85;
+            ctx.fillStyle = color;
+            ctx.fillRect(-3, -3, 6, 6);
+        }
+
+        // Ground shadow of the incoming round
+        ctx.globalAlpha = 0.18 + 0.2 * progress;
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 0.35 * (0.4 + progress), this.radius * 0.18 * (0.4 + progress), 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    /** Phase 2: column of light, flash and expanding rings */
+    private drawImpact(ctx: CanvasRenderingContext2D) {
+        const t = this.postTimer;
+        const fade = Math.max(0, 1 - t / 0.5);
+        if (fade <= 0) return;
+
+        // Column of light punching down through the impact point. Three
+        // nested widths fake a soft edge without a second gradient.
+        const columnLife = Math.max(0, 1 - t / 0.2);
+        if (columnLife > 0) {
+            for (let i = 0; i < 3; i++) {
+                const width = this.radius * (0.62 - i * 0.18) * columnLife;
+                if (width <= 0) continue;
+                const alpha = (0.16 + i * 0.16) * columnLife;
+                const grad = ctx.createLinearGradient(0, -OrbitalStrikeZone.SKY, 0, 0);
+                grad.addColorStop(0, 'rgba(255, 220, 150, 0)');
+                grad.addColorStop(1, `rgba(255, 248, 214, ${alpha.toFixed(3)})`);
+                ctx.fillStyle = grad;
+                ctx.fillRect(-width / 2, -OrbitalStrikeZone.SKY, width, OrbitalStrikeZone.SKY);
             }
         }
 
-        // Core explosion
-        const coreGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
-        coreGradient.addColorStop(0, `rgba(255, 255, 200, ${0.9 * fade})`);
-        coreGradient.addColorStop(0.3, `rgba(255, 200, 50, ${0.7 * fade})`);
-        coreGradient.addColorStop(0.6, `rgba(255, 100, 0, ${0.5 * fade})`);
-        coreGradient.addColorStop(1, `rgba(200, 50, 0, 0)`);
-
+        // Core flash
+        const core = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * (1 + t * 1.5));
+        core.addColorStop(0, `rgba(255, 255, 230, ${0.9 * fade})`);
+        core.addColorStop(0.35, `rgba(255, 180, 60, ${0.6 * fade})`);
+        core.addColorStop(1, 'rgba(255, 90, 20, 0)');
+        ctx.fillStyle = core;
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = coreGradient;
-        ctx.shadowColor = '#ff6600';
-        ctx.shadowBlur = 50 * fade;
+        ctx.arc(0, 0, this.radius * (1 + t * 1.5), 0, Math.PI * 2);
         ctx.fill();
 
-        // Mushroom cloud stem
-        if (this.atomicMushroomHeight > 0) {
-            const stemGradient = ctx.createLinearGradient(0, 0, 0, -this.atomicMushroomHeight);
-            stemGradient.addColorStop(0, `rgba(200, 100, 50, ${0.6 * fade})`);
-            stemGradient.addColorStop(1, `rgba(150, 80, 40, ${0.3 * fade})`);
-
+        // Two expanding rings
+        ctx.lineCap = 'butt';
+        for (let i = 0; i < 2; i++) {
+            const rt = t - i * 0.07;
+            if (rt <= 0) continue;
+            // Rings stay near the crater — a ring sprinting off-screen just
+            // reads as a stray line
+            const r = this.radius * (0.5 + rt * 2.4);
+            ctx.globalAlpha = Math.max(0, fade * (1 - i * 0.35));
+            ctx.strokeStyle = i === 0 ? '#fff2c0' : '#ff8a3c';
+            ctx.lineWidth = Math.max(1, 7 * fade);
             ctx.beginPath();
-            ctx.moveTo(-this.radius * 0.3, 0);
-            ctx.lineTo(-this.radius * 0.2, -this.atomicMushroomHeight * 0.7);
-            ctx.lineTo(this.radius * 0.2, -this.atomicMushroomHeight * 0.7);
-            ctx.lineTo(this.radius * 0.3, 0);
-            ctx.fillStyle = stemGradient;
-            ctx.fill();
-
-            // Mushroom cap
-            ctx.beginPath();
-            ctx.ellipse(0, -this.atomicMushroomHeight * 0.8, this.radius * 0.8, this.radius * 0.4, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(180, 80, 40, ${0.5 * fade})`;
-            ctx.fill();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.stroke();
         }
 
-        ctx.restore();
+        // Scorch mark left in the crater
+        ctx.globalAlpha = 0.35 * fade;
+        ctx.fillStyle = '#1a0d05';
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 
 export class OrbitalStrikeWeapon extends Weapon {
     name = "Orbital Strike";
     emoji = "🛰️";
-    description = "Calls down random explosions.";
+    description = "Marks a spot, then drops a kinetic round on it.";
 
     readonly stats = {
         damage: 40,
@@ -121,8 +188,10 @@ export class OrbitalStrikeWeapon extends Weapon {
         duration: 1.0,
     };
 
-    private activeAtomicBomb: any = null;
-    private waitingForExplosion: boolean = false;
+    /** How far from the player a strike may be placed */
+    private static readonly SPREAD = 420;
+    /** Shells per evolved salvo */
+    private static readonly BARRAGE_SHELLS = 6;
 
     constructor(owner: Player) {
         super(owner);
@@ -132,48 +201,73 @@ export class OrbitalStrikeWeapon extends Weapon {
     }
 
     update(dt: number) {
-        const isEvolved = this.evolved;
-
-        if (isEvolved && this.waitingForExplosion) {
-            if (this.activeAtomicBomb && this.activeAtomicBomb.isDead) {
-                this.waitingForExplosion = false;
-                this.activeAtomicBomb = null;
-            }
-            return;
-        }
-
         this.cooldown -= dt;
+        if (this.cooldown > 0) return;
 
-        if (this.cooldown <= 0) {
-            if (isEvolved) {
-                const atomicBomb = new AtomicBombZone(
-                    this.owner.pos.x + (Math.random() - 0.5) * 300,
-                    this.owner.pos.y + (Math.random() - 0.5) * 200,
-                    300,
-                    this.damage * 8
-                );
-                atomicBomb.source = this;
-                this.activeAtomicBomb = atomicBomb;
-                this.waitingForExplosion = true;
-                this.onSpawn(atomicBomb);
-
-                this.cooldown = 8.0 * this.owner.stats.cooldown;
-            } else {
-                const offsetX = (Math.random() - 0.5) * 1000;
-                const offsetY = (Math.random() - 0.5) * 800;
-
-                const zone = new DelayedExplosionZone(
-                    this.owner.pos.x + offsetX,
-                    this.owner.pos.y + offsetY,
-                    this.area * this.owner.stats.area * (1 + this.level * 0.1),
-                    1.0,
-                    this.damage,
-                    '💥'
-                );
-                zone.source = this;
-                this.onSpawn(zone);
-                this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
-            }
+        if (this.evolved) {
+            this.fireBarrage();
+            this.cooldown = 7.0 * this.owner.stats.cooldown;
+        } else {
+            this.fireShell(this.pickTarget(), this.blastRadius(), this.damage, 0.9, false);
+            this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
         }
+    }
+
+    private blastRadius(): number {
+        return this.area * this.owner.stats.area * (1 + this.level * 0.1);
+    }
+
+    /**
+     * Prefer to land on an actual enemy — a strike that hits nothing looks
+     * broken. Falls back to a random spot near the player when the field is
+     * empty.
+     */
+    private pickTarget(): Vector2 {
+        const candidates = this.findRandomEnemies(1, OrbitalStrikeWeapon.SPREAD);
+        if (candidates.length > 0) {
+            const target = candidates[0];
+            // Lead the target slightly so it isn't a guaranteed hit
+            return {
+                x: target.pos.x + (Math.random() - 0.5) * 40,
+                y: target.pos.y + (Math.random() - 0.5) * 40,
+            };
+        }
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 120 + Math.random() * (OrbitalStrikeWeapon.SPREAD - 120);
+        return {
+            x: this.owner.pos.x + Math.cos(angle) * dist,
+            y: this.owner.pos.y + Math.sin(angle) * dist,
+        };
+    }
+
+    /** Walk a salvo across the field, finishing with one heavy shell */
+    private fireBarrage() {
+        const shells = OrbitalStrikeWeapon.BARRAGE_SHELLS;
+        const radius = this.blastRadius() * 0.85;
+        // Shells sweep along a line through the player, so the salvo reads as
+        // a strafing run rather than random scatter
+        const sweep = Math.random() * Math.PI * 2;
+        const spacing = OrbitalStrikeWeapon.SPREAD / (shells - 1);
+
+        for (let i = 0; i < shells; i++) {
+            const offset = (i - (shells - 1) / 2) * spacing;
+            const jitterX = (Math.random() - 0.5) * 90;
+            const jitterY = (Math.random() - 0.5) * 90;
+            const pos = {
+                x: this.owner.pos.x + Math.cos(sweep) * offset + jitterX,
+                y: this.owner.pos.y + Math.sin(sweep) * offset + jitterY,
+            };
+            // Staggered fuses make the salvo land as a rolling barrage
+            this.fireShell(pos, radius, this.damage, 0.75 + i * 0.16, false);
+        }
+
+        // Finisher lands last, on the densest spot we can find
+        this.fireShell(this.pickTarget(), radius * 1.7, this.damage * 2, 0.75 + shells * 0.16, true);
+    }
+
+    private fireShell(pos: Vector2, radius: number, damage: number, delay: number, heavy: boolean) {
+        const zone = new OrbitalStrikeZone(pos.x, pos.y, radius, delay, damage, heavy);
+        zone.source = this;
+        this.onSpawn(zone);
     }
 }

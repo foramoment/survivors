@@ -386,20 +386,28 @@ export class DelayedExplosionZone extends Zone {
         }
     }
 
+    /**
+     * Impact feedback. Subclasses override this to spend a different particle
+     * budget — a six-shell barrage cannot afford the single-strike burst.
+     */
+    protected emitImpact() {
+        if (this.isAtomic) {
+            particles.emitNuclear(this.pos.x, this.pos.y, this.radius);
+            juice.addTrauma(0.55);
+            juice.hitStop(0.06);
+            juice.flash('#ffeeaa', 0.35, 0.4);
+            juice.shockwave(this.pos.x, this.pos.y, this.radius * 2.2, '#ffcc55', 0.55, 8);
+        } else {
+            particles.emitOrbitalStrike(this.pos.x, this.pos.y, this.radius);
+            juice.addTrauma(0.3);
+            juice.shockwave(this.pos.x, this.pos.y, this.radius * 1.8, '#ff8844', 0.4, 5);
+        }
+    }
+
     explode() {
         if (!this.particlesEmitted) {
             this.particlesEmitted = true;
-            if (this.isAtomic) {
-                particles.emitNuclear(this.pos.x, this.pos.y, this.radius);
-                juice.addTrauma(0.55);
-                juice.hitStop(0.06);
-                juice.flash('#ffeeaa', 0.35, 0.4);
-                juice.shockwave(this.pos.x, this.pos.y, this.radius * 2.2, '#ffcc55', 0.55, 8);
-            } else {
-                particles.emitOrbitalStrike(this.pos.x, this.pos.y, this.radius);
-                juice.addTrauma(0.3);
-                juice.shockwave(this.pos.x, this.pos.y, this.radius * 1.8, '#ff8844', 0.4, 5);
-            }
+            this.emitImpact();
         }
 
         const enemiesInBlast = levelSpatialHash.getWithinRadius(this.pos, this.radius);

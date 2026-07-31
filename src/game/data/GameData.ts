@@ -61,12 +61,12 @@ export const WEAPONS = [
         id: 'phantom_slash',
         name: "Phantom Slash",
         emoji: "⚔️",
-        description: "Instantly cuts random enemies",
+        description: "Blinks between the closest enemies and cuts them",
         class: PhantomSlashWeapon,
         evolution: {
             name: "Dimensional Blade",
             emoji: "🗡️",
-            description: "Cuts through dimensions, pierces all"
+            description: "Every cut tears a rift that slows and grinds"
         }
     },
     {
@@ -121,12 +121,12 @@ export const WEAPONS = [
         id: 'orbital_strike',
         name: "Orbital Strike",
         emoji: "🛰️",
-        description: "Calls down random explosions",
+        description: "Marks a spot, then drops a kinetic round on it",
         class: OrbitalStrikeWeapon,
         evolution: {
-            name: "Atomic Bomb",
-            emoji: "☢️",
-            description: "Massive nuclear explosion with mushroom cloud"
+            name: "Orbital Barrage",
+            emoji: "☄️",
+            description: "A rolling salvo of shells, heavy round last"
         }
     },
     {
@@ -169,12 +169,12 @@ export const WEAPONS = [
         id: 'lightning_chain',
         name: "Lightning Chain",
         emoji: "⚡",
-        description: "Chains between enemies",
+        description: "A bolt from the sky arcs between nearby enemies",
         class: LightningChainWeapon,
         evolution: {
             name: "Thunderstorm",
             emoji: "🌩️",
-            description: "Infinite chain lightning"
+            description: "Slower arcs that leave crackling static fields"
         }
     },
     {

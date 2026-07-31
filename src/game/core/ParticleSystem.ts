@@ -231,6 +231,60 @@ export class ParticleSystem {
         this.emitExplosion(x, y, radius, ['#ff2200', '#ff5500', '#ff8800', '#ffcc00']);
     }
 
+    /**
+     * Lean kinetic impact (~34 particles) — for salvos where several land in
+     * the same second and emitOrbitalStrike's ~165 would spike the frame.
+     */
+    emitOrbitalImpact(x: number, y: number, radius: number) {
+        // Core flash
+        this.emit({
+            x, y,
+            count: 8,
+            color: ['#ffffff', '#ffe9b0'],
+            speed: radius * 2.2,
+            size: 9,
+            sizeEnd: 0,
+            life: 0.18,
+            spread: Math.PI * 2,
+            glow: true,
+            glowSize: 14,
+            shape: 'circle'
+        });
+
+        // Embers thrown outward
+        this.emit({
+            x, y,
+            count: 16,
+            color: ['#ff7a1a', '#ffb020', '#ff4400'],
+            speed: radius * 1.6,
+            speedVariation: 0.7,
+            size: 6,
+            sizeEnd: 0,
+            life: 0.45,
+            lifeVariation: 0.4,
+            spread: Math.PI * 2,
+            glow: true,
+            glowSize: 7,
+            shape: 'square'
+        });
+
+        // Debris kicked up
+        this.emit({
+            x, y,
+            count: 10,
+            color: ['#8a6a4a', '#5c4632', '#c9a06a'],
+            speed: radius * 1.1,
+            speedVariation: 0.8,
+            size: 5,
+            sizeEnd: 2,
+            life: 0.8,
+            gravity: 420,
+            spread: Math.PI,
+            angle: -Math.PI / 2,
+            shape: 'square'
+        });
+    }
+
     emitNuclear(x: number, y: number, radius: number) {
         // Intense white flash
         this.emit({

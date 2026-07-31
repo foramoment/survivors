@@ -173,23 +173,64 @@ export class VoidRayBeam extends Projectile {
 }
 
 // ============================================
-// CHAIN LIGHTNING - Bouncing beam
+// CHAIN LIGHTNING - Sequential arcing bolt
 // ============================================
+
+/** One arc of a chain: a pre-baked polyline that fades out */
+export interface BoltSegment {
+    points: Vector2[];
+    /** Short-lived branch forks, baked with the segment */
+    forks: Vector2[][];
+    alpha: number;
+    width: number;
+}
+
+/**
+ * Chain lightning that walks from enemy to enemy **over time** — one hop every
+ * `hopInterval` seconds — instead of resolving the whole chain in a single
+ * frame.
+ *
+ * Two reasons this is better than the old version:
+ *   1. Look: you can actually watch the bolt travel, and each arc is baked
+ *      once (points are generated when the segment is created, not re-randomised
+ *      every frame), so bolts read as solid lightning instead of static.
+ *   2. Cost: damage, particles and damage numbers are spread across frames, so
+ *      a long chain can't spike a single frame.
+ *
+ * The first arc falls from off-screen above the target — the strike comes from
+ * the sky, not from the player, so there is no laser-pointer line any more.
+ */
 export class ChainLightning extends Projectile {
+    /** Remaining hops */
     bounces: number;
-    timer: number = 0;
-    interval: number = 0.1;
-    currentPos: Vector2;
-    segments: { start: Vector2, end: Vector2, alpha: number }[] = [];
-    hitEnemies: Set<any> = new Set();
-    range: number = 400;
+    /** How far a single hop may reach */
+    chainRange: number = 170;
+    /** Seconds between hops */
+    hopInterval: number = 0.05;
+    /** Damage multiplier applied per hop */
+    damageFalloff: number = 0.9;
+    /** Height the opening bolt falls from */
+    skyHeight: number = 460;
+    /** Total distance the chain may cover before it gives up */
     maxChainLength: number;
+
+    segments: BoltSegment[] = [];
+    hitEnemies: Set<any> = new Set();
+    currentPos: Vector2;
     totalChainLength: number = 0;
     initialDamage: number;
+    /** Bolt palette (glow, body, core) */
+    colors: [string, string, string] = ['rgba(80, 190, 255,', 'rgba(160, 230, 255,', 'rgba(255, 255, 255,'];
 
     onHit: (target: any, damage: number) => void = () => { };
+    /** Fires at every impact point, including the first — used for AoE drops */
+    onArc: (pos: Vector2, hop: number) => void = () => { };
 
-    constructor(x: number, y: number, damage: number, bounces: number, maxChainLength: number = 800) {
+    private hopTimer: number = 0;
+    private started: boolean = false;
+    private hopsDone: number = 0;
+
+    constructor(x: number, y: number, damage: number, bounces: number, maxChainLength: number = 700) {
         super(x, y, { x: 0, y: 0 }, 10, damage, 0, '');
         this.canCollide = false;
         this.currentPos = { x, y };
@@ -198,193 +239,169 @@ export class ChainLightning extends Projectile {
         this.initialDamage = damage;
     }
 
-    hasChained: boolean = false;
-
-    // Override to chain to enemy (can be extended in evolved versions)
-    chainToEnemy(_enemy: any, _currentBounces: number) {
-        // Base implementation does nothing - evolved versions can override
-    }
-
     update(dt: number) {
-        this.segments.forEach(s => s.alpha -= dt * 5);
-        this.segments = this.segments.filter(s => s.alpha > 0);
+        // Fade existing arcs
+        for (let i = this.segments.length - 1; i >= 0; i--) {
+            this.segments[i].alpha -= dt * 3.2;
+            if (this.segments[i].alpha <= 0) this.segments.splice(i, 1);
+        }
 
-        if (!this.hasChained) {
-            this.hasChained = true;
+        if (!this.started) {
+            this.started = true;
+            // Opening strike out of the sky
+            this.segments.push(this.buildSegment(
+                { x: this.pos.x + (Math.random() - 0.5) * 60, y: this.pos.y - this.skyHeight },
+                this.pos,
+                34,
+                5,
+            ));
+            this.onArc(this.pos, 0);
+        }
 
-            let currentBounces = this.bounces;
-
-            while (currentBounces > 0) {
-                let target: any = null;
-                let minDst = this.range;
-
-                // Use spatial hash for O(1) lookup
-                const nearby = levelSpatialHash.getWithinRadius(this.currentPos, this.range);
-
-                for (const enemy of nearby) {
-                    if (this.hitEnemies.has(enemy)) continue;
-
-                    const d = distance(this.currentPos, enemy.pos);
-                    if (d < minDst) {
-                        minDst = d;
-                        target = enemy;
-                    }
-                }
-
-                if (target) {
-                    const chainSegmentLength = distance(this.currentPos, target.pos);
-                    if (this.totalChainLength + chainSegmentLength > this.maxChainLength) break;
-
-                    this.totalChainLength += chainSegmentLength;
-                    this.hitEnemies.add(target);
-
-                    const totalBounces = this.segments.length;
-                    const damageMultiplier = Math.pow(0.85, totalBounces);
-                    const currentDamage = this.initialDamage * damageMultiplier;
-
-                    this.onHit(target, currentDamage);
-
-                    this.segments.push({
-                        start: { ...this.currentPos },
-                        end: { ...target.pos },
-                        alpha: 1.0
-                    });
-
-                    this.currentPos = { ...target.pos };
-                    currentBounces--;
-                } else {
-                    break;
-                }
+        this.hopTimer += dt;
+        while (this.bounces > 0 && this.hopTimer >= this.hopInterval) {
+            this.hopTimer -= this.hopInterval;
+            if (!this.hop()) {
+                this.bounces = 0;
+                break;
             }
         }
 
-        if (this.hasChained && this.segments.length === 0) {
+        if (this.bounces <= 0 && this.segments.length === 0) {
             this.isDead = true;
         }
     }
 
-    /** Long chains render only their newest segments, without glow passes */
-    protected static readonly MAX_DRAWN_SEGMENTS = 16;
-    protected static readonly CHEAP_DRAW_THRESHOLD = 8;
+    /** Advance the chain by one enemy. Returns false when it can't continue. */
+    private hop(): boolean {
+        let target: any = null;
+        let minDst = this.chainRange;
 
-    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        ctx.save();
-        ctx.translate(-camera.x, -camera.y);
-
-        // shadowBlur strokes are expensive; with many segments switch to a
-        // single-pass cheap render and cap how many segments are drawn at all
-        const cheap = this.segments.length > ChainLightning.CHEAP_DRAW_THRESHOLD;
-        const drawn = this.segments.length > ChainLightning.MAX_DRAWN_SEGMENTS
-            ? this.segments.slice(-ChainLightning.MAX_DRAWN_SEGMENTS)
-            : this.segments;
-        for (const seg of drawn) {
-            this.drawLightningBolt(ctx, seg.start, seg.end, seg.alpha, cheap);
+        const nearby = levelSpatialHash.getWithinRadius(this.currentPos, this.chainRange);
+        for (const enemy of nearby) {
+            if (this.hitEnemies.has(enemy)) continue;
+            const d = distance(this.currentPos, enemy.pos);
+            if (d < minDst) {
+                minDst = d;
+                target = enemy;
+            }
         }
+        if (!target) return false;
 
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = 'transparent';
-        ctx.globalAlpha = 1;
-        ctx.restore();
+        const hopLength = distance(this.currentPos, target.pos);
+        if (this.totalChainLength + hopLength > this.maxChainLength) return false;
+
+        this.totalChainLength += hopLength;
+        this.hitEnemies.add(target);
+        this.hopsDone++;
+        this.bounces--;
+
+        this.onHit(target, this.initialDamage * Math.pow(this.damageFalloff, this.hopsDone));
+        this.segments.push(this.buildSegment({ ...this.currentPos }, { ...target.pos }, 16, 4));
+        this.onArc({ ...target.pos }, this.hopsDone);
+
+        this.currentPos = { ...target.pos };
+        return true;
     }
 
-    protected drawLightningBolt(ctx: CanvasRenderingContext2D, start: Vector2, end: Vector2, alpha: number, cheap: boolean = false) {
+    /** Bake a jagged polyline (plus a few forks) once, so it doesn't crawl */
+    private buildSegment(start: Vector2, end: Vector2, jitter: number, width: number): BoltSegment {
         const dx = end.x - start.x;
         const dy = end.y - start.y;
-        const dist = distance(start, end);
-
-        if (dist < 5 || !isFinite(dist) || !isFinite(alpha) || alpha <= 0) return;
-
-        ctx.save();
-
-        const numSegments = Math.min(15, Math.max(4, Math.floor(dist / 30)));
-        const points: Vector2[] = [{ x: start.x, y: start.y }];
-
+        const dist = Math.max(1, Math.hypot(dx, dy));
+        const steps = Math.min(14, Math.max(3, Math.round(dist / 26)));
         const perpX = -dy / dist;
         const perpY = dx / dist;
 
-        for (let i = 1; i < numSegments; i++) {
-            const t = i / numSegments;
-            const baseX = start.x + dx * t;
-            const baseY = start.y + dy * t;
-
-            const offset = (Math.random() - 0.5) * 25 * (1 - Math.abs(t - 0.5) * 1.5);
+        const points: Vector2[] = [{ ...start }];
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            // Taper the jitter at both ends so the bolt visibly connects
+            const taper = 1 - Math.abs(t - 0.5) * 1.6;
+            const offset = (Math.random() - 0.5) * 2 * jitter * taper;
             points.push({
-                x: baseX + perpX * offset,
-                y: baseY + perpY * offset
+                x: start.x + dx * t + perpX * offset,
+                y: start.y + dy * t + perpY * offset,
             });
         }
-        points.push({ x: end.x, y: end.y });
+        points.push({ ...end });
 
-        if (cheap) {
-            // Single pass, no shadow — used when the chain is long
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(points[i].x, points[i].y);
-            }
-            ctx.strokeStyle = `rgba(180, 235, 255, ${alpha * 0.9})`;
-            ctx.lineWidth = 2.5;
+        // A couple of dead-end forks sell the "electric" read
+        const forks: Vector2[][] = [];
+        const forkCount = dist > 70 ? 2 : 1;
+        for (let f = 0; f < forkCount; f++) {
+            const i = 1 + Math.floor(Math.random() * Math.max(1, points.length - 2));
+            const angle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 1.8;
+            const len = 12 + Math.random() * 22;
+            forks.push([
+                points[i],
+                {
+                    x: points[i].x + Math.cos(angle) * len * 0.5,
+                    y: points[i].y + Math.sin(angle) * len * 0.5,
+                },
+                {
+                    x: points[i].x + Math.cos(angle + 0.5) * len,
+                    y: points[i].y + Math.sin(angle + 0.5) * len,
+                },
+            ]);
+        }
+
+        return { points, forks, alpha: 1, width };
+    }
+
+    /** Safety cap — arcs fade in ~0.3s so this is rarely reached */
+    protected static readonly MAX_DRAWN_SEGMENTS = 10;
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        if (this.segments.length === 0) return;
+
+        ctx.save();
+        ctx.translate(-camera.x, -camera.y);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        const drawn = this.segments.length > ChainLightning.MAX_DRAWN_SEGMENTS
+            ? this.segments.slice(-ChainLightning.MAX_DRAWN_SEGMENTS)
+            : this.segments;
+
+        // Flicker is a per-frame alpha wobble, never a geometry change
+        const flicker = 0.85 + 0.15 * Math.sin(performance.now() / 22);
+        const [glow, body, core] = this.colors;
+
+        for (const seg of drawn) {
+            const a = Math.max(0, Math.min(1, seg.alpha)) * flicker;
+
+            this.tracePath(ctx, seg.points);
+            ctx.strokeStyle = `${glow} ${(a * 0.4).toFixed(3)})`;
+            ctx.lineWidth = seg.width * 3.5;
             ctx.stroke();
-            ctx.restore();
-            return;
-        }
 
-        // Glow layer
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.strokeStyle = `rgba(100, 200, 255, ${alpha * 0.3})`;
-        ctx.lineWidth = 10;
-        ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 20;
-        ctx.stroke();
+            this.tracePath(ctx, seg.points);
+            ctx.strokeStyle = `${body} ${a.toFixed(3)})`;
+            ctx.lineWidth = seg.width;
+            ctx.stroke();
 
-        // Main bolt
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.strokeStyle = `rgba(150, 230, 255, ${alpha * 0.8})`;
-        ctx.lineWidth = 3;
-        ctx.shadowBlur = 10;
-        ctx.stroke();
+            this.tracePath(ctx, seg.points);
+            ctx.strokeStyle = `${core} ${a.toFixed(3)})`;
+            ctx.lineWidth = Math.max(1, seg.width * 0.4);
+            ctx.stroke();
 
-        // Bright core
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-        ctx.lineWidth = 1.5;
-        ctx.shadowBlur = 5;
-        ctx.stroke();
-
-        // Small branches
-        if (alpha > 0.4 && dist > 40) {
-            for (let i = 2; i < points.length - 1; i += 2) {
-                if (Math.random() > 0.6) {
-                    const branchAngle = (Math.random() - 0.5) * Math.PI * 0.5;
-                    const branchLen = 10 + Math.random() * 20;
-                    const angle = Math.atan2(dy, dx) + branchAngle;
-
-                    ctx.beginPath();
-                    ctx.moveTo(points[i].x, points[i].y);
-                    ctx.lineTo(
-                        points[i].x + Math.cos(angle) * branchLen,
-                        points[i].y + Math.sin(angle) * branchLen
-                    );
-                    ctx.strokeStyle = `rgba(150, 230, 255, ${alpha * 0.4})`;
-                    ctx.lineWidth = 1;
-                    ctx.shadowBlur = 3;
+            if (a > 0.35) {
+                ctx.strokeStyle = `${body} ${(a * 0.5).toFixed(3)})`;
+                ctx.lineWidth = Math.max(1, seg.width * 0.35);
+                for (const fork of seg.forks) {
+                    this.tracePath(ctx, fork);
                     ctx.stroke();
                 }
             }
         }
 
         ctx.restore();
+    }
+
+    private tracePath(ctx: CanvasRenderingContext2D, points: Vector2[]) {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
     }
 }

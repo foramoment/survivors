@@ -347,10 +347,9 @@ describe('LightningChainWeapon', () => {
         weapon.cooldown = 0;
         weapon.update(0.1);
 
-        // LightningChain spawns both Beam and ChainLightning
-        expect(spawnedEntities).toHaveLength(2);
-        // ChainLightning has segments array (second entity)
-        expect(spawnedEntities[1].segments).toBeDefined();
+        // Only the chain spawns — the old player-to-target beam is gone
+        expect(spawnedEntities).toHaveLength(1);
+        expect(spawnedEntities[0].segments).toBeDefined();
     });
 
     it('should use findClosestEnemy for targeting', () => {
@@ -361,8 +360,9 @@ describe('LightningChainWeapon', () => {
         weapon.cooldown = 0;
         weapon.update(0.1);
 
-        // Spawns Beam + ChainLightning
-        expect(spawnedEntities).toHaveLength(2);
+        expect(spawnedEntities).toHaveLength(1);
+        // The chain starts on the closer enemy
+        expect(spawnedEntities[0].pos.x).toBe(150);
     });
 
     it('should NOT fire when no enemy in range', () => {

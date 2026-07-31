@@ -1006,7 +1006,9 @@ export class GameManager {
 
         const life = isCrit ? 0.8 : 0.55;
         this.damageNumbers.push({
-            x: pos.x + (Math.random() - 0.5) * 10,
+            // Wide horizontal jitter so simultaneous hits don't stack into an
+            // unreadable pile of digits
+            x: pos.x + (Math.random() - 0.5) * 28,
             y: pos.y,
             // Arc upward and outward so overlapping hits stay readable
             vx: (Math.random() - 0.5) * 60,
