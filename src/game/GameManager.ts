@@ -14,6 +14,7 @@ import { collisionSystem } from './core/CollisionSystem';
 import { difficultyDirector } from './core/DifficultyDirector';
 import { sprites } from './core/SpriteFactory';
 import { stageBackdrop } from './core/StageBackdrop';
+import { propField } from './core/PropField';
 import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
@@ -144,6 +145,8 @@ export class GameManager {
         this.currentStage = STAGES[stageIndex] ?? STAGES[0];
         this.backgroundTheme = this.currentStage.theme;
         stageBackdrop.setStage(this.currentStage);
+        propField.setStage(this.currentStage);
+        propField.reset();
         this.finalBoss = null;
         this.finalBossSpawned = false;
         // Reset progression tracking BEFORE adding the starting weapon
@@ -721,6 +724,10 @@ export class GameManager {
         }
 
         this.player.update(dt);
+        // Obstacles: stream in the chunks around the player, then stop them
+        // from walking through cover
+        propField.update(this.player.pos);
+        propField.resolve(this.player);
         this.player.weapons.forEach(w => w.update(dt));
 
         // Reset enemy stats and forces before updates/collisions
@@ -758,6 +765,12 @@ export class GameManager {
 
         // Update enemies (Move) AFTER collisions have potentially applied slows
         this.enemies.forEach(e => e.update(dt, this.player!.pos));
+
+        // Enemies flow around obstacles; bosses are big enough to plough through
+        for (const e of this.enemies) {
+            if (e.isBoss) continue;
+            propField.resolve(e, this.player.pos, e.speed * e.speedMultiplier * 0.7, dt);
+        }
 
         // === PLAYER-ENEMY COLLISION WITH KNOCKBACK ===
         const hpBeforeContact = this.player.hp;
@@ -1081,6 +1094,7 @@ export class GameManager {
         }
 
         this.drawBackground(ctx, camera);
+        propField.draw(ctx, camera, this.canvas.width, this.canvas.height);
 
         this.projectiles.forEach(p => {
             if (p instanceof Zone) p.draw(ctx, camera);

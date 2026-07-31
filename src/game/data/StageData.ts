@@ -33,6 +33,19 @@ export interface StageVisuals {
     pulse: number;
 }
 
+/** Shape family of a stage's obstacles */
+export type PropStyle = 'rock' | 'crate' | 'crystal';
+
+/** Obstacles scattered across the arena — these block movement */
+export interface StageProps {
+    style: PropStyle;
+    /** Average obstacles per 520×520 world chunk (0 = none) */
+    density: number;
+    /** Collision radius range in world pixels */
+    minRadius: number;
+    maxRadius: number;
+}
+
 export interface StageConfig {
     id: string;
     name: string;
@@ -42,6 +55,8 @@ export interface StageConfig {
     theme: string;
     /** Parallax + lighting palette */
     visuals: StageVisuals;
+    /** Obstacle field */
+    props: StageProps;
     /** Indices into ENEMIES, in wave order (wave N spawns pool[N] → pool[N+1]) */
     enemyPool: number[];
     /** Seconds to survive before the final boss appears */
@@ -73,6 +88,7 @@ export const STAGES: StageConfig[] = [
             flicker: 0,
             pulse: 0.18,
         },
+        props: { style: 'rock', density: 1.1, minRadius: 26, maxRadius: 52 },
         enemyPool: [0, 1, 2, 3, 4, 5, 6],
         duration: 600, // 10 minutes
         hpScale: 1,
@@ -98,6 +114,7 @@ export const STAGES: StageConfig[] = [
             flicker: 0.9,
             pulse: 0,
         },
+        props: { style: 'crate', density: 1.4, minRadius: 24, maxRadius: 44 },
         enemyPool: [1, 3, 4, 6, 7, 8, 9],
         duration: 720, // 12 minutes
         hpScale: 1.4,
@@ -123,6 +140,7 @@ export const STAGES: StageConfig[] = [
             flicker: 0.2,
             pulse: 0.55,
         },
+        props: { style: 'crystal', density: 0.9, minRadius: 22, maxRadius: 40 },
         enemyPool: [3, 5, 6, 7, 8, 9, 10],
         duration: 900, // 15 minutes
         hpScale: 1.9,

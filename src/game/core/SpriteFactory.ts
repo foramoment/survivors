@@ -335,6 +335,132 @@ export class SpriteFactory {
     }
 
     // =========================================================
+    // Arena props (obstacles)
+    // =========================================================
+
+    /**
+     * Obstacle sprite: a chunky silhouette on a 20×20 logical grid, seeded by
+     * `variant` so a stage gets a handful of distinct shapes it can reuse.
+     */
+    getPropSprite(style: string, variant: number, hue: number): HTMLCanvasElement {
+        const key = `prop:${style}:${variant}:${hue}`;
+        let sprite = this.cache.get(key);
+        if (!sprite) {
+            sprite = this.generatePropSprite(style, variant, hue);
+            this.cache.set(key, sprite);
+        }
+        return sprite;
+    }
+
+    private generatePropSprite(style: string, variant: number, hue: number): HTMLCanvasElement {
+        const size = 20;
+        const rng = mulberry32(hashString(`${style}:${variant}`));
+        const grid: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
+        const c = (size - 1) / 2;
+        // Shared four-tone ramp: 1 shadow, 2 body, 3 lit body, 4 highlight
+        const set = (x: number, y: number, tone: number) => {
+            const px = Math.round(x);
+            const py = Math.round(y);
+            if (px < 0 || py < 0 || px >= size || py >= size) return;
+            grid[py][px] = tone;
+        };
+
+        if (style === 'crate') {
+            // Cargo container: lit top face, shadowed right side, hazard stripe
+            const w = 6 + Math.floor(rng() * 2);
+            const h = 5 + Math.floor(rng() * 3);
+            const x0 = Math.max(0, Math.round(c - w));
+            const x1 = Math.min(size - 1, Math.round(c + w));
+            const y0 = Math.max(0, Math.round(c - h));
+            const y1 = Math.min(size - 1, Math.round(c + h));
+            for (let y = y0; y <= y1; y++) {
+                for (let x = x0; x <= x1; x++) {
+                    const top = y <= y0 + 1;
+                    const bottom = y >= y1 - 1;
+                    const right = x >= x1 - 1;
+                    grid[y][x] = top ? 3 : bottom || right ? 1 : 2;
+                }
+            }
+            // Panel seam and hazard stripe across the front
+            const seam = Math.round(c);
+            for (let x = x0 + 1; x <= x1 - 1; x++) {
+                grid[seam][x] = 1;
+                if (x % 2 === 0) grid[seam - 1][x] = 4;
+            }
+            // Corner bolts
+            set(x0 + 1, y0 + 2, 4);
+            set(x1 - 2, y0 + 2, 4);
+            set(x0 + 1, y1 - 2, 4);
+        } else if (style === 'crystal') {
+            // Cluster: one tall shard flanked by two smaller ones, so the
+            // silhouette actually fills the collision circle
+            const shard = (ox: number, halfW: number, halfH: number, lean: number) => {
+                for (let y = 0; y < size; y++) {
+                    const t = Math.abs(y - c) / halfH;
+                    if (t > 1) continue;
+                    const w = halfW * (1 - t);
+                    if (w < 0.5) continue;
+                    const axis = c + ox + (y - c) * lean;
+                    for (let x = Math.round(axis - w); x <= Math.round(axis + w); x++) {
+                        const rel = (x - axis) / Math.max(1, w);
+                        set(x, y, rel < -0.35 ? 3 : rel > 0.45 ? 1 : Math.abs(rel) < 0.2 ? 4 : 2);
+                    }
+                }
+            };
+            shard(0, 3.2 + rng(), 9, (rng() - 0.5) * 0.18);
+            shard(-4 - rng() * 1.5, 2 + rng() * 0.6, 5.5 + rng(), -0.12);
+            shard(4 + rng() * 1.5, 1.8 + rng() * 0.6, 4.5 + rng(), 0.12);
+        } else {
+            // Rock: per-angle radius wobble, lit from the upper left, with a
+            // bright rim on the lit edge and a couple of craters
+            const spikes = Array.from({ length: 8 }, () => 0.7 + rng() * 0.3);
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const dx = x - c;
+                    const dy = y - c;
+                    const dist = Math.hypot(dx, dy) / c;
+                    const angle = (Math.atan2(dy, dx) + Math.PI) / (Math.PI * 2) * spikes.length;
+                    const idx = Math.floor(angle) % spikes.length;
+                    const next = (idx + 1) % spikes.length;
+                    const f = angle - Math.floor(angle);
+                    const limit = spikes[idx] + (spikes[next] - spikes[idx]) * f;
+                    if (dist > limit) continue;
+                    const lit = -(dx + dy) / (c * 1.5);
+                    const edge = dist / limit;
+                    grid[y][x] = edge > 0.82
+                        ? (lit > 0.1 ? 4 : 1)
+                        : lit > 0.05 ? 3 : 2;
+                }
+            }
+            for (let i = 0; i < 2; i++) {
+                const a = rng() * Math.PI * 2;
+                const d = rng() * c * 0.45;
+                const cx = c + Math.cos(a) * d;
+                const cy = c + Math.sin(a) * d;
+                if (grid[Math.round(cy)]?.[Math.round(cx)] === 0) continue;
+                set(cx, cy, 2);
+                set(cx + 1, cy, 1);
+            }
+        }
+
+        const palette = style === 'crystal'
+            ? {
+                1: `hsl(${hue}, 55%, 20%)`,
+                2: `hsl(${hue}, 52%, 30%)`,
+                3: `hsl(${hue}, 50%, 40%)`,
+                4: `hsl(${(hue + 12) % 360}, 90%, 74%)`,
+            }
+            : {
+                1: `hsl(${hue}, 16%, 10%)`,
+                2: `hsl(${hue}, 15%, 17%)`,
+                3: `hsl(${hue}, 14%, 25%)`,
+                4: `hsl(${(hue + 8) % 360}, 20%, 40%)`,
+            };
+
+        return this.renderGrid(grid, palette, `hsl(${hue}, 22%, 7%)`, false);
+    }
+
+    // =========================================================
     // Background tiles
     // =========================================================
 
