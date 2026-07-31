@@ -554,6 +554,61 @@ h2.lucky {
 }
 
 /* =========================================================================
+   Pause
+   ========================================================================= */
+
+.hud-pause {
+  font-family: var(--font-pixel);
+  font-size: 0.8em;
+  letter-spacing: 0.14em;
+  color: var(--c-ink);
+  background: #12081a;
+  border: 0;
+  padding: 6px 10px;
+  cursor: pointer;
+  box-shadow: 0 0 0 var(--px) #000, 0 0 0 calc(var(--px) * 2) #3a3f5c;
+  pointer-events: auto;
+}
+
+.hud-pause:hover,
+.hud-pause:focus-visible {
+  color: #fff;
+  box-shadow: 0 0 0 var(--px) #000, 0 0 0 calc(var(--px) * 2) var(--c-accent, #66f7ff);
+  outline: none;
+}
+
+.pause-screen {
+  background: rgba(5, 4, 13, 0.9);
+  gap: 18px;
+  animation: pause-in 120ms steps(3) both;
+}
+
+.pause-hint {
+  font-family: var(--font-pixel);
+  font-size: 0.75em;
+  letter-spacing: 0.12em;
+  color: #8d93b5;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.pause-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(320px, 80vw);
+}
+
+@keyframes pause-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* =========================================================================
    Level-up: the panel smashes through the screen
    ========================================================================= */
 

@@ -10,7 +10,7 @@ export const CLASSES = [
     { name: "Cyber Samurai", emoji: "🤖", bonus: "Crit +10%", weaponId: 'phantom_slash', hp: 85, stats: { critChance: 0.15 } },
     { name: "Heavy Gunner", emoji: "🦍", bonus: "Might +20%, Speed -10%", weaponId: 'plasma_cannon', hp: 110, stats: { might: 1.2, moveSpeed: 0.9 } },
     { name: "Technomancer", emoji: "🧙‍♂️", bonus: "Duration +20%", weaponId: 'nanobot_swarm', hp: 100, stats: { duration: 1.2 } },
-    { name: "Astro Biologist", emoji: "👨‍🔬", bonus: "Regen +1", weaponId: 'spore_cloud', hp: 95, stats: { regen: 1 } },
+    { name: "Astro Biologist", emoji: "👨‍🔬", bonus: "Regen +0.6", weaponId: 'spore_cloud', hp: 95, stats: { regen: 0.6 } },
     { name: "Quantum Physicist", emoji: "⚛️", bonus: "Cooldown -10%", weaponId: 'singularity_orb', hp: 80, stats: { cooldown: 0.9 } },
     { name: "Exo Marine", emoji: "👮", bonus: "Armor +2", weaponId: 'orbital_strike', hp: 130, stats: { armor: 2 } },
     { name: "Psionicist", emoji: "🧠", bonus: "Area +20%", weaponId: 'mind_blast', hp: 75, stats: { area: 1.2 } },
@@ -26,14 +26,17 @@ export const CLASSES = [
 // (see core/UpgradePool.ts getPowerupValue)
 export const POWERUPS = [
     // Basic
-    { name: "Nano-Repair", description: "Hull nanites knit you back together", type: "regen", value: 0.7, emoji: "❤️" },
+    // Regen stacks additively AND grows 25% per stack, so a low base is
+    // deliberate: at the 8-stack cap this is still ~1.4 HP/s, which used to be
+    // over 3 HP/s and made the player effectively unkillable.
+    { name: "Nano-Repair", description: "Hull nanites knit you back together", type: "regen", value: 0.3, emoji: "❤️" },
     { name: "Targeting HUD", description: "Weak-point overlay for your visor", type: "critChance", value: 0.06, emoji: "🎯" },
     { name: "Plasma Core", description: "Raw damage amplifier", type: "might", value: 0.08, emoji: "💪" },
     { name: "Cooling System", description: "Weapons fire more often", type: "cooldown", value: -0.06, emoji: "❄️" },
 
     // Creative
     { name: "Gravity Well", description: "Crystals fly to you from farther away", type: "magnet", value: 30, emoji: "🧲" },
-    { name: "Chain Reaction", description: "Bigger blasts, wider zones", type: "area", value: 0.12, emoji: "💣" },
+    { name: "Chain Reaction", description: "Bigger blasts, wider zones", type: "area", value: 0.09, emoji: "💣" },
     { name: "Vampiric Link", description: "Drain more XP from every kill", type: "growth", value: 0.12, emoji: "🧛" },
     { name: "Temporal Flux", description: "Effects linger longer", type: "duration", value: 0.18, emoji: "⏰" },
     { name: "Berserker Rage", description: "Crits hit like a freight train", type: "critDamage", value: 0.3, emoji: "😡" },

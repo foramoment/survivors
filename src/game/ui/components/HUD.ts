@@ -41,6 +41,7 @@ export class HUD {
                 </div>
                 <div class="stats" id="timer">00:00</div>
                 <div class="stats" id="kill-count">💀 0</div>
+                <button class="hud-pause interactive" id="hud-pause" aria-label="Pause">II</button>
             </div>
             <div class="xp-bar-container">
                 <div class="xp-bar-fill" id="xp-bar"></div>

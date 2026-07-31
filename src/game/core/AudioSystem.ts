@@ -160,6 +160,8 @@ export class AudioSystem {
 
     // Music state
     private musicTimer: ReturnType<typeof setInterval> | null = null;
+    /** Set by pauseMusic so resumeMusic knows there is a song to pick back up */
+    private musicPaused: boolean = false;
     private nextNoteTime: number = 0;
     private musicStep: number = 0;
     private musicRng: () => number = mulberry32(1);
@@ -569,6 +571,29 @@ export class AudioSystem {
             clearInterval(this.musicTimer);
             this.musicTimer = null;
         }
+        this.musicPaused = false;
+    }
+
+    /**
+     * Suspend the tracker without losing the song (game pause).
+     * Notes already scheduled a fraction of a second ahead still play out —
+     * cancelling them would click.
+     */
+    pauseMusic() {
+        if (this.musicTimer === null) return;
+        clearInterval(this.musicTimer);
+        this.musicTimer = null;
+        this.musicPaused = true;
+    }
+
+    /** Pick the song back up where it stopped */
+    resumeMusic() {
+        if (!this.musicPaused || !this.song || !this.ctx) return;
+        this.musicPaused = false;
+        // Re-anchor the scheduler to *now*, otherwise it dumps every note it
+        // "missed" while the game was paused in one burst.
+        this.nextNoteTime = this.ctx.currentTime + 0.1;
+        this.musicTimer = setInterval(() => this.scheduleMusic(), 40);
     }
 
     /**

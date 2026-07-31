@@ -95,7 +95,7 @@ describe('Damage Refactor Verification', () => {
             target: enemy,
             position: { x: 0, y: 0 }
         });
-        expect(enemy.takeDamage).toHaveBeenLastCalledWith(20); // might 1.0 * critDamage 2.0 = 20
+        expect(enemy.takeDamage).toHaveBeenLastCalledWith(20); // 10 * might 1.0 * GLOBAL_DAMAGE 2
 
         // 2. Increase player might
         player.stats.might = 2.0;
@@ -108,7 +108,7 @@ describe('Damage Refactor Verification', () => {
             position: { x: 0, y: 0 }
         });
 
-        // Should be 40 now (10 * 2.0 might * 2.0 critDamage)
+        // Should be 40 now (10 * might 2.0 * GLOBAL_DAMAGE 2)
         expect(enemy.takeDamage).toHaveBeenLastCalledWith(40);
     });
 
@@ -128,10 +128,34 @@ describe('Damage Refactor Verification', () => {
             position: { x: 0, y: 0 }
         });
 
-        // result.finalDamage should be 20
-        expect(result.finalDamage).toBe(20);
+        // 10 * might 1.0 * GLOBAL_DAMAGE 2 * critDamage 2.0
+        expect(result.finalDamage).toBe(40);
         expect(result.isCrit).toBe(true);
-        expect(enemy.takeDamage).toHaveBeenLastCalledWith(20);
+        expect(enemy.takeDamage).toHaveBeenLastCalledWith(40);
+    });
+
+    it('crits always hit harder than normal hits', () => {
+        const zone = new Zone(0, 0, 10, 1, 10, 1, '');
+        zone.source = weapon;
+        player.stats.might = 1.0;
+
+        // The old formula was `isCrit ? critDamage : 2`, which made a default
+        // 1.5x crit WEAKER than a normal hit. Guard against that regression.
+        player.stats.critDamage = 1.5;
+
+        player.stats.critChance = 0;
+        const normal = damageSystem.dealDamage({
+            baseDamage: 10, source: zone, target: enemy, position: { x: 0, y: 0 },
+        });
+
+        player.stats.critChance = 1;
+        const crit = damageSystem.dealDamage({
+            baseDamage: 10, source: zone, target: enemy, position: { x: 0, y: 0 },
+        });
+
+        expect(normal.isCrit).toBe(false);
+        expect(crit.isCrit).toBe(true);
+        expect(crit.finalDamage).toBeCloseTo(normal.finalDamage * 1.5, 6);
     });
 
     it('should properly track source chain Zone -> Weapon -> Player', () => {

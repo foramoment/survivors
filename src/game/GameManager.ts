@@ -64,6 +64,7 @@ export class GameManager {
     currentStage: StageConfig = STAGES[0];
     private finalBoss: Enemy | null = null;
     private finalBossSpawned: boolean = false;
+    private pauseOverlay: HTMLElement | null = null;
 
 
 
@@ -150,6 +151,8 @@ export class GameManager {
         propField.reset();
         arenaEvents.reset();
         stageBackdrop.blackout = 0;
+        this.pauseOverlay?.remove();
+        this.pauseOverlay = null;
         this.finalBoss = null;
         this.finalBossSpawned = false;
         // Reset progression tracking BEFORE adding the starting weapon
@@ -350,6 +353,72 @@ export class GameManager {
         }
 
         return svg as unknown as HTMLElement;
+    }
+
+    /**
+     * Escape / pause button. Only PLAYING ↔ PAUSED — a level-up or the game
+     * over panel is already a modal state and must not be interruptible.
+     */
+    togglePause() {
+        if (this.state === 'PLAYING') this.pauseGame();
+        else if (this.state === 'PAUSED') this.resumeGame();
+    }
+
+    private pauseGame() {
+        this.state = 'PAUSED';
+        audio.pauseMusic();
+
+        const screen = document.createElement('div');
+        screen.className = 'screen pause-screen';
+        this.pauseOverlay = screen;
+
+        const heading = document.createElement('h2');
+        heading.textContent = 'PAUSED';
+        screen.appendChild(heading);
+
+        const info = document.createElement('p');
+        info.className = 'pause-hint';
+        info.textContent = `${this.currentStage.name} · ${this.formatTime(this.gameTime)} · ${this.killCount} kills`;
+        screen.appendChild(info);
+
+        const actions = document.createElement('div');
+        actions.className = 'pause-actions';
+        actions.appendChild(this.createPauseButton('▶ RESUME', 'primary', () => this.resumeGame()));
+        actions.appendChild(this.createPauseButton('✖ QUIT TO MENU', 'danger', () => {
+            this.resumeGame();
+            audio.stopMusic();
+            this.state = 'MENU';
+            screenManager.goto('main_menu');
+        }));
+        screen.appendChild(actions);
+
+        this.uiLayer.appendChild(screen);
+    }
+
+    private resumeGame() {
+        this.pauseOverlay?.remove();
+        this.pauseOverlay = null;
+        if (this.state === 'PAUSED') this.state = 'PLAYING';
+        audio.resumeMusic();
+    }
+
+    /** Same look and blips as the menu buttons, without the screen base class */
+    private createPauseButton(text: string, variant: string, onClick: () => void): HTMLButtonElement {
+        const btn = document.createElement('button');
+        btn.className = `pixel-btn pixel-btn--${variant} interactive`;
+        btn.textContent = text;
+        btn.addEventListener('pointerenter', () => audio.play('uiHover'));
+        btn.addEventListener('click', () => {
+            audio.play('uiSelect');
+            onClick();
+        });
+        return btn;
+    }
+
+    private formatTime(seconds: number): string {
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
     }
 
     showLevelUp() {

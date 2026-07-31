@@ -38,6 +38,11 @@ export class GameScreen extends BaseScreen {
         this.hud = new HUD();
         this.hud.create(this.uiLayer);
 
+        // Touch players have no Escape key
+        document.getElementById('hud-pause')?.addEventListener('click', () => {
+            engine?.gameManager.togglePause();
+        });
+
         // Start the game via GameManager
         if (engine?.gameManager) {
             engine.gameManager.devMode = this.devMode;

@@ -38,6 +38,14 @@ export class Engine {
         // Register all screens
         this.registerScreens();
 
+        // Escape pauses/resumes a run (keyboard); the HUD button covers touch
+        window.addEventListener('keydown', (e) => {
+            if (e.code !== 'Escape') return;
+            if (screenManager.currentScreenId !== 'game') return;
+            e.preventDefault();
+            this.gameManager.togglePause();
+        });
+
         // Start at main menu
         screenManager.goto('main_menu');
 
@@ -75,12 +83,25 @@ export class Engine {
         this.canvas.height = window.innerHeight;
     }
 
+    /** A paused run freezes the whole loop; menus keep animating */
+    private isPaused(): boolean {
+        return screenManager.currentScreenId === 'game' && this.gameManager.state === 'PAUSED';
+    }
+
     loop(timestamp: number) {
         const dt = (timestamp - this.lastTime) / 1000;
         this.lastTime = timestamp;
 
         // Cap dt to prevent huge jumps if tab is inactive
         const safeDt = Math.min(dt, 0.1);
+
+        // Paused: do no work at all. The canvas is left untouched, so the last
+        // rendered frame stays on screen under the DOM overlay — nothing to
+        // clear, nothing to redraw, no juice timers draining.
+        if (this.isPaused()) {
+            requestAnimationFrame((t) => this.loop(t));
+            return;
+        }
 
         // Juice runs on real time so hit-stop and flashes resolve while the
         // world is frozen; gameplay gets the scaled delta.

@@ -25,6 +25,18 @@ export interface DamageParams {
     skipModifiers?: boolean;  // If true, skip crit/might (for pre-calculated damage)
 }
 
+/**
+ * Flat multiplier on every modified hit.
+ *
+ * History: the crit branch used to read `isCrit ? critDamage : 2`, so *normal*
+ * hits were doubled and a default 1.5x crit landed for LESS than a normal hit.
+ * The whole game was balanced around that doubling, so the fix keeps it — as an
+ * explicit global multiplier — and lets the crit multiplier stack on top of it
+ * instead of replacing it. Non-crit damage is unchanged; a crit is now
+ * genuinely critDamage times stronger than a normal hit.
+ */
+export const GLOBAL_DAMAGE = 2;
+
 export interface DamageResult {
     finalDamage: number;
     isCrit: boolean;
@@ -53,10 +65,10 @@ class DamageSystemClass {
 
         // Calculate crit
         const isCrit = Math.random() < player.stats.critChance;
-        const critMultiplier = isCrit ? player.stats.critDamage : 2;
+        const critMultiplier = isCrit ? player.stats.critDamage : 1;
 
         // Calculate final damage
-        const finalDamage = baseDamage * player.stats.might * critMultiplier;
+        const finalDamage = baseDamage * player.stats.might * GLOBAL_DAMAGE * critMultiplier;
 
         return this.applyDamage(finalDamage, target, position, isCrit);
     }
@@ -91,7 +103,7 @@ class DamageSystemClass {
     calculateDamage(baseDamage: number, player: any): { damage: number, isCrit: boolean } {
         const isCrit = Math.random() < player.stats.critChance;
         const critMultiplier = isCrit ? player.stats.critDamage : 1;
-        const damage = baseDamage * player.stats.might * critMultiplier;
+        const damage = baseDamage * player.stats.might * GLOBAL_DAMAGE * critMultiplier;
         return { damage, isCrit };
     }
 
