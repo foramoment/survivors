@@ -31,6 +31,8 @@ interface Particle {
     sizeEnd: number;
     life: number;
     maxLife: number;
+    gravity: number;
+    fadeOut: boolean;
     color: string;
     alpha: number;
     glow: boolean;
@@ -42,6 +44,7 @@ export class ParticleSystem {
     private static instance: ParticleSystem;
     private particles: Particle[] = [];
     private maxParticles: number = 2000;
+    private overflowCursor: number = 0;
 
     private constructor() { }
 
@@ -71,18 +74,13 @@ export class ParticleSystem {
         const colors = Array.isArray(config.color) ? config.color : [config.color ?? '#ffffff'];
 
         for (let i = 0; i < count; i++) {
-            if (this.particles.length >= this.maxParticles) {
-                // Remove oldest particles
-                this.particles.shift();
-            }
-
             const particleSpeed = speed * (1 + (Math.random() - 0.5) * 2 * speedVariation);
             const particleAngle = angle + (Math.random() - 0.5) * spread;
             const particleSize = size * (1 + (Math.random() - 0.5) * 2 * sizeVariation);
             const particleLife = life * (1 + (Math.random() - 0.5) * 2 * lifeVariation);
             const particleColor = colors[Math.floor(Math.random() * colors.length)];
 
-            this.particles.push({
+            const particle: Particle = {
                 x: config.x,
                 y: config.y,
                 vx: Math.cos(particleAngle) * particleSpeed,
@@ -92,12 +90,22 @@ export class ParticleSystem {
                 sizeEnd: sizeEnd,
                 life: particleLife,
                 maxLife: particleLife,
+                gravity: config.gravity ?? 100,
+                fadeOut: config.fadeOut ?? true,
                 color: particleColor,
                 alpha: 1,
                 glow: glow,
                 glowSize: glowSize,
                 shape: shape
-            });
+            };
+
+            if (this.particles.length >= this.maxParticles) {
+                // At capacity: overwrite in place (O(1)) instead of shift (O(n))
+                this.overflowCursor = (this.overflowCursor + 1) % this.maxParticles;
+                this.particles[this.overflowCursor] = particle;
+            } else {
+                this.particles.push(particle);
+            }
         }
     }
 
@@ -617,8 +625,7 @@ export class ParticleSystem {
             p.x += p.vx * dt;
             p.y += p.vy * dt;
 
-            // Apply gravity if particle has negative velocity (going up)
-            p.vy += 100 * dt; // Light gravity for floating effect
+            p.vy += p.gravity * dt;
 
             p.life -= dt;
 
@@ -626,8 +633,7 @@ export class ParticleSystem {
             const lifeRatio = p.life / p.maxLife;
             p.size = p.sizeEnd + (p.sizeStart - p.sizeEnd) * lifeRatio;
 
-            // Fade out
-            p.alpha = lifeRatio;
+            p.alpha = p.fadeOut ? lifeRatio : 1;
 
             if (p.life <= 0) {
                 // Swap with last element and pop — O(1) removal

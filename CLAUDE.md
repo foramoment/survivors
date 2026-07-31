@@ -15,6 +15,9 @@ src/game/
 │   ├── DamageSystem.ts   # ⚔️ Singleton: расчёт урона, криты, might
 │   ├── ParticleSystem.ts # ✨ Singleton: эффекты частиц
 │   ├── SpatialHash.ts    # 🗺️ Оптимизация поиска сущностей O(1)
+│   ├── DifficultyDirector.ts # 🎚️ Адаптивная сложность, спавн, волны, мини-боссы
+│   ├── SpriteFactory.ts  # 🎨 Процедурные пиксельные спрайты (враги/игрок/фон) — БЕЗ ассетов
+│   ├── AudioSystem.ts    # 🔊 Процедурный звук Web Audio (SFX + генеративная музыка)
 │   ├── StateMachine.ts   # Состояния игры: PLAYING, LEVEL_UP, PAUSED
 │   ├── EventBus.ts       # Pub/sub система событий
 │   ├── PlayerStats.ts    # Типы и дефолты статов
@@ -209,29 +212,25 @@ ENEMY_CONFIG = {
 | 9     | Plasma Elemental | ⚡     | 0.9       |
 | 10    | Doom Harbinger   | ☠️     | 1.0       |
 
-### Логика спавна
+### Логика спавна и адаптивная сложность
 
-**Файл:** `GameManager.ts` → `spawnEnemy()`
+**Файлы:** `core/DifficultyDirector.ts` + `GameManager.ts` → `spawnEnemy()`
 
-```typescript
-// Волна = 60 секунд
-// Переход 90%/10% → 10%/90% между двумя соседними врагами
+Спавном управляет **DifficultyDirector** (singleton `difficultyDirector`):
+- Спавн через аккумулятор (независим от FPS): `spawnRate = min(30, (2 + gameTime/45) × intensity)`
+- **intensity** (0.6–3.0) адаптируется раз в секунду по HP игрока и скорости зачистки (kills/sec vs spawns/sec)
+- HP врагов: `(1 + gameTime/240) × (0.75 + 0.25 × intensity)` × `stage.hpScale` — **кап 3x убран**
+- Урон: `(1 + gameTime/300) × (0.85 + 0.15 × intensity)` × `stage.damageScale`
+- Elite: шанс растёт со временем и intensity, кап 8%
+- События на границе волны (каждые 60с): **burst** (кольцо врагов, 8 + wave×4) и **miniboss** (×12 HP, ×2 радиус, HP-бар)
 
-const waveIndex = Math.floor(gameTime / 60);
-const waveProgress = (gameTime % 60) / 60;
+Выбор типа врага — из `stage.enemyPool` (индексы в ENEMIES), микс 90%/10% → 10%/90% внутри волны, как раньше.
 
-const primaryIndex = min(waveIndex, ENEMIES.length - 2);
-const secondaryIndex = min(waveIndex + 1, ENEMIES.length - 1);
+### Стейджи
 
-const secondaryChance = 0.1 + (waveProgress * 0.8);  // 10% → 90%
-const type = random() < secondaryChance ? ENEMIES[secondaryIndex] : ENEMIES[primaryIndex];
-```
+**Файлы:** `data/StageData.ts`, `ui/screens/StageSelectionScreen.ts` (screen id `level_select`)
 
-**Временное усиление:**
-- HP × min(timeMultiplier, 3) — кап на 3x
-- Урон × timeMultiplier — без капа
-
-**Elite враги:** 1% шанс, ×5 HP, ×1.5 размер, цветное свечение.
+3 стейджа с собственным пулом врагов, темой фона, множителями и длительностью. По истечении `duration` спавнится финальный босс (miniboss ×3 HP); его смерть = победа (`showVictory`).
 
 ### Сепарация врагов
 

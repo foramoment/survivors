@@ -1,9 +1,10 @@
 /**
- * OPTIONS SCREEN - Game settings (stub for now)
+ * OPTIONS SCREEN - Game settings (audio volumes)
  */
 
 import { BaseScreen } from '../BaseScreen';
 import { screenManager } from '../ScreenManager';
+import { audio } from '../../core/AudioSystem';
 
 export class OptionsScreen extends BaseScreen {
     enter(): void {
@@ -24,11 +25,13 @@ export class OptionsScreen extends BaseScreen {
         title.textContent = '⚙️ OPTIONS';
         screen.appendChild(title);
 
-        // Placeholder message
-        const message = document.createElement('p');
-        message.style.cssText = 'color: #888; margin: 30px 0;';
-        message.textContent = 'Settings coming soon...';
-        screen.appendChild(message);
+        // Volume sliders
+        const sliders = document.createElement('div');
+        sliders.style.cssText = 'display: flex; flex-direction: column; gap: 20px; margin: 30px 0; min-width: 300px;';
+        sliders.appendChild(this.createVolumeSlider('🔊 Master', 'master'));
+        sliders.appendChild(this.createVolumeSlider('💥 Effects', 'sfx'));
+        sliders.appendChild(this.createVolumeSlider('🎵 Music', 'music'));
+        screen.appendChild(sliders);
 
         // Back button
         const backBtn = this.createButton('← Back', () => {
@@ -37,6 +40,37 @@ export class OptionsScreen extends BaseScreen {
         screen.appendChild(backBtn);
 
         this.uiLayer.appendChild(screen);
+    }
+
+    private createVolumeSlider(label: string, channel: 'master' | 'sfx' | 'music'): HTMLElement {
+        const row = document.createElement('div');
+        row.className = 'interactive';
+        row.style.cssText = 'display: flex; align-items: center; gap: 15px; color: #00ffff;';
+
+        const text = document.createElement('span');
+        text.style.cssText = 'min-width: 110px; text-align: left;';
+        text.textContent = label;
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '100';
+        slider.value = String(Math.round(audio.settings[channel] * 100));
+        slider.style.cssText = 'flex: 1; accent-color: #00ffff; cursor: pointer;';
+        slider.oninput = () => {
+            audio.setVolume(channel, Number(slider.value) / 100);
+            value.textContent = `${slider.value}%`;
+            if (channel !== 'music') audio.play('pickup'); // instant feedback
+        };
+
+        const value = document.createElement('span');
+        value.style.cssText = 'min-width: 45px; text-align: right;';
+        value.textContent = `${slider.value}%`;
+
+        row.appendChild(text);
+        row.appendChild(slider);
+        row.appendChild(value);
+        return row;
     }
 
     private createButton(text: string, onClick: () => void): HTMLButtonElement {

@@ -11,6 +11,10 @@ import { stateMachine, type GameState } from './core/StateMachine';
 import { damageSystem } from './core/DamageSystem';
 import { debugOverlay } from './core/DebugOverlay';
 import { collisionSystem } from './core/CollisionSystem';
+import { difficultyDirector } from './core/DifficultyDirector';
+import { sprites } from './core/SpriteFactory';
+import { STAGES, type StageConfig } from './data/StageData';
+import { audio } from './core/AudioSystem';
 
 export class GameManager {
     canvas: HTMLCanvasElement;
@@ -32,6 +36,15 @@ export class GameManager {
 
     camera: Vector2 = { x: 0, y: 0 };
 
+    // Screen shake state
+    private shakeTime: number = 0;
+    private shakeDuration: number = 0;
+    private shakeMagnitude: number = 0;
+
+    backgroundTheme: string = 'Asteroid Fields';
+    private backgroundPattern: CanvasPattern | null = null;
+    private backgroundPatternTheme: string = '';
+
     waveTimer: number = 0;
     gameTime: number = 0;
 
@@ -42,6 +55,10 @@ export class GameManager {
 
     devMode: boolean = false;
     killCount: number = 0;
+
+    currentStage: StageConfig = STAGES[0];
+    private finalBoss: Enemy | null = null;
+    private finalBossSpawned: boolean = false;
 
 
 
@@ -120,7 +137,13 @@ export class GameManager {
         this.uiLayer.appendChild(screen);
     }
 
-    startGame(classIndex: number) {
+    startGame(classIndex: number, stageIndex: number = 0) {
+        this.currentStage = STAGES[stageIndex] ?? STAGES[0];
+        this.backgroundTheme = this.currentStage.theme;
+        this.backgroundPattern = null;
+        this.finalBoss = null;
+        this.finalBossSpawned = false;
+
         const cls = CLASSES[classIndex];
         this.player = new Player(0, 0);
 
@@ -145,6 +168,11 @@ export class GameManager {
         this.damageNumbers = [];
         this.killCount = 0;
         this.gameTime = 0;
+        difficultyDirector.reset();
+        this.camera.x = this.player.pos.x - this.canvas.width / 2;
+        this.camera.y = this.player.pos.y - this.canvas.height / 2;
+        this.shakeTime = 0;
+        audio.startMusic(this.currentStage.theme);
         this.state = 'PLAYING';
 
         // Enable debug overlay if in dev mode
@@ -204,6 +232,7 @@ export class GameManager {
         // NOTE: Removed baseCooldown *= 0.5 - evolved weapons handle their own CD
 
         this.weaponLevels.set(weaponId, 6);
+        audio.play('evolve');
     }
 
     createHUD() {
@@ -249,11 +278,13 @@ export class GameManager {
     spawnEntity(entity: Entity) {
         if (entity instanceof Projectile || entity instanceof Zone) {
             this.projectiles.push(entity as any);
+            audio.play('shoot');
         }
     }
 
     showLevelUp() {
         this.state = 'LEVEL_UP';
+        audio.play('levelup');
 
         const screen = document.createElement('div');
         screen.className = 'screen level-up-screen';
@@ -565,11 +596,38 @@ export class GameManager {
         this.gameTime += dt;
         this.waveTimer += dt;
 
-        // Spawning Logic - max 400 enemies on screen
-        if (this.enemies.length < Math.min(400, 30 + this.gameTime / 5)) {
-            if (Math.random() < 0.05 + (this.gameTime / 1000)) {
-                this.spawnEnemy();
+        // Adaptive spawning — DifficultyDirector decides how many and how strong
+        difficultyDirector.update(dt, {
+            gameTime: this.gameTime,
+            playerLevel: this.player.level,
+            playerHpRatio: this.player.hp / this.player.maxHp,
+            enemyCount: this.enemies.length,
+            killCount: this.killCount,
+        });
+
+        for (const event of difficultyDirector.consumeEvents()) {
+            if (event.type === 'burst') {
+                // Ring of enemies converging on the player
+                for (let i = 0; i < event.count; i++) {
+                    this.spawnEnemy({ angle: (i / event.count) * Math.PI * 2 });
+                }
+            } else if (event.type === 'miniboss') {
+                this.spawnEnemy({ boss: true });
+                audio.play('bossSpawn');
             }
+        }
+
+        const spawnCount = difficultyDirector.takeSpawnCount(this.enemies.length);
+        for (let i = 0; i < spawnCount; i++) {
+            this.spawnEnemy();
+        }
+
+        // Stage final boss: appears once the survival timer runs out
+        if (!this.finalBossSpawned && this.gameTime >= this.currentStage.duration) {
+            this.finalBossSpawned = true;
+            this.spawnEnemy({ boss: true, final: true });
+            this.shake(10, 0.6);
+            audio.play('bossSpawn');
         }
 
         this.player.update(dt);
@@ -612,6 +670,7 @@ export class GameManager {
         this.enemies.forEach(e => e.update(dt, this.player!.pos));
 
         // === PLAYER-ENEMY COLLISION WITH KNOCKBACK ===
+        const hpBeforeContact = this.player.hp;
         for (const e of this.enemies) {
             if (checkCollision(e, this.player)) {
                 // Deal damage to player
@@ -633,10 +692,26 @@ export class GameManager {
                 }
             }
         }
+        if (this.player.hp < hpBeforeContact) {
+            this.shake(4, 0.2);
+            audio.play('hurt');
+        }
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             if (this.enemies[i].isDead) {
                 const enemy = this.enemies[i];
+                // Death burst in the enemy's palette color
+                particles.emitHit(enemy.pos.x, enemy.pos.y, sprites.getEnemyBodyColor(enemy.name));
+                audio.play('enemyDeath');
+                if (enemy.isBoss) {
+                    audio.play('explosion');
+                    particles.emitExplosion(enemy.pos.x, enemy.pos.y, enemy.radius * 2, [
+                        sprites.getEnemyAccentColor(enemy.name),
+                        sprites.getEnemyBodyColor(enemy.name),
+                        '#ffffff',
+                    ]);
+                    this.shake(8, 0.4);
+                }
                 // Drop XP crystals instead of giving XP directly
                 const crystalValue = enemy.xpValue;
                 this.spawnXPCrystal(enemy.pos.x, enemy.pos.y, crystalValue);
@@ -654,6 +729,7 @@ export class GameManager {
             if (checkCollision(crystal, this.player)) {
                 // Give XP
                 this.player.gainXp(crystal.value);
+                audio.play('pickup');
                 this.xpCrystals.splice(i, 1);
             } else if (crystal.isDead) {
                 this.xpCrystals.splice(i, 1);
@@ -663,68 +739,118 @@ export class GameManager {
         if (this.player.isDead) {
             this.state = 'GAME_OVER';
             this.showGameOver();
+        } else if (this.finalBoss?.isDead) {
+            this.state = 'GAME_OVER';
+            this.showVictory();
         }
 
-        this.camera.x = this.player.pos.x - this.canvas.width / 2;
-        this.camera.y = this.player.pos.y - this.canvas.height / 2;
+        // Smooth camera follow
+        const targetX = this.player.pos.x - this.canvas.width / 2;
+        const targetY = this.player.pos.y - this.canvas.height / 2;
+        const followSpeed = Math.min(1, dt * 10);
+        this.camera.x += (targetX - this.camera.x) * followSpeed;
+        this.camera.y += (targetY - this.camera.y) * followSpeed;
+
+        if (this.shakeTime > 0) this.shakeTime -= dt;
 
         this.updateParticles(dt);
         this.updateHUD();
     }
 
     showGameOver() {
+        audio.stopMusic();
+        audio.play('gameOver');
         const screen = document.createElement('div');
         screen.className = 'screen';
         screen.innerHTML = `
         <h1>GAME OVER</h1>
-        <h2>Time: ${Math.floor(this.gameTime)}s</h2>
+        <h2>${this.currentStage.name} — Time: ${Math.floor(this.gameTime)}s — 💀 ${this.killCount}</h2>
         <button class="interactive" style="padding: 20px; font-size: 20px; cursor: pointer;" onclick="location.reload()">RESTART</button>
       `;
         this.uiLayer.appendChild(screen);
     }
 
-    spawnEnemy() {
+    showVictory() {
+        audio.stopMusic();
+        audio.play('victory');
+        const screen = document.createElement('div');
+        screen.className = 'screen';
+        screen.innerHTML = `
+        <h1>🏆 VICTORY!</h1>
+        <h2>${this.currentStage.name} cleared — Time: ${Math.floor(this.gameTime)}s — 💀 ${this.killCount}</h2>
+        <button class="interactive" style="padding: 20px; font-size: 20px; cursor: pointer;" onclick="location.reload()">PLAY AGAIN</button>
+      `;
+        this.uiLayer.appendChild(screen);
+    }
+
+    spawnEnemy(options: { boss?: boolean; final?: boolean; angle?: number } = {}) {
         if (!this.player) return;
-        const angle = Math.random() * Math.PI * 2;
+        const angle = options.angle ?? Math.random() * Math.PI * 2;
         const dist = Math.max(this.canvas.width, this.canvas.height) / 2 + 100;
         const x = this.player.pos.x + Math.cos(angle) * dist;
         const y = this.player.pos.y + Math.sin(angle) * dist;
 
-        // === ДИНАМИЧЕСКАЯ СИСТЕМА СПАВНА ===
-        // Волна длится 60 секунд, переход 90%/10% → 10%/90%
+        // Wave lasts 60 seconds; enemy mix shifts 90%/10% → 10%/90%
         const WAVE_DURATION = 60;
-
-        // Определяем текущую волну (0, 1, 2, ...)
         const waveIndex = Math.floor(this.gameTime / WAVE_DURATION);
-
-        // Прогресс внутри волны (0.0 - 1.0)
         const waveProgress = (this.gameTime % WAVE_DURATION) / WAVE_DURATION;
 
-        // Индексы врагов (с ограничением по размеру массива)
-        const primaryIndex = Math.min(waveIndex, ENEMIES.length - 2);
-        const secondaryIndex = Math.min(waveIndex + 1, ENEMIES.length - 1);
-
-        // Вероятность спавна следующего врага: 10% → 90%
+        // The stage defines which enemies appear and in what order
+        const pool = this.currentStage.enemyPool;
+        const primaryIndex = pool[Math.min(waveIndex, pool.length - 2)];
+        const secondaryIndex = pool[Math.min(waveIndex + 1, pool.length - 1)];
         const secondaryChance = 0.1 + (waveProgress * 0.8);
 
-        const type = Math.random() < secondaryChance
-            ? ENEMIES[secondaryIndex]
-            : ENEMIES[primaryIndex];
+        // Bosses are always the upcoming wave's enemy type; the stage's final
+        // boss is the strongest enemy of its pool
+        const type = options.final
+            ? ENEMIES[pool[pool.length - 1]]
+            : options.boss || Math.random() < secondaryChance
+                ? ENEMIES[secondaryIndex]
+                : ENEMIES[primaryIndex];
 
-        // 1% chance to spawn elite enemy
-        const isElite = Math.random() < 0.01;
+        const isElite = !options.boss && Math.random() < difficultyDirector.getEliteChance(this.gameTime);
 
-        // Create enemy and apply time-based scaling
         const enemy = new Enemy(x, y, type, isElite);
 
-        // Enemies get stronger over time
-        const timeMultiplier = 1 + (this.gameTime / 300); // +1 multiplier every 5 minutes
-        enemy.maxHp = enemy.baseHp * Math.min(timeMultiplier, 3); // Cap at 3x HP
+        // Time + adaptive + stage scaling (HP cap removed — see DifficultyDirector)
+        enemy.maxHp = enemy.maxHp * difficultyDirector.getHpMultiplier(this.gameTime) * this.currentStage.hpScale;
         enemy.hp = enemy.maxHp;
-        // Remove cap on damage or make it much higher
-        enemy.damage *= (1 + (this.gameTime / 300)); // Uncapped damage scaling
+        enemy.damage *= difficultyDirector.getDamageMultiplier(this.gameTime) * this.currentStage.damageScale;
+
+        if (options.boss) {
+            enemy.makeBoss();
+            if (options.final) {
+                // Final boss: considerably tougher than wave minibosses
+                enemy.hp *= 3;
+                enemy.maxHp *= 3;
+                enemy.radius *= 1.3;
+                enemy.xpValue *= 3;
+                this.finalBoss = enemy;
+            }
+        }
 
         this.enemies.push(enemy);
+    }
+
+    /** Trigger screen shake (magnitude in px, duration in seconds) */
+    shake(magnitude: number, duration: number) {
+        if (magnitude >= this.shakeMagnitude || this.shakeTime <= 0) {
+            this.shakeMagnitude = magnitude;
+            this.shakeDuration = duration;
+            this.shakeTime = duration;
+        }
+    }
+
+    /** Camera with the current shake offset applied (used for rendering only) */
+    private getRenderCamera(): Vector2 {
+        if (this.shakeTime <= 0) return this.camera;
+        const falloff = this.shakeTime / this.shakeDuration;
+        const magnitude = this.shakeMagnitude * falloff;
+        return {
+            x: this.camera.x + (Math.random() - 0.5) * 2 * magnitude,
+            y: this.camera.y + (Math.random() - 0.5) * 2 * magnitude,
+        };
     }
 
     spawnDamageNumber(pos: Vector2, amount: number, isCrit: boolean = false) {
@@ -750,32 +876,34 @@ export class GameManager {
         ctx.globalAlpha = 1;
         ctx.setLineDash([]);
 
-        this.drawGrid(ctx);
+        const camera = this.getRenderCamera();
+
+        this.drawBackground(ctx, camera);
 
         this.projectiles.forEach(p => {
-            if (p instanceof Zone) p.draw(ctx, this.camera);
+            if (p instanceof Zone) p.draw(ctx, camera);
         });
 
         // Draw XP crystals
-        this.xpCrystals.forEach(c => c.draw(ctx, this.camera));
+        this.xpCrystals.forEach(c => c.draw(ctx, camera));
 
-        this.enemies.forEach(e => e.draw(ctx, this.camera));
+        this.enemies.forEach(e => e.draw(ctx, camera));
 
-        this.player?.draw(ctx, this.camera);
+        this.player?.draw(ctx, camera);
 
         this.projectiles.forEach(p => {
-            if (p instanceof Projectile) p.draw(ctx, this.camera);
+            if (p instanceof Projectile) p.draw(ctx, camera);
         });
 
         // Draw particles
-        particles.draw(ctx, this.camera);
+        particles.draw(ctx, camera);
 
         ctx.font = '20px Arial';
         ctx.fillStyle = 'white';
         ctx.textAlign = 'center';
         this.damageNumbers.forEach((dn: any, i) => {
-            const screenX = dn.x - this.camera.x;
-            const screenY = dn.y - this.camera.y - (0.5 - dn.life) * 50;
+            const screenX = dn.x - camera.x;
+            const screenY = dn.y - camera.y - (0.5 - dn.life) * 50;
 
             ctx.save();
             if (dn.isCrit) {
@@ -800,32 +928,23 @@ export class GameManager {
         debugOverlay.draw(ctx);
     }
 
-    drawGrid(ctx: CanvasRenderingContext2D) {
+    drawBackground(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        if (!this.backgroundPattern || this.backgroundPatternTheme !== this.backgroundTheme) {
+            const tile = sprites.getBackgroundTile(this.backgroundTheme);
+            this.backgroundPattern = ctx.createPattern(tile, 'repeat');
+            this.backgroundPatternTheme = this.backgroundTheme;
+        }
+        if (!this.backgroundPattern) return;
+
         ctx.save();
-
-        const gridSize = 100;
-        const offsetX = -this.camera.x % gridSize;
-        const offsetY = -this.camera.y % gridSize;
-
-        // Reset any shadow effects from previous drawing
         ctx.shadowBlur = 0;
         ctx.shadowColor = 'transparent';
         ctx.globalAlpha = 1;
 
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-
-        for (let x = offsetX; x < this.canvas.width; x += gridSize) {
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, this.canvas.height);
-        }
-        for (let y = offsetY; y < this.canvas.height; y += gridSize) {
-            ctx.moveTo(0, y);
-            ctx.lineTo(this.canvas.width, y);
-        }
-        ctx.stroke();
-
+        // Anchor the pattern to world space so it scrolls with the camera
+        ctx.translate(-camera.x, -camera.y);
+        ctx.fillStyle = this.backgroundPattern;
+        ctx.fillRect(camera.x, camera.y, this.canvas.width, this.canvas.height);
         ctx.restore();
     }
 

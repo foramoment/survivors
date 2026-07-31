@@ -2,6 +2,7 @@ import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
 import { input } from '../core/Input';
 import { Weapon } from '../Weapon';
+import { sprites } from '../core/SpriteFactory';
 
 export class Player extends Entity {
     speed: number = 200;
@@ -40,6 +41,10 @@ export class Player extends Entity {
     className: string = "Survivor";
     classEmoji: string = "🧑‍🚀";
 
+    animTimer: number = 0;
+    isMoving: boolean = false;
+    facingLeft: boolean = false;
+
     onLevelUp: () => void = () => { };
 
     constructor(x: number, y: number) {
@@ -74,6 +79,10 @@ export class Player extends Entity {
                 moveDir = normalize(dirToMouse);
             }
         }
+
+        this.isMoving = moveDir.x !== 0 || moveDir.y !== 0;
+        if (this.isMoving) this.animTimer += dt;
+        if (moveDir.x !== 0) this.facingLeft = moveDir.x < 0;
 
         // Apply movement
         let moveX = moveDir.x * this.speed * this.stats.moveSpeed;
@@ -124,11 +133,17 @@ export class Player extends Entity {
             ctx.globalAlpha = alpha;
         }
 
-        // Body (Emoji)
-        ctx.font = '30px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(this.classEmoji, 0, 0);
+        // Procedural pixel sprite (astronaut tinted by class)
+        const frame = this.isMoving ? Math.floor(this.animTimer * 8) % 2 : 0;
+        const sprite = sprites.getPlayerSprite(this.className, frame);
+        const height = this.radius * 2.6;
+        const width = height * (sprite.width / sprite.height);
+        const bob = this.isMoving ? Math.sin(this.animTimer * 16) * 1.2 : 0;
+
+        ctx.imageSmoothingEnabled = false;
+        if (this.facingLeft) ctx.scale(-1, 1);
+        ctx.drawImage(sprite, -width / 2, -height / 2 + bob, width, height);
+        if (this.facingLeft) ctx.scale(-1, 1);
 
         ctx.globalAlpha = 1.0; // Reset alpha
 

@@ -1,5 +1,6 @@
 import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
+import { sprites } from '../core/SpriteFactory';
 
 export class XPCrystal extends Entity {
     value: number;
@@ -67,11 +68,12 @@ export class XPCrystal extends Entity {
         ctx.arc(0, 0, glowSize, 0, Math.PI * 2);
         ctx.fill();
 
-        // Crystal emoji
-        ctx.font = `${this.fontSize}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('💎', 0, 0);
+        // Procedural pixel diamond, gentle bobbing
+        const sprite = sprites.getCrystalSprite(this.value);
+        const size = this.fontSize * 1.4;
+        const bobY = Math.sin(this.pulseTimer * 4) * 2;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(sprite, -size / 2, -size / 2 + bobY, size, size);
 
         ctx.restore();
     }

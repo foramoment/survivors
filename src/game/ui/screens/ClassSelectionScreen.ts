@@ -95,8 +95,8 @@ export class ClassSelectionScreen extends BaseScreen {
     }
 
     private selectClass(index: number): void {
-        // Navigate to game screen with selected class
-        screenManager.goto('game', {
+        // Navigate to stage selection with the chosen class
+        screenManager.goto('level_select', {
             classIndex: index,
             devMode: this.devMode
         });

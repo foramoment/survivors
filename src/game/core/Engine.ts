@@ -16,6 +16,7 @@ import { GameScreen } from '../ui/screens/GameScreen';
 import { OptionsScreen } from '../ui/screens/OptionsScreen';
 import { GameOverScreen } from '../ui/screens/GameOverScreen';
 import { ParticleDebugScreen } from '../ui/screens/ParticleDebugScreen';
+import { StageSelectionScreen } from '../ui/screens/StageSelectionScreen';
 
 export class Engine {
     canvas: HTMLCanvasElement;
@@ -53,6 +54,9 @@ export class Engine {
         // Game Screen - with callback to start game via GameManager
         const gameScreen = new GameScreen(this.canvas, this.ctx);
         screenManager.register('game', gameScreen);
+
+        // Stage Selection
+        screenManager.register('level_select', new StageSelectionScreen(this.canvas, this.ctx));
 
         // Options
         screenManager.register('options', new OptionsScreen(this.canvas, this.ctx));

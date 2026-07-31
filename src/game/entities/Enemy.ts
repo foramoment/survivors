@@ -1,5 +1,6 @@
 import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
+import { sprites } from '../core/SpriteFactory';
 
 export class Enemy extends Entity {
     hp: number;
@@ -9,7 +10,12 @@ export class Enemy extends Entity {
     damage: number;
     xpValue: number;
     emoji: string;
+    name: string = '';
+    animTimer: number = Math.random() * 10;
+    hitFlash: number = 0;
+    facingLeft: boolean = false;
     isElite: boolean = false;
+    isBoss: boolean = false;
     eliteSizeMultiplier: number = 1;
     eliteOutlineColor: string = '';
 
@@ -29,6 +35,7 @@ export class Enemy extends Entity {
         this.damage = type.damage;
         this.xpValue = type.xpValue;
         this.emoji = type.emoji;
+        this.name = type.name;
 
         if (isElite) {
             this.isElite = true;
@@ -42,6 +49,22 @@ export class Enemy extends Entity {
     }
 
     speedMultiplier: number = 1;
+
+    /**
+     * Promote this enemy to a wave miniboss. Call after time scaling so the
+     * multipliers stack on the already-scaled stats.
+     */
+    makeBoss() {
+        this.isBoss = true;
+        this.hp *= 12;
+        this.maxHp *= 12;
+        this.baseHp *= 12;
+        this.damage *= 1.5;
+        this.xpValue *= 10;
+        this.radius *= 2;
+        this.speed *= 0.8;
+        if (!this.eliteOutlineColor) this.eliteOutlineColor = '#ff3355';
+    }
 
     /**
      * Reset forces at start of frame
@@ -83,7 +106,10 @@ export class Enemy extends Entity {
     }
 
     update(dt: number, playerPos?: Vector2) {
+        this.animTimer += dt;
+        if (this.hitFlash > 0) this.hitFlash -= dt;
         if (!playerPos) return;
+        this.facingLeft = playerPos.x < this.pos.x;
 
         // 1. Calculate movement towards player
         const toPlayer = normalize({
@@ -124,7 +150,7 @@ export class Enemy extends Entity {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        if (this.isElite) {
+        if (this.isElite || this.isBoss) {
             const pulse = 0.8 + 0.2 * Math.sin(Date.now() / 200);
             const glowSize = this.radius * pulse * 2;
 
@@ -137,23 +163,34 @@ export class Enemy extends Entity {
             ctx.fill();
         }
 
-        const fontSize = this.isElite ? 36 : 24;
-        ctx.font = `${fontSize}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
+        // Procedural pixel sprite with walk animation and hit flash
+        const frame = Math.floor(this.animTimer * 6) % 2;
+        const sprite = sprites.getEnemySprite(this.name, frame, this.hitFlash > 0);
+        const size = this.radius * 2.4;
+        const bob = Math.sin(this.animTimer * 8) * this.radius * 0.08;
 
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
-        ctx.shadowBlur = 8;
-        ctx.fillText(this.emoji, 0, 0);
+        ctx.imageSmoothingEnabled = false;
+        if (this.facingLeft) ctx.scale(-1, 1);
+        ctx.drawImage(sprite, -size / 2, -size / 2 + bob, size, size);
+        if (this.facingLeft) ctx.scale(-1, 1);
 
-        ctx.shadowBlur = 0;
-        ctx.fillText(this.emoji, 0, 0);
+        // Boss HP bar above the sprite
+        if (this.isBoss) {
+            const barWidth = this.radius * 2.5;
+            const barHeight = 5;
+            const y = -this.radius - 14;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(-barWidth / 2, y, barWidth, barHeight);
+            ctx.fillStyle = '#ff3355';
+            ctx.fillRect(-barWidth / 2, y, barWidth * Math.max(0, this.hp / this.maxHp), barHeight);
+        }
 
         ctx.restore();
     }
 
     takeDamage(amount: number) {
         this.hp -= amount;
+        this.hitFlash = 0.08;
         if (this.hp <= 0) {
             this.isDead = true;
         }

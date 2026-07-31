@@ -7,6 +7,7 @@ import type { Weapon } from '../../Weapon';
 import { type Vector2, normalize, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
+import { sprites } from '../../core/SpriteFactory';
 
 // ============================================
 // PROJECTILE - Base class for all flying entities
@@ -44,10 +45,12 @@ export class Projectile extends Entity {
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-        ctx.font = '20px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(this.emoji, 0, 0);
+        // Procedural pixel orb tinted by weapon, rotated to flight direction
+        ctx.rotate(Math.atan2(this.velocity.y, this.velocity.x));
+        const sprite = sprites.getProjectileSprite(this.emoji);
+        const size = Math.max(14, this.radius * 3);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
         ctx.restore();
     }
 
