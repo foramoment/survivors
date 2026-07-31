@@ -263,12 +263,22 @@ export class ChainLightning extends Projectile {
         }
     }
 
+    /** Long chains render only their newest segments, without glow passes */
+    protected static readonly MAX_DRAWN_SEGMENTS = 16;
+    protected static readonly CHEAP_DRAW_THRESHOLD = 8;
+
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         ctx.save();
         ctx.translate(-camera.x, -camera.y);
 
-        for (const seg of this.segments) {
-            this.drawLightningBolt(ctx, seg.start, seg.end, seg.alpha);
+        // shadowBlur strokes are expensive; with many segments switch to a
+        // single-pass cheap render and cap how many segments are drawn at all
+        const cheap = this.segments.length > ChainLightning.CHEAP_DRAW_THRESHOLD;
+        const drawn = this.segments.length > ChainLightning.MAX_DRAWN_SEGMENTS
+            ? this.segments.slice(-ChainLightning.MAX_DRAWN_SEGMENTS)
+            : this.segments;
+        for (const seg of drawn) {
+            this.drawLightningBolt(ctx, seg.start, seg.end, seg.alpha, cheap);
         }
 
         ctx.shadowBlur = 0;
@@ -277,7 +287,7 @@ export class ChainLightning extends Projectile {
         ctx.restore();
     }
 
-    protected drawLightningBolt(ctx: CanvasRenderingContext2D, start: Vector2, end: Vector2, alpha: number) {
+    protected drawLightningBolt(ctx: CanvasRenderingContext2D, start: Vector2, end: Vector2, alpha: number, cheap: boolean = false) {
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const dist = distance(start, end);
@@ -304,6 +314,20 @@ export class ChainLightning extends Projectile {
             });
         }
         points.push({ x: end.x, y: end.y });
+
+        if (cheap) {
+            // Single pass, no shadow — used when the chain is long
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.strokeStyle = `rgba(180, 235, 255, ${alpha * 0.9})`;
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
 
         // Glow layer
         ctx.beginPath();

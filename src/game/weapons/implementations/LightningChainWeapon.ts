@@ -18,6 +18,8 @@ import { levelSpatialHash } from '../../core/SpatialHash';
 
 export class ThunderstormLightning extends ChainLightning {
     splitChance: number = 0.1;
+    /** Hard cap on queued branches — splits used to snowball unbounded */
+    private static readonly MAX_PENDING_SPLITS = 4;
     private pendingSplits: { pos: Vector2; damage: number; bounces: number; hitEnemies: Set<any> }[] = [];
 
     update(dt: number) {
@@ -66,8 +68,9 @@ export class ThunderstormLightning extends ChainLightning {
             // Emit particles
             particles.emitLightning(target.pos.x, target.pos.y);
 
-            // Check for another split
-            if (Math.random() < this.splitChance) {
+            // Check for another split (bounded queue)
+            if (Math.random() < this.splitChance
+                && this.pendingSplits.length < ThunderstormLightning.MAX_PENDING_SPLITS) {
                 this.pendingSplits.push({
                     pos: { ...target.pos },
                     damage: split.damage * 0.9,
@@ -77,7 +80,8 @@ export class ThunderstormLightning extends ChainLightning {
             }
 
             // Continue chain
-            if (split.bounces > 1) {
+            if (split.bounces > 1
+                && this.pendingSplits.length < ThunderstormLightning.MAX_PENDING_SPLITS) {
                 this.pendingSplits.push({
                     pos: { ...target.pos },
                     damage: split.damage * 0.95,
@@ -90,8 +94,9 @@ export class ThunderstormLightning extends ChainLightning {
 
     // Override to add split logic
     chainToEnemy(enemy: any, currentBounces: number) {
-        // Check for split
-        if (Math.random() < this.splitChance && currentBounces > 1) {
+        // Check for split (bounded queue)
+        if (Math.random() < this.splitChance && currentBounces > 1
+            && this.pendingSplits.length < ThunderstormLightning.MAX_PENDING_SPLITS) {
             this.pendingSplits.push({
                 pos: { ...enemy.pos },
                 damage: this.damage * 0.9,
@@ -105,14 +110,21 @@ export class ThunderstormLightning extends ChainLightning {
         ctx.save();
         ctx.translate(-camera.x, -camera.y);
 
-        for (const seg of this.segments) {
-            this.drawThunderstormBolt(ctx, seg.start, seg.end, seg.alpha);
+        // Same segment cap / cheap-mode strategy as the base class
+        const cheap = this.segments.length > ChainLightning.CHEAP_DRAW_THRESHOLD;
+        const drawn = this.segments.length > ChainLightning.MAX_DRAWN_SEGMENTS
+            ? this.segments.slice(-ChainLightning.MAX_DRAWN_SEGMENTS)
+            : this.segments;
+        for (const seg of drawn) {
+            this.drawThunderstormBolt(ctx, seg.start, seg.end, seg.alpha, cheap);
         }
 
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
         ctx.restore();
     }
 
-    private drawThunderstormBolt(ctx: CanvasRenderingContext2D, start: Vector2, end: Vector2, alpha: number) {
+    private drawThunderstormBolt(ctx: CanvasRenderingContext2D, start: Vector2, end: Vector2, alpha: number, cheap: boolean = false) {
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const dist = distance(start, end);
@@ -122,7 +134,9 @@ export class ThunderstormLightning extends ChainLightning {
         ctx.save();
 
         // Generate zigzag points
-        const numSegments = Math.min(18, Math.max(5, Math.floor(dist / 25)));
+        const numSegments = cheap
+            ? Math.min(8, Math.max(4, Math.floor(dist / 40)))
+            : Math.min(18, Math.max(5, Math.floor(dist / 25)));
         const points: Vector2[] = [{ x: start.x, y: start.y }];
 
         const perpX = -dy / dist;
@@ -139,6 +153,20 @@ export class ThunderstormLightning extends ChainLightning {
             });
         }
         points.push({ x: end.x, y: end.y });
+
+        if (cheap) {
+            // Single pass, no shadow — long chains
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.strokeStyle = `rgba(210, 170, 255, ${alpha * 0.9})`;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
 
         // Outer glow - purple tint for evolved
         ctx.beginPath();
@@ -258,8 +286,11 @@ export class LightningChainWeapon extends ProjectileWeapon {
         const beam = new Beam(this.owner.pos, target.pos, 0.1, beamColor, isEvolved ? 3 : 2);
         this.onSpawn(beam);
 
-        const bounces = isEvolved ? 999 : (this.pierce) + this.level;
-        const maxChainLength = isEvolved ? 10000 : this.area;
+        // Bounded chain: unbounded (999 bounces / 10000 range) hit every enemy
+        // on the map in one frame and tanked FPS on damage numbers, particles
+        // and glow rendering. 24 bounces still reads as "hits everything nearby".
+        const bounces = isEvolved ? 24 : Math.min(12, this.pierce + this.level);
+        const maxChainLength = isEvolved ? 4000 : this.area;
 
         let chain: ChainLightning | ThunderstormLightning;
         if (isEvolved) {
@@ -271,6 +302,9 @@ export class LightningChainWeapon extends ProjectileWeapon {
         }
 
         chain.hitEnemies.add(target);
+        // Particles only for the first hits of a chain — damage still applies
+        // to every target, but 400 simultaneous particle bursts is a spike
+        let particleBudget = 8;
         chain.onHit = (t: any, d: number) => {
             damageSystem.dealDamage({
                 baseDamage: d,
@@ -278,7 +312,10 @@ export class LightningChainWeapon extends ProjectileWeapon {
                 target: t,
                 position: t.pos
             });
-            particles.emitLightning(t.pos.x, t.pos.y);
+            if (particleBudget > 0) {
+                particleBudget--;
+                particles.emitLightning(t.pos.x, t.pos.y);
+            }
         };
 
         this.onSpawn(chain);
