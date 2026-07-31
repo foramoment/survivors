@@ -338,61 +338,104 @@ export class SpriteFactory {
     // Background tiles
     // =========================================================
 
-    getBackgroundTile(theme: string): HTMLCanvasElement {
-        const key = `bg:${theme}`;
+    /**
+     * Tileable floor plate. `hue` comes from the stage palette; without it the
+     * theme name is hashed into one (keeps older callers working).
+     *
+     * The tile is deliberately *not* fully opaque: seams are punched out with
+     * `destination-out` and the whole plate loses a little alpha, so the
+     * parallax starfield behind it (see `core/StageBackdrop`) bleeds through.
+     */
+    getBackgroundTile(theme: string, hue?: number): HTMLCanvasElement {
+        const h = hue ?? hashString(theme) % 360;
+        const key = `bg:${theme}:${h}`;
         let tile = this.cache.get(key);
         if (!tile) {
-            tile = this.generateBackgroundTile(theme);
+            tile = this.generateBackgroundTile(theme, h);
             this.cache.set(key, tile);
         }
         return tile;
     }
 
-    private generateBackgroundTile(theme: string): HTMLCanvasElement {
-        const size = 256;
+    private generateBackgroundTile(theme: string, hue: number): HTMLCanvasElement {
+        const size = 384;
         const canvas = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext('2d')!;
         const rng = mulberry32(hashString(theme));
 
-        const hue = hashString(theme) % 360;
-        ctx.fillStyle = `hsl(${hue}, 25%, 7%)`;
+        ctx.fillStyle = `hsl(${hue}, 20%, 7%)`;
         ctx.fillRect(0, 0, size, size);
 
         // Subtle rocky noise patches
-        for (let i = 0; i < 90; i++) {
+        for (let i = 0; i < 220; i++) {
             const x = Math.floor(rng() * size / 8) * 8;
             const y = Math.floor(rng() * size / 8) * 8;
-            const l = 6 + rng() * 5;
-            ctx.fillStyle = `hsla(${hue}, 20%, ${l}%, 0.9)`;
+            const l = 5 + rng() * 6;
+            ctx.fillStyle = `hsla(${hue}, 14%, ${l}%, 0.9)`;
             ctx.fillRect(x, y, 8, 8);
         }
 
-        // Cracks / seams
-        ctx.strokeStyle = `hsla(${hue}, 30%, 4%, 0.8)`;
-        ctx.lineWidth = 2;
-        for (let i = 0; i < 5; i++) {
-            ctx.beginPath();
-            let x = rng() * size;
-            let y = rng() * size;
-            ctx.moveTo(x, y);
-            for (let s = 0; s < 6; s++) {
-                x += (rng() - 0.5) * 70;
-                y += (rng() - 0.5) * 70;
-                ctx.lineTo(x, y);
-            }
-            ctx.stroke();
-        }
-
-        // Glowing speckles (stars / minerals)
-        for (let i = 0; i < 24; i++) {
+        // Glowing speckles (minerals / hull lights)
+        for (let i = 0; i < 30; i++) {
             const x = Math.floor(rng() * size);
             const y = Math.floor(rng() * size);
-            const bright = 40 + rng() * 40;
-            ctx.fillStyle = `hsla(${(hue + 40) % 360}, 60%, ${bright}%, ${0.25 + rng() * 0.3})`;
+            const bright = 35 + rng() * 35;
+            ctx.fillStyle = `hsla(${(hue + 40) % 360}, 55%, ${bright}%, ${0.18 + rng() * 0.2})`;
             ctx.fillRect(x, y, 2, 2);
         }
+
+        // Seams: baked once as short polylines, drawn twice — a faint lit rim,
+        // then a hairline transparent core cut straight through the plate.
+        // Kept low-contrast on purpose: strong marks make the 384px repeat
+        // readable as a grid.
+        const seams: Array<Array<[number, number]>> = [];
+        for (let i = 0; i < 5; i++) {
+            const points: Array<[number, number]> = [];
+            let x = rng() * size;
+            let y = rng() * size;
+            points.push([x, y]);
+            for (let s = 0; s < 4; s++) {
+                x += (rng() - 0.5) * 55;
+                y += (rng() - 0.5) * 55;
+                points.push([x, y]);
+            }
+            seams.push(points);
+        }
+
+        const strokeSeams = () => {
+            for (const points of seams) {
+                ctx.beginPath();
+                ctx.moveTo(points[0][0], points[0][1]);
+                for (let p = 1; p < points.length; p++) ctx.lineTo(points[p][0], points[p][1]);
+                ctx.stroke();
+            }
+        };
+
+        ctx.strokeStyle = `hsla(${(hue + 20) % 360}, 45%, 30%, 0.10)`;
+        ctx.lineWidth = 3;
+        strokeSeams();
+
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
+        ctx.lineWidth = 1.5;
+        strokeSeams();
+
+        // Vent holes — small windows onto the void
+        for (let i = 0; i < 3; i++) {
+            const x = Math.floor(rng() * size);
+            const y = Math.floor(rng() * size);
+            const w = 4 + Math.floor(rng() * 2) * 4;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(x, y, w, w);
+        }
+
+        // The whole plate is translucent so the parallax layers behind it stay
+        // readable — it is a floor floating in space, not a wall.
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+        ctx.fillRect(0, 0, size, size);
+        ctx.globalCompositeOperation = 'source-over';
 
         return canvas;
     }

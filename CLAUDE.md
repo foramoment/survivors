@@ -17,6 +17,7 @@ src/game/
 │   ├── SpatialHash.ts    # 🗺️ Оптимизация поиска сущностей O(1)
 │   ├── DifficultyDirector.ts # 🎚️ Адаптивная сложность, спавн, волны, мини-боссы
 │   ├── SpriteFactory.ts  # 🎨 Процедурные пиксельные спрайты (враги/игрок/фон) — БЕЗ ассетов
+│   ├── StageBackdrop.ts  # 🌠 Параллакс арены (небула/звёзды/пол/пыль) + свет стейджа
 │   ├── PixelFont.ts      # 🔤 Битмап-шрифт 5×7 в коде (титры, damage numbers)
 │   ├── AudioSystem.ts    # 🔊 Процедурный чиптюн Web Audio (SFX + генеративная музыка)
 │   ├── JuiceSystem.ts    # 💥 Game feel: тряска, hit-stop, вспышки, zoom, ударные волны
@@ -272,6 +273,22 @@ ENEMY_CONFIG = {
 **Файлы:** `data/StageData.ts`, `ui/screens/StageSelectionScreen.ts` (screen id `level_select`)
 
 3 стейджа с собственным пулом врагов, темой фона, множителями и длительностью. По истечении `duration` спавнится финальный босс (miniboss ×3 HP); его смерть = победа (`showVictory`).
+
+Каждый стейдж несёт палитру `visuals: StageVisuals` (цвет пустоты, небулы,
+звёзд, пыли, hue пола, экранный свет + виньетка, `flicker`/`pulse`). Её читает
+`core/StageBackdrop.ts` — единственное место, где рисуется фон арены:
+
+```
+far   (0.22×)  запечённая плитка небула+звёзды        ← ctx.createPattern
+stars (0.22×)  ~160 живых мерцающих точек
+floor (1.00×)  плитка пола, полупрозрачная (швы вырезаны destination-out)
+near  (1.45×)  пыль и обломки перед игроком
+```
+
+`drawLighting()` (screen-space, вызывается из `GameManager.draw` после снятия
+zoom-трансформа) кладёт цветную заливку + виньетку; `flicker` даёт аварийные
+лампы станции, `pulse` — «дыхание» Нексуса. Всё анимированное отключается
+вместе с `juice.enabled` (Options → Screen FX).
 
 ### Сепарация врагов
 

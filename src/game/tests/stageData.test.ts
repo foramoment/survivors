@@ -32,6 +32,27 @@ describe('StageData', () => {
         }
     });
 
+    it('every stage carries a full visual palette', () => {
+        for (const stage of STAGES) {
+            const v = stage.visuals;
+            expect(v.nebula).toHaveLength(2);
+            expect(v.floorHue).toBeGreaterThanOrEqual(0);
+            expect(v.floorHue).toBeLessThan(360);
+            expect(v.lightAlpha).toBeGreaterThan(0);
+            expect(v.lightAlpha).toBeLessThanOrEqual(0.25);
+            expect(v.edgeAlpha).toBeGreaterThan(0);
+            expect(v.edgeAlpha).toBeLessThanOrEqual(0.8);
+            for (const color of [v.space, v.star, v.dust, v.light, v.edge]) {
+                expect(color).toMatch(/^#[0-9a-f]{6}$/i);
+            }
+        }
+    });
+
+    it('stages are visually distinct from each other', () => {
+        const hues = new Set(STAGES.map(s => s.visuals.floorHue));
+        expect(hues.size).toBe(STAGES.length);
+    });
+
     it('stages get progressively harder', () => {
         for (let i = 1; i < STAGES.length; i++) {
             expect(STAGES[i].hpScale).toBeGreaterThan(STAGES[i - 1].hpScale);

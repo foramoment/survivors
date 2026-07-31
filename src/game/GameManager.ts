@@ -13,6 +13,7 @@ import { debugOverlay } from './core/DebugOverlay';
 import { collisionSystem } from './core/CollisionSystem';
 import { difficultyDirector } from './core/DifficultyDirector';
 import { sprites } from './core/SpriteFactory';
+import { stageBackdrop } from './core/StageBackdrop';
 import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
@@ -44,8 +45,6 @@ export class GameManager {
     private lastCritStop: number = 0;
 
     backgroundTheme: string = 'Asteroid Fields';
-    private backgroundPattern: CanvasPattern | null = null;
-    private backgroundPatternTheme: string = '';
 
     waveTimer: number = 0;
     gameTime: number = 0;
@@ -144,7 +143,7 @@ export class GameManager {
     startGame(classIndex: number, stageIndex: number = 0) {
         this.currentStage = STAGES[stageIndex] ?? STAGES[0];
         this.backgroundTheme = this.currentStage.theme;
-        this.backgroundPattern = null;
+        stageBackdrop.setStage(this.currentStage);
         this.finalBoss = null;
         this.finalBossSpawned = false;
         // Reset progression tracking BEFORE adding the starting weapon
@@ -668,6 +667,9 @@ export class GameManager {
         this.gameTime += dt;
         this.waveTimer += dt;
 
+        // Parallax layers drift with the camera (frozen while paused)
+        stageBackdrop.update(dt, this.camera, this.canvas.width, this.canvas.height);
+
         // Adaptive spawning — DifficultyDirector decides how many and how strong
         difficultyDirector.update(dt, {
             gameTime: this.gameTime,
@@ -1105,6 +1107,9 @@ export class GameManager {
 
         if (transformed) ctx.restore();
 
+        // Stage lighting sits above the world but below the HUD and juice flashes
+        stageBackdrop.drawLighting(ctx, this.canvas.width, this.canvas.height);
+
         // Draw debug overlay (FPS, stats)
         debugOverlay.draw(ctx);
     }
@@ -1136,29 +1141,7 @@ export class GameManager {
     }
 
     drawBackground(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        if (!this.backgroundPattern || this.backgroundPatternTheme !== this.backgroundTheme) {
-            const tile = sprites.getBackgroundTile(this.backgroundTheme);
-            this.backgroundPattern = ctx.createPattern(tile, 'repeat');
-            this.backgroundPatternTheme = this.backgroundTheme;
-        }
-        if (!this.backgroundPattern) return;
-
-        ctx.save();
-        ctx.shadowBlur = 0;
-        ctx.shadowColor = 'transparent';
-        ctx.globalAlpha = 1;
-
-        // Anchor the pattern to world space so it scrolls with the camera.
-        // Oversized by 25% so a zoom-out punch never exposes the void.
-        const padX = this.canvas.width * 0.125;
-        const padY = this.canvas.height * 0.125;
-        ctx.translate(-camera.x, -camera.y);
-        ctx.fillStyle = this.backgroundPattern;
-        ctx.fillRect(
-            camera.x - padX, camera.y - padY,
-            this.canvas.width + padX * 2, this.canvas.height + padY * 2
-        );
-        ctx.restore();
+        stageBackdrop.draw(ctx, camera, this.canvas.width, this.canvas.height);
     }
 
     getProjectileColor(emoji: string): string {
