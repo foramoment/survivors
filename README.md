@@ -6,6 +6,8 @@ A **Vampire Survivors-like** roguelike game built with TypeScript and Vite. Batt
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 ![Capacitor](https://img.shields.io/badge/Capacitor-119EFF?style=for-the-badge&logo=capacitor&logoColor=white)
 
+### ▶️ [Play in your browser](https://foramoment.github.io/survivors/)
+
 ## 🎮 Features
 
 - **14 Unique Classes** — Each with different starting weapons and stat bonuses
