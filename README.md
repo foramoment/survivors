@@ -139,7 +139,11 @@ export const WEAPON_STATS: Record<string, WeaponConfig> = {
 
 ## 📜 License
 
-This project is licensed under the **MIT License** — you're free to use, modify, and distribute it however you like! Just keep the copyright notice. See [LICENSE](LICENSE) for details.
+**All rights reserved.** Copyright (c) 2024-2026 Aleksey Dudnikov.
+
+The source is readable here, but it is not open source: copying, redistributing
+or re-hosting the game — source or built — is not permitted without written
+permission. See [LICENSE](LICENSE).
 
 ---
 
