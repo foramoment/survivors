@@ -4,6 +4,7 @@ import { input } from '../core/Input';
 import { Weapon } from '../Weapon';
 import { sprites } from '../core/SpriteFactory';
 import { adrenalineMultiplier } from '../core/Tactics';
+import type { ClassPerLevel } from '../data/GameData';
 
 export class Player extends Entity {
     speed: number = 200;
@@ -52,8 +53,13 @@ export class Player extends Entity {
         siphon: 0,
     };
 
+    classId: string = 'void_walker';
     className: string = "Survivor";
     classEmoji: string = "🧑‍🚀";
+    /** Class HP before any per-level growth — the base for the maxHp perk */
+    baseMaxHp: number = 100;
+    /** Stat this class grows on every level-up (see GameData CLASSES) */
+    perLevel: ClassPerLevel | null = null;
 
     animTimer: number = 0;
     /** Always-advancing clock for effects that must animate while standing still */
@@ -173,7 +179,7 @@ export class Player extends Entity {
 
         // Procedural pixel sprite (astronaut tinted by class)
         const frame = this.isMoving ? Math.floor(this.animTimer * 8) % 2 : 0;
-        const sprite = sprites.getPlayerSprite(this.className, frame);
+        const sprite = sprites.getPlayerSprite(this.classId, frame);
         const height = this.radius * 2.6;
         const width = height * (sprite.width / sprite.height);
         const bob = this.isMoving ? Math.sin(this.animTimer * 16) * 1.2 : 0;
@@ -258,6 +264,32 @@ export class Player extends Entity {
         }
     }
 
+    /**
+     * The class's per-level growth. Multiplier stats (might/area/cooldown) take
+     * the value as a share of their base of 1, so +0.01 really is +1% of the
+     * starting value and fifty levels land near +50% — not a compounding curve
+     * that runs away. `maxHp` is special-cased because it is a property, not a
+     * stat, and grows off the CLASS's HP rather than the current maximum, so
+     * Barrier Field picks do not multiply with it.
+     */
+    private applyClassGrowth() {
+        if (!this.perLevel) return;
+
+        if (this.perLevel.stat === 'maxHp') {
+            const gain = this.baseMaxHp * this.perLevel.value;
+            this.maxHp += gain;
+            this.hp = Math.min(this.maxHp, this.hp + gain);
+            return;
+        }
+
+        const stats = this.stats as Record<string, number>;
+        if (this.perLevel.stat in stats) {
+            stats[this.perLevel.stat] += this.perLevel.value;
+        }
+        // Stacked cooldown growth must not go degenerate
+        if (this.stats.cooldown < 0.25) this.stats.cooldown = 0.25;
+    }
+
     gainXp(amount: number) {
         this.xp += amount * this.stats.growth;
         if (this.xp >= this.nextLevelXp) {
@@ -268,6 +300,7 @@ export class Player extends Entity {
     levelUp() {
         this.level++;
         this.xp -= this.nextLevelXp;
+        this.applyClassGrowth();
 
         // XP curve: gentle-exponential with a flat term.
         // Old curve (1/2/3/5/8 then ×1.15) spammed level-ups in the first

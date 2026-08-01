@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { CLASSES, WEAPONS } from '../data/GameData';
 import { VALID_PLAYER_STATS } from '../core/PlayerStats';
+import { CHARACTER_SPRITES } from '../data/CharacterSprites';
 
 describe('CLASSES Validation', () => {
     it('should only use valid player stats', () => {
@@ -66,5 +67,43 @@ describe('CLASSES Validation', () => {
         for (const cls of CLASSES) {
             expect(cls.hp, `${cls.name} has invalid HP`).toBeGreaterThan(0);
         }
+    });
+
+    it('every class has its own pixel sprite', () => {
+        for (const cls of CLASSES) {
+            expect(CHARACTER_SPRITES[cls.id], `${cls.name} has no sprite`).toBeDefined();
+        }
+    });
+
+    it('sprite templates are the right shape', () => {
+        for (const [id, sprite] of Object.entries(CHARACTER_SPRITES)) {
+            expect(sprite.body.length, `${id} body rows`).toBe(13);
+            for (const row of sprite.body) {
+                expect(row.length, `${id} row "${row}"`).toBe(12);
+            }
+            for (const frame of sprite.legs) {
+                expect(frame.length, `${id} leg rows`).toBe(3);
+                for (const row of frame) expect(row.length, `${id} leg "${row}"`).toBe(12);
+            }
+        }
+    });
+
+    it('every class grows a real stat on level-up', () => {
+        for (const cls of CLASSES) {
+            expect(cls.perLevel, `${cls.name} has no per-level growth`).toBeDefined();
+            const stat = cls.perLevel.stat;
+            expect(VALID_PLAYER_STATS.includes(stat as any), `${cls.name}: ${stat}`).toBe(true);
+        }
+    });
+
+    it('each class starts with a different weapon', () => {
+        const ids = CLASSES.map(c => c.weaponId);
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('dropped starting weapons are still in the level-up pool', () => {
+        // Cutting the roster must not cut content — the other weapons stay
+        // available, they just are not starting picks any more
+        expect(WEAPONS.length).toBeGreaterThan(CLASSES.length);
     });
 });

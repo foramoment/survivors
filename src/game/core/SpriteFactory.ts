@@ -14,6 +14,8 @@
  * uses drawImage with image smoothing disabled to keep pixels crisp.
  */
 
+import { CHARACTER_SPRITES, FALLBACK_SPRITE_ID } from '../data/CharacterSprites';
+
 type Palette = {
     dark: string;
     mid: string;
@@ -159,55 +161,34 @@ export class SpriteFactory {
     // Player (astronaut template, suit color per class)
     // =========================================================
 
-    getPlayerSprite(className: string, frame: number): HTMLCanvasElement {
-        const key = `player:${className}:${frame % 2}`;
+    /**
+     * `classId` (not the display name) keys the sprite: the name is
+     * user-visible and gets translated, the id does not.
+     */
+    getPlayerSprite(classId: string, frame: number): HTMLCanvasElement {
+        const key = `player:${classId}:${frame % 2}`;
         let sprite = this.cache.get(key);
         if (!sprite) {
-            sprite = this.generatePlayerSprite(className, frame % 2);
+            sprite = this.generatePlayerSprite(classId, frame % 2);
             this.cache.set(key, sprite);
         }
         return sprite;
     }
 
-    private generatePlayerSprite(className: string, frame: number): HTMLCanvasElement {
-        const hue = hashString(className) % 360;
-        const suitDark = `hsl(${hue}, 55%, 30%)`;
-        const suit = `hsl(${hue}, 60%, 48%)`;
-        const suitLight = `hsl(${hue}, 65%, 65%)`;
-        const visor = '#66eeff';
-        const white = '#e8e8f0';
+    /** Data URL of the idle frame — for DOM character cards */
+    getPlayerSpriteUrl(classId: string): string {
+        return this.getPlayerSprite(classId, 0).toDataURL();
+    }
 
-        // 12 wide × 16 tall template, drawn as strings for readability.
-        // . empty, h helmet(white), v visor, s suit, S suit light, d suit dark, b boots
-        const legA = [
-            '..dss..ssd..',
-            '..ds....sd..',
-            '..bb....bb..',
-        ];
-        const legB = [
-            '...dssssd...',
-            '...ds..sd...',
-            '...bb..bb...',
-        ];
-        const rows = [
-            '....hhhh....',
-            '...hhhhhh...',
-            '..hhvvvvhh..',
-            '..hhvvvvhh..',
-            '...hhhhhh...',
-            '....ssss....',
-            '..sSssssSs..',
-            '.dsSssssSsd.',
-            '.dssssssssd.',
-            '.d.ssssss.d.',
-            '...ssssss...',
-            '...dssssd...',
-            '...dssssd...',
-            ...(frame === 0 ? legA : legB),
-        ];
+    private generatePlayerSprite(classId: string, frame: number): HTMLCanvasElement {
+        const template = CHARACTER_SPRITES[classId] ?? CHARACTER_SPRITES[FALLBACK_SPRITE_ID];
+        const p = template.palette;
+
+        const rows = [...template.body, ...template.legs[frame]];
 
         const colorFor: Record<string, string> = {
-            h: white, v: visor, s: suit, S: suitLight, d: suitDark, b: '#333340',
+            h: p.shell, v: p.visor, s: p.mid, S: p.light, d: p.dark,
+            a: p.accent, b: p.boots,
         };
 
         const w = rows[0].length;
@@ -231,7 +212,7 @@ export class SpriteFactory {
             grid.push(row);
         }
 
-        return this.renderGrid(grid, colors, suitDark, false);
+        return this.renderGrid(grid, colors, p.dark, false);
     }
 
     // =========================================================

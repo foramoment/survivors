@@ -5,24 +5,78 @@ import {
     FrostNovaWeapon, PlasmaGrenadeWeapon
 } from '../weapons/implementations';
 
-/** `id` is the stable key for translations (see data/locales) and save data */
+/**
+ * Playable characters.
+ *
+ * There used to be fourteen, one per weapon, so "choosing a character" was
+ * really "choosing a starting weapon" and every class was a tinted copy of the
+ * same astronaut. Six is the number that lets each one have its own pixel
+ * silhouette (see data/CharacterSprites), a starting weapon that plays
+ * differently from the others, and a growth stat of its own. The other eight
+ * weapons did not go anywhere — they are still in the level-up pool, they just
+ * are not starting weapons.
+ *
+ * `perLevel` is applied on every level-up, so a class keeps mattering for the
+ * whole run instead of being a stat block you forget by minute two. ~1% per
+ * level lands around +50% over a full clear — noticeable, but not enough to
+ * out-scale the powerups you pick.
+ *
+ * `id` is the stable key for translations, sprites and save data.
+ */
+export interface ClassPerLevel {
+    /** Key in Player.stats, or the special-cased `maxHp` */
+    stat: string;
+    /** Signed: cooldown wants a negative value */
+    value: number;
+}
+
 export const CLASSES = [
-    { id: 'void_walker', name: "Void Walker", emoji: "🌑", bonus: "Speed +10%", weaponId: 'void_ray', hp: 90, stats: { moveSpeed: 1.1 } },
-    { id: 'cyber_samurai', name: "Cyber Samurai", emoji: "🤖", bonus: "Crit 15%", weaponId: 'phantom_slash', hp: 85, stats: { critChance: 0.15 } },
-    { id: 'heavy_gunner', name: "Heavy Gunner", emoji: "🦍", bonus: "Might +20%, Speed -10%", weaponId: 'plasma_cannon', hp: 110, stats: { might: 1.2, moveSpeed: 0.9 } },
-    { id: 'technomancer', name: "Technomancer", emoji: "🧙‍♂️", bonus: "Duration +20%", weaponId: 'nanobot_swarm', hp: 100, stats: { duration: 1.2 } },
-    // Kept in step with the flat Nano-Repair stack (0.1 HP/s): a class perk is
-    // worth ~2.5 picks, not 6.
-    { id: 'astro_biologist', name: "Astro Biologist", emoji: "👨‍🔬", bonus: "Regen +0.25", weaponId: 'spore_cloud', hp: 95, stats: { regen: 0.25 } },
-    { id: 'quantum_physicist', name: "Quantum Physicist", emoji: "⚛️", bonus: "Cooldown -10%", weaponId: 'singularity_orb', hp: 80, stats: { cooldown: 0.9 } },
-    { id: 'exo_marine', name: "Exo Marine", emoji: "👮", bonus: "Armor +2", weaponId: 'orbital_strike', hp: 130, stats: { armor: 2 } },
-    { id: 'psionicist', name: "Psionicist", emoji: "🧠", bonus: "Area +20%", weaponId: 'mind_blast', hp: 75, stats: { area: 1.2 } },
-    { id: 'time_keeper', name: "Time Keeper", emoji: "⏳", bonus: "Proj Speed +20%", weaponId: 'chrono_disc', hp: 100, stats: { speed: 1.2 } },
-    { id: 'alien_symbiote', name: "Alien Symbiote", emoji: "👽", bonus: "Growth +20%", weaponId: 'acid_pool', hp: 95, stats: { growth: 1.2 } },
-    { id: 'storm_mage', name: "Storm Mage", emoji: "⚡", bonus: "Might +15%", weaponId: 'lightning_chain', hp: 70, stats: { might: 1.15 } },
-    { id: 'berserker', name: "Berserker", emoji: "🔥", bonus: "HP +50%, Armor -2, Might +10%", weaponId: 'spinning_ember', hp: 150, stats: { armor: -2, might: 1.1 } },
-    { id: 'ice_mage', name: "Ice Mage", emoji: "🧊", bonus: "Area +15%, Cooldown -10%", weaponId: 'frost_nova', hp: 85, stats: { area: 1.15, cooldown: 0.9 } },
-    { id: 'demolitions_expert', name: "Demolitions Expert", emoji: "💣", bonus: "Area +20%, Might +10%", weaponId: 'plasma_grenade', hp: 100, stats: { area: 1.2, might: 1.1 } },
+    {
+        id: 'void_walker', name: "Void Walker", emoji: "🌑",
+        bonus: "Speed +10% · +1% damage per level",
+        weaponId: 'void_ray', hp: 90,
+        stats: { moveSpeed: 1.1 },
+        perLevel: { stat: 'might', value: 0.01 } as ClassPerLevel,
+    },
+    {
+        id: 'cyber_samurai', name: "Cyber Samurai", emoji: "🤖",
+        bonus: "Crit 15% · +1% crit damage per level",
+        weaponId: 'phantom_slash', hp: 85,
+        stats: { critChance: 0.15 },
+        perLevel: { stat: 'critDamage', value: 0.01 } as ClassPerLevel,
+    },
+    {
+        id: 'exo_marine', name: "Exo Marine", emoji: "🛡️",
+        bonus: "Armor +2 · +1% max HP per level",
+        weaponId: 'orbital_strike', hp: 130,
+        stats: { armor: 2 },
+        perLevel: { stat: 'maxHp', value: 0.01 } as ClassPerLevel,
+    },
+    {
+        // Regen kept in step with the flat Nano-Repair stack (0.1 HP/s): a
+        // class perk is worth ~2.5 picks, not 6.
+        id: 'astro_biologist', name: "Astro Biologist", emoji: "🧬",
+        bonus: "Regen +0.25 · +1% area per level",
+        weaponId: 'spore_cloud', hp: 95,
+        stats: { regen: 0.25, area: 1.1 },
+        perLevel: { stat: 'area', value: 0.01 } as ClassPerLevel,
+    },
+    {
+        id: 'storm_mage', name: "Storm Mage", emoji: "⚡",
+        bonus: "Might +15% · −1% cooldown per level",
+        weaponId: 'lightning_chain', hp: 75,
+        stats: { might: 1.15 },
+        perLevel: { stat: 'cooldown', value: -0.01 } as ClassPerLevel,
+    },
+    {
+        // The only class that starts with a tactic: adrenaline turns its
+        // missing armour into the reason to keep fighting at low HP
+        id: 'berserker', name: "Berserker", emoji: "🔥",
+        bonus: "HP +50%, Armor −2, Adrenaline · +1% crit per level",
+        weaponId: 'spinning_ember', hp: 150,
+        stats: { armor: -2, might: 1.1, adrenaline: 0.15 },
+        perLevel: { stat: 'critChance', value: 0.01 } as ClassPerLevel,
+    },
 ];
 
 // Base values are the FIRST pick; repeat picks stack and grow 25% per stack

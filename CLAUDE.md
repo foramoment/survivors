@@ -17,6 +17,8 @@ src/game/
 │   ├── ParticleSystem.ts # ✨ Singleton: эффекты частиц
 │   ├── SpatialHash.ts    # 🗺️ Оптимизация поиска сущностей O(1)
 │   ├── DifficultyDirector.ts # 🎚️ Адаптивная сложность, спавн, волны, мини-боссы
+│   ├── Tactics.ts        # 🧩 Перки-механики: разряд, эхо, адреналин, сифон
+│   ├── Score.ts          # 🏅 Очки за забег + локальный лидерборд (localStorage)
 │   ├── SpriteFactory.ts  # 🎨 Процедурные пиксельные спрайты (враги/игрок/фон) — БЕЗ ассетов
 │   ├── StageBackdrop.ts  # 🌠 Параллакс арены (небула/звёзды/пол/пыль) + свет стейджа
 │   ├── PropField.ts      # 🪨 Препятствия: чанковая генерация, коллизии, отрисовка
@@ -34,6 +36,7 @@ src/game/
 │   └── Utils.ts          # Vector2, distance, normalize
 ├── data/
 │   ├── GameData.ts       # 📊 Конфиг: классы, powerups, враги, оружия
+│   ├── CharacterSprites.ts # 🧍 По одному пиксельному шаблону на каждого из 6 персонажей
 │   └── locales/          # 🌐 en.ts (UI) + ru.ts (UI + переводы игровых данных)
 ├── entities/
 │   ├── Player.ts         # Игрок со статами

@@ -131,8 +131,10 @@ export class GameManager {
         this.player = new Player(0, 0);
 
         // Apply Class Stats
+        this.player.classId = cls.id;
         this.player.className = cls.name;
         this.player.classEmoji = cls.emoji;
+        this.player.perLevel = cls.perLevel;
 
         // Set HP from class
         this.player.hp = cls.hp;
@@ -140,6 +142,7 @@ export class GameManager {
 
         Object.assign(this.player.stats, cls.stats);
 
+        this.player.baseMaxHp = cls.hp;
         this.player.onLevelUp = () => this.showLevelUp();
 
         // Add starting weapon

@@ -4,6 +4,7 @@ import { screenManager } from '../ScreenManager';
 import { audio } from '../../core/AudioSystem';
 import { t } from '../../core/I18n';
 import { classLabel, classBonus, weaponName } from '../../core/Labels';
+import { sprites } from '../../core/SpriteFactory';
 
 export interface ClassSelectionParams {
     devMode?: boolean;
@@ -86,13 +87,16 @@ export class ClassSelectionScreen extends BaseScreen {
             const weaponEmoji = weaponData ? weaponData.emoji : '❓';
 
             const card = document.createElement('div');
-            card.className = 'class-card interactive';
+            card.className = 'class-card class-card--portrait interactive';
+            // The card shows the sprite you will actually be playing, not an
+            // emoji standing in for it — same canvas the game renders, exported
+            // once as a data URL
             card.innerHTML = `
-                <div class="class-icon">${cls.emoji}</div>
+                <img class="class-portrait" src="${sprites.getPlayerSpriteUrl(cls.id)}" alt="">
                 <div class="class-name">${classLabel(cls)}</div>
                 <div class="class-bonus">❤️ ${t('classes.hp', { n: cls.hp })}</div>
                 <div class="class-bonus">${weaponEmoji} ${weapon}</div>
-                <div class="class-bonus">${classBonus(cls)}</div>
+                <div class="class-bonus class-perk">${classBonus(cls)}</div>
             `;
             // Staggered entrance so the grid cascades in
             card.style.animationDelay = `${(index * 0.045).toFixed(3)}s`;

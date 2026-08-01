@@ -921,6 +921,35 @@ h2.lucky {
   text-shadow: 2px 2px 0 #000;
 }
 
+/* Character cards show the real in-game sprite instead of an emoji */
+.class-card--portrait {
+  padding-top: 18px;
+}
+
+.class-portrait {
+  display: block;
+  width: 72px;
+  height: 96px;
+  margin: 0 auto 10px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, 0.6));
+}
+
+.class-card--portrait:hover .class-portrait {
+  animation: portrait-bob 420ms steps(2) infinite alternate;
+}
+
+@keyframes portrait-bob {
+  from { transform: translateY(0); }
+  to { transform: translateY(-3px); }
+}
+
+/* The per-level growth is the reason to pick one class over another */
+.class-perk {
+  color: var(--c-yellow, #ffd23f);
+}
+
 /* =========================================================================
    Records (local leaderboard)
    ========================================================================= */
