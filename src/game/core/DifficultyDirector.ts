@@ -154,9 +154,17 @@ export class DifficultyDirector {
         return (1 + gameTime / 240) * (0.75 + 0.25 * this.intensity);
     }
 
-    /** Enemy contact damage multiplier — milder intensity influence than HP */
+    /**
+     * Enemy contact damage-per-second multiplier — milder than HP in both time
+     * and intensity.
+     *
+     * Time growth is /600 rather than /300 because contact damage is now
+     * actually applied (see core/ContactDamage) and stacks across a crowd:
+     * doubling by minute 10 already turns a late-game pile into a 3-second
+     * death sentence. Enemy *count* is what escalates late, not per-enemy bite.
+     */
     getDamageMultiplier(gameTime: number): number {
-        return (1 + gameTime / 300) * (0.85 + 0.15 * this.intensity);
+        return (1 + gameTime / 600) * (0.85 + 0.15 * this.intensity);
     }
 
     /** Elite spawn chance grows with time and with player overperformance */

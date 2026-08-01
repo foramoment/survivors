@@ -22,7 +22,11 @@ import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
 import { drawPixelText } from './core/PixelFont';
 import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, POWERUP_STACK_CAP } from './core/UpgradePool';
+import { contactDamagePerSecond } from './core/ContactDamage';
 import { screenManager } from './ui/ScreenManager';
+
+/** Seconds between hurt beats (sound + shake) while enemies are on the player */
+const CONTACT_FX_INTERVAL = 0.28;
 import { createSettingsPanel } from './ui/components/SettingsPanel';
 import { i18n, t } from './core/I18n';
 import {
@@ -71,6 +75,8 @@ export class GameManager {
     currentStage: StageConfig = STAGES[0];
     private finalBoss: Enemy | null = null;
     private finalBossSpawned: boolean = false;
+    /** Countdown to the next hurt beat while standing in contact */
+    private contactFxTimer: number = 0;
     private pauseOverlay: HTMLElement | null = null;
     /** Survives a pause-overlay rebuild so a language switch keeps the panel open */
     private pauseSettingsOpen: boolean = false;
@@ -381,6 +387,31 @@ export class GameManager {
         this.pauseOverlay = null;
         if (this.state === 'PAUSED') this.state = 'PLAYING';
         audio.resumeMusic();
+    }
+
+    /**
+     * Hurt feedback while enemies are on the player.
+     *
+     * Contact damage now ticks every frame, so the old "did HP go down?" check
+     * would fire the hurt sound and a screen flash 60 times a second. Instead
+     * the feedback fires on a fixed beat, and how hard it hits scales with the
+     * incoming DPS — a light graze reads differently from being buried.
+     */
+    private emitContactFeedback(dps: number, dt: number) {
+        this.contactFxTimer -= dt;
+        if (this.contactFxTimer > 0 || !this.player) return;
+        this.contactFxTimer = CONTACT_FX_INTERVAL;
+
+        // 0 at a graze, 1 when a beat costs ~15% of max HP
+        const severity = Math.min(1, (dps * CONTACT_FX_INTERVAL) / (this.player.maxHp * 0.15));
+
+        audio.play('hurt');
+        juice.addTrauma(0.14 + 0.26 * severity);
+        // No full-screen flash and no hit-stop here on purpose: those read as a
+        // single event, and firing them on every beat of a sustained contact
+        // paints the arena solid red and stutters the frame. The vignette only
+        // darkens the edges, so the fight stays visible while the danger reads.
+        juice.pulseVignette(0.4 + (1 - this.player.hp / this.player.maxHp) * 0.6);
     }
 
     /** Same look and blips as the menu buttons, without the screen base class */
@@ -843,36 +874,39 @@ export class GameManager {
             propField.resolve(e, this.player.pos, e.speed * e.speedMultiplier * 0.7, dt);
         }
 
-        // === PLAYER-ENEMY COLLISION WITH KNOCKBACK ===
-        const hpBeforeContact = this.player.hp;
+        // === PLAYER-ENEMY CONTACT ===
+        // Contact damage is continuous (HP/second) and every overlapping enemy
+        // contributes — see core/ContactDamage for why, and for the armor and
+        // crowd-stacking rules. It deliberately does NOT use takeDamage(),
+        // whose i-frames would cap a 40-enemy pile at the same 2 HP/s as one bat.
+        const contactDamages: number[] = [];
         for (const e of this.enemies) {
-            if (checkCollision(e, this.player)) {
-                // Deal damage to player
-                this.player.takeDamage(e.damage * dt);
+            if (!checkCollision(e, this.player)) continue;
 
-                // Calculate direction from enemy to player
-                const dx = this.player.pos.x - e.pos.x;
-                const dy = this.player.pos.y - e.pos.y;
-                const dist = distance(this.player.pos, e.pos);
+            contactDamages.push(e.damage);
 
-                if (dist > 0.001) {
-                    const nx = dx / dist;
-                    const ny = dy / dist;
+            // Calculate direction from enemy to player
+            const dx = this.player.pos.x - e.pos.x;
+            const dy = this.player.pos.y - e.pos.y;
+            const dist = distance(this.player.pos, e.pos);
 
-                    // Knockback force (player gets pushed away, enemy gets pushed back)
-                    const knockbackForce = 150;
-                    this.player.applyKnockback(nx, ny, knockbackForce);
-                    e.applyKnockback(-nx, -ny, knockbackForce * 0.5); // Enemy pushed back less
-                }
+            if (dist > 0.001) {
+                const nx = dx / dist;
+                const ny = dy / dist;
+
+                // Knockback force (player gets pushed away, enemy gets pushed back)
+                const knockbackForce = 150;
+                this.player.applyKnockback(nx, ny, knockbackForce);
+                e.applyKnockback(-nx, -ny, knockbackForce * 0.5); // Enemy pushed back less
             }
         }
-        if (this.player.hp < hpBeforeContact) {
-            audio.play('hurt');
-            juice.addTrauma(0.3);
-            juice.hitStop(0.05);
-            juice.flash('#ff0022', 0.3, 0.28);
-            // The redder the vignette, the closer to death — readable at a glance
-            juice.pulseVignette(0.5 + (1 - this.player.hp / this.player.maxHp) * 0.6);
+
+        if (contactDamages.length > 0) {
+            const dps = contactDamagePerSecond(contactDamages, this.player.stats.armor);
+            this.player.takeContactDamage(dps, dt);
+            this.emitContactFeedback(dps, dt);
+        } else {
+            this.contactFxTimer = 0;
         }
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {

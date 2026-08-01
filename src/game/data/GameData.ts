@@ -63,7 +63,11 @@ export const POWERUPS: PowerupData[] = [
     { id: 'overclock', name: "Overclock", description: "Projectiles travel faster", type: "speed", value: 0.12, emoji: "⏩" },
     { id: 'phase_shift', name: "Phase Shift", description: "Move faster between phases", type: "moveSpeed", value: 0.1, emoji: "👻" },
     { id: 'rapid_tick', name: "Rapid Tick", description: "Zones damage more frequently", type: "tick", value: 0.1, emoji: "⏱️" },
-    { id: 'void_shield', name: "Void Shield", description: "Flat damage reduction", type: "armor", value: 1, emoji: "🌌" },
+    // Armor is subtracted from every touching enemy's damage-per-second, so it
+    // compounds with crowd size on its own. Left on the 25% curve the 8-stack
+    // cap would be ~20 armor and shrug off a late-game swarm entirely; flat
+    // stacking caps it at 8, which is a real but survivable wall.
+    { id: 'void_shield', name: "Void Shield", description: "Flat damage reduction", type: "armor", value: 1, stackGrowth: 1, emoji: "🌌" },
 ];
 
 export const WEAPONS = [
@@ -240,11 +244,19 @@ export const WEAPONS = [
 
 
 // ⚙️ Конфигурация врагов — измени эти значения для балансировки
+//
+// ВАЖНО: `damage` — это урон В СЕКУНДУ, пока враг стоит на игроке
+// (см. core/ContactDamage). Раньше он не применялся вообще — любой враг бил
+// ровно на 1, — поэтому кривая ×1.5 за тир никогда не проверялась в бою.
+// При включённом уроне последние тиры давали 100+ урона в секунду, то есть
+// мгновенную смерть, так что множитель снижен до ×1.22:
+//   5, 6, 7, 9, 11, 13, 16, 20, 24, 30, 36
+// Поверх ложится масштаб времени/сложности (DifficultyDirector) и стейджа.
 export const ENEMY_CONFIG = {
     baseHp: 10,           // Базовое HP первого врага
     hpMultiplier: 2,      // Множитель HP для каждого следующего (x2)
-    baseDamage: 5,        // Базовый урон первого врага
-    damageMultiplier: 1.5, // Множитель урона для каждого следующего (x1.5)
+    baseDamage: 5,        // Контактный урон в секунду у первого врага
+    damageMultiplier: 1.22, // Множитель урона для каждого следующего
     baseXp: 1,            // Базовый XP первого врага
     xpMultiplier: 1.5,    // Множитель XP для каждого следующего (x1.5)
     baseSpeed: 100,       // Базовая скорость

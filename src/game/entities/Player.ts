@@ -14,9 +14,12 @@ export class Player extends Entity {
 
     weapons: Weapon[] = [];
 
-    // Invulnerability system
+    // Invulnerability system — discrete hits only (see takeDamage)
     invulnerabilityTimer: number = 0;
     invulnerabilityDuration: number = 0.5;
+
+    /** Seconds left of the "enemies are on me" tint; refreshed while in contact */
+    contactTimer: number = 0;
 
     // Knockback system
     knockback: Vector2 = { x: 0, y: 0 };
@@ -42,6 +45,8 @@ export class Player extends Entity {
     classEmoji: string = "🧑‍🚀";
 
     animTimer: number = 0;
+    /** Always-advancing clock for effects that must animate while standing still */
+    pulseClock: number = 0;
     isMoving: boolean = false;
     facingLeft: boolean = false;
 
@@ -80,6 +85,7 @@ export class Player extends Entity {
             }
         }
 
+        this.pulseClock += dt;
         this.isMoving = moveDir.x !== 0 || moveDir.y !== 0;
         if (this.isMoving) this.animTimer += dt;
         if (moveDir.x !== 0) this.facingLeft = moveDir.x < 0;
@@ -113,6 +119,9 @@ export class Player extends Entity {
         if (this.invulnerabilityTimer > 0) {
             this.invulnerabilityTimer -= dt;
         }
+        if (this.contactTimer > 0) {
+            this.contactTimer -= dt;
+        }
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
@@ -140,6 +149,18 @@ export class Player extends Entity {
         const width = height * (sprite.width / sprite.height);
         const bob = this.isMoving ? Math.sin(this.animTimer * 16) * 1.2 : 0;
 
+        // Contact damage has no i-frame flash to read, so a red ring pulses
+        // under the player while enemies are on them — otherwise HP just
+        // drains with no visible cause.
+        if (this.contactTimer > 0) {
+            const pulse = 0.55 + 0.45 * Math.sin(this.pulseClock * 26);
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 4, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 48, 68, ${0.35 + 0.4 * pulse})`;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
         ctx.imageSmoothingEnabled = false;
         if (this.facingLeft) ctx.scale(-1, 1);
         ctx.drawImage(sprite, -width / 2, -height / 2 + bob, width, height);
@@ -166,6 +187,12 @@ export class Player extends Entity {
         ctx.restore();
     }
 
+    /**
+     * A discrete hit: meteors, rift collapses, boss slams. Grants i-frames so a
+     * single event cannot chain-hit, and floors at 1 so a hazard always stings.
+     *
+     * Enemy contact does NOT go through here — see takeContactDamage.
+     */
     takeDamage(amount: number) {
         // Check if player is currently invulnerable
         if (this.invulnerabilityTimer > 0) {
@@ -179,6 +206,25 @@ export class Player extends Entity {
         this.invulnerabilityTimer = this.invulnerabilityDuration;
 
         if (this.hp <= 0) {
+            this.isDead = true;
+        }
+    }
+
+    /**
+     * Continuous damage from enemies pressed against the player, in HP/second.
+     * No i-frames: they would cap crowd damage at 1/invulnerabilityDuration
+     * regardless of how many enemies are biting, which is what used to make
+     * standing in a swarm free. Armor is already applied by the caller
+     * (core/ContactDamage) per enemy, not here.
+     */
+    takeContactDamage(dps: number, dt: number) {
+        if (dps <= 0) return;
+
+        this.hp -= dps * dt;
+        this.contactTimer = 0.12; // drives the "being chewed" tint in draw()
+
+        if (this.hp <= 0) {
+            this.hp = 0;
             this.isDead = true;
         }
     }

@@ -13,6 +13,7 @@ src/game/
 ├── Entity.ts             # Базовая сущность (pos, radius)
 ├── core/                 # Ядро движка
 │   ├── DamageSystem.ts   # ⚔️ Singleton: расчёт урона, криты, might
+│   ├── ContactDamage.ts  # 🩸 Урон игроку от врагов вокруг: броня + стакинг толпы
 │   ├── ParticleSystem.ts # ✨ Singleton: эффекты частиц
 │   ├── SpatialHash.ts    # 🗺️ Оптимизация поиска сущностей O(1)
 │   ├── DifficultyDirector.ts # 🎚️ Адаптивная сложность, спавн, волны, мини-боссы
@@ -81,6 +82,38 @@ critDamage    = player.stats.critDamage (default 1.5x)
 > крит на дефолтных 1.5× бил **слабее** обычного. Удвоение вынесено в явную
 > константу `GLOBAL_DAMAGE`, крит умножается сверху: не-крит урон не изменился,
 > ребаланс не потребовался.
+
+### ContactDamage
+**Файл:** `core/ContactDamage.ts`
+
+Урон **игроку** от врагов, стоящих на нём. Это отдельная система, не
+`DamageSystem` (тот про урон врагам).
+
+Как было сломано: `GameManager` звал `player.takeDamage(enemy.damage * dt)`
+(≈0.08 за кадр), а `takeDamage` делал `Math.max(1, amount - armor)` и вешал
+0.5с неуязвимости. Итог: любой враг бил ровно на 1, **броня не работала
+вообще**, а i-frames ограничивали весь входящий урон 2 HP/с — хоть один враг
+рядом, хоть сто. Стоять в толпе было бесплатно.
+
+Как сейчас:
+
+```typescript
+// непрерывный урон, HP в секунду, без i-frames
+const dps = contactDamagePerSecond(touchingEnemyDamages, player.stats.armor);
+player.takeContactDamage(dps, dt);
+```
+
+- `enemy.damage` в `ENEMY_CONFIG` — это **урон в секунду**, а не за удар.
+- Броня вычитается **у каждого врага отдельно** (пол — 20% урона), поэтому
+  сильна против кучи слабых и умеренна против одного большого.
+- Стакинг толпы с затуханием `1/sqrt(k)`: второй враг кусает на 70% от
+  первого, четвёртый — на 50%. Общий потолок — `CROWD_CAP` (4×) от самого
+  сильного, чтобы куча из 40 врагов убивала за секунды, а не мгновенно.
+- `takeDamage` (с i-frames) остался для **дискретных** ударов: метеориты,
+  схлопывание разлома. Не зови его для контакта.
+- Фидбек — `GameManager.emitContactFeedback`, раз в 0.28с: звук, тряска,
+  виньетка. **Без** полноэкранной вспышки и hit-stop: на непрерывном контакте
+  они заливают арену красным и дёргают кадр.
 
 ### StatusEffects (Singleton)
 **Файл:** `core/StatusEffects.ts`
@@ -195,7 +228,7 @@ tf('weapon.void_ray.name', w.name)      // данные: английский о
 | `moveSpeed`  | 1.0     | Скорость передвижения                 |
 | `magnet`     | 100     | Радиус притяжения XP кристаллов       |
 | `growth`     | 1.0     | Множитель получаемого XP              |
-| `armor`      | 0       | Снижение урона                        |
+| `armor`      | 0       | Снижение урона от каждого врага (см. ContactDamage) |
 | `regen`      | 0       | HP/сек регенерации                    |
 | `critChance` | 0.05    | Шанс крита (5%)                       |
 | `critDamage` | 1.5     | Множитель крит урона                  |
@@ -287,8 +320,8 @@ upgrade(): void {
 ENEMY_CONFIG = {
     baseHp: 10,
     hpMultiplier: 2,      // HP удваивается для каждого следующего типа
-    baseDamage: 5,
-    damageMultiplier: 1.5, // Урон ×1.5 для следующего типа
+    baseDamage: 5,         // Контактный урон В СЕКУНДУ (см. ContactDamage)
+    damageMultiplier: 1.22, // Урон ×1.22 для следующего типа
     baseXp: 1,
     xpMultiplier: 1.5,
     baseSpeed: 100,
@@ -319,7 +352,9 @@ ENEMY_CONFIG = {
 - Спавн через аккумулятор (независим от FPS): `spawnRate = min(30, (2 + gameTime/45) × intensity)`
 - **intensity** (0.6–3.0) адаптируется раз в секунду по HP игрока и скорости зачистки (kills/sec vs spawns/sec)
 - HP врагов: `(1 + gameTime/240) × (0.75 + 0.25 × intensity)` × `stage.hpScale` — **кап 3x убран**
-- Урон: `(1 + gameTime/300) × (0.85 + 0.15 × intensity)` × `stage.damageScale`
+- Урон: `(1 + gameTime/600) × (0.85 + 0.15 × intensity)` × `stage.damageScale` —
+  растёт медленнее HP, потому что контактный урон теперь реально применяется и
+  стакается по толпе (поздняя игра давит **количеством**, а не укусом одного)
 - Elite: шанс растёт со временем и intensity, кап 8%
 - События на границе волны (каждые 60с): **burst** (кольцо врагов, 8 + wave×4) и **miniboss** (×12 HP, ×2 радиус, HP-бар)
 
@@ -578,7 +613,9 @@ const dist = Math.sqrt(dx * dx + dy * dy);
 
 ## ⚠️ Важные правила
 
-1. **Урон всегда через DamageSystem** — не вызывай `enemy.takeDamage()` напрямую
+1. **Урон врагам — всегда через DamageSystem** — не вызывай `enemy.takeDamage()`
+   напрямую. Урон **игроку** от контакта — через `contactDamagePerSecond` +
+   `player.takeContactDamage`; `player.takeDamage` только для дискретных ударов
 2. **Cooldown НЕ уменьшается при апгрейде** — только через powerups
 3. **Эволюция = level >= 6** — проверяй `this.evolved`, не `this.level === 6`
 4. **Статы оружия в конструкторе** — копируй из `this.stats` в свойства
