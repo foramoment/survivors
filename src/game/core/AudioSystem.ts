@@ -8,9 +8,10 @@
  *   NOISE    → drums (kick / snare / hat)
  *
  * The music is a generative *song*, not a random walk: every stage theme seeds
- * a key, tempo, chord progression and an 8-note motif. Bars are assembled from
- * hand-authored drum/bass patterns picked by the current section (INTRO →
- * VERSE → CHORUS → BRIDGE), and the section is chosen by gameplay intensity.
+ * a key, tempo, an eight-bar chord progression and a pair of 8-note motifs
+ * (a hook and its answer). Bars are assembled from hand-authored drum/bass
+ * patterns picked by the current section, and sections follow a written form
+ * (see FORM) that gameplay intensity overrides only at the extremes.
  * The motif is transposed and ornamented per chord, so the track stays
  * recognisable while never repeating exactly.
  *
@@ -64,30 +65,46 @@ function noteFreq(midi: number): number {
 /** Semitone offsets of the natural minor scale */
 const MINOR_SCALE = [0, 2, 3, 5, 7, 8, 10];
 
-/** Chord degrees (scale steps) of the progressions we pick from */
-const PROGRESSIONS: number[][] = [
-    [0, 5, 3, 4], // i  VI  IV  V   — heroic
-    [0, 3, 4, 4], // i  IV  V   V   — driving
-    [0, 6, 5, 4], // i  VII VI  V   — descending, epic
-    [0, 2, 5, 4], // i  III VI  V   — wistful
+/**
+ * Chord degrees (scale steps), eight bars per cycle.
+ *
+ * These used to be four bars, so the harmony came back around every ~7
+ * seconds and the track wore out fast in a ten-minute run. Eight bars in an
+ * A-A'-B-B' shape doubles the loop and, more importantly, gives the second
+ * half somewhere to *go*: the fourth bar of each half is a half cadence
+ * (question), the eighth resolves (answer).
+ */
+export const PROGRESSIONS: number[][] = [
+    [0, 5, 3, 4, 0, 5, 3, 0], // i  VI IV V  | i  VI IV i   — heroic
+    [0, 3, 4, 4, 5, 3, 4, 0], // i  IV V  V  | VI IV V  i   — driving
+    [0, 6, 5, 4, 0, 6, 3, 4], // i  VII VI V | i  VII IV V  — descending, epic
+    [0, 2, 5, 4, 2, 5, 6, 0], // i  III VI V | III VI VII i — wistful
 ];
 
 /** One 16-step bar of drums/bass behaviour */
-interface Section {
+export interface Section {
     kick: string;
     snare: string;
     hat: string;
-    /** 0 = roots only, 1 = root+fifth, 2 = driving eighths */
+    /** Open hi-hat accents — longer, brighter than the closed hat */
+    openHat?: string;
+    /** 0 = roots only, 1 = root+fifth, 2 = driving eighths, 3 = walking */
     bass: number;
     /** Lead note density multiplier */
     lead: number;
     /** Fast arpeggio on the second pulse channel */
     arp: boolean;
+    /**
+     * Sparse chord-tone answers on the second pulse channel, in the gaps the
+     * lead leaves. Sections either arpeggiate or answer, never both — two busy
+     * voices on one channel just turns to mud.
+     */
+    answer?: boolean;
     /** Base octave offset for the lead, in semitones */
     leadShift: number;
 }
 
-const SECTIONS: Record<string, Section> = {
+export const SECTIONS: Record<string, Section> = {
     intro: {
         kick: 'x-------x-------',
         snare: '----------------',
@@ -98,27 +115,59 @@ const SECTIONS: Record<string, Section> = {
         kick: 'x-----x-x-------',
         snare: '----x-------x---',
         hat: '--x-x-x-x-x-x-x-',
-        bass: 1, lead: 0.7, arp: false, leadShift: 0,
+        openHat: '--------------x-',
+        bass: 1, lead: 0.7, arp: false, answer: true, leadShift: 0,
+    },
+    // Second half of a verse: same groove, syncopated kick and a busier answer
+    verseB: {
+        kick: 'x-----x---x-x---',
+        snare: '----x-------x---',
+        hat: '--x-x-x-x-x-x-xx',
+        openHat: '------x-------x-',
+        bass: 1, lead: 0.8, arp: false, answer: true, leadShift: 0,
     },
     chorus: {
         kick: 'x---x---x---x---',
         snare: '----x-------x---',
         hat: '-x-x-x-x-x-x-xxx',
+        openHat: '------------x---',
         bass: 2, lead: 1, arp: true, leadShift: 12,
     },
     bridge: {
         kick: 'x-------x---x---',
         snare: '----x-------x-x-',
         hat: '--x---x---x---x-',
-        bass: 1, lead: 0.8, arp: true, leadShift: 0,
+        bass: 3, lead: 0.8, arp: true, leadShift: 0,
+    },
+    // Everything drops out but the pulse — the room to breathe that makes the
+    // next chorus land
+    breakdown: {
+        kick: 'x-------x-------',
+        snare: '--------------x-',
+        hat: '----x-------x---',
+        bass: 0, lead: 0.55, arp: false, answer: true, leadShift: 12,
     },
     finale: {
         kick: 'x-x-x-x-x-x-x-x-',
         snare: '----x---x---x-x-',
         hat: 'xxxxxxxxxxxxxxxx',
+        openHat: '--------------x-',
         bass: 2, lead: 1.15, arp: true, leadShift: 12,
     },
 };
+
+/**
+ * The arrangement, as a list of section names one per cycle. Heat still
+ * overrides it at the extremes (a calm player gets the intro, a boss fight gets
+ * the finale), but in between the track follows a written form instead of
+ * flipping between two sections on a threshold — that flipping is what made it
+ * feel like it was looping even when it wasn't.
+ */
+export const FORM: string[] = [
+    'verse', 'verseB', 'chorus', 'verse',
+    'verseB', 'chorus', 'bridge', 'chorus',
+    'breakdown', 'chorus', 'verseB', 'bridge',
+];
 
 /** Everything a stage theme needs to sound like its own track */
 interface Song {
@@ -126,8 +175,10 @@ interface Song {
     root: number;
     bpm: number;
     progression: number[];
-    /** 8 scale-degree offsets (or -1 for a rest) that form the hook */
+    /** 8 scale-degree offsets (or -1 for a rest) — the hook, first half */
     motif: number[];
+    /** Answering phrase for the second half */
+    motifB: number[];
     /** Duty cycle of the lead pulse: 0.125 / 0.25 / 0.5 */
     leadDuty: number;
     arpDuty: number;
@@ -520,8 +571,9 @@ export class AudioSystem {
     // Generative chiptune song
     // =========================================================
 
-    private static readonly BAR = 16;   // 16th-note steps per bar
-    private static readonly CYCLE = 64; // 4 bars
+    private static readonly BAR = 16;    // 16th-note steps per bar
+    private static readonly BARS = 8;    // bars per cycle (was 4 — see PROGRESSIONS)
+    private static readonly CYCLE = AudioSystem.BAR * AudioSystem.BARS;
 
     /**
      * Set music dynamics (0 = calm intro, 1 = full assault).
@@ -547,12 +599,14 @@ export class AudioSystem {
         this.musicRng = mulberry32(seed);
         const rng = this.musicRng;
 
-        // The theme decides key, tempo, progression and hook — deterministically
+        // The theme decides key, tempo, progression and hooks — deterministically
+        const motif = this.makeMotif(rng);
         this.song = {
             root: 45 + Math.floor(rng() * 5),      // A2..D3
             bpm: 124 + Math.floor(rng() * 18),
             progression: PROGRESSIONS[Math.floor(rng() * PROGRESSIONS.length)],
-            motif: this.makeMotif(rng),
+            motif,
+            motifB: this.makeAnswer(motif, rng),
             leadDuty: [0.125, 0.25, 0.5][Math.floor(rng() * 3)],
             arpDuty: 0.125,
         };
@@ -617,6 +671,25 @@ export class AudioSystem {
         return motif;
     }
 
+    /**
+     * The answering phrase: the same hook a third higher with a new tail.
+     *
+     * Generating a second independent motif would just sound like two unrelated
+     * tunes taking turns. Reusing the shape and changing where it lands is what
+     * makes a call and a response — the listener recognises it and still hears
+     * something new.
+     */
+    private makeAnswer(motif: number[], rng: () => number): number[] {
+        const lift = rng() < 0.5 ? 2 : 3;
+        const answer = motif.map(d => (d < 0 ? -1 : Math.min(9, d + lift)));
+
+        // Rewrite the last two notes so the phrase closes instead of repeating
+        const tail = answer.length - 2;
+        answer[tail] = Math.max(0, answer[tail] - 1);
+        answer[tail + 1] = rng() < 0.6 ? 0 : 4;
+        return answer;
+    }
+
     /** Scale degree (can be negative / above an octave) → MIDI note */
     private degreeToMidi(root: number, degree: number): number {
         const octave = Math.floor(degree / MINOR_SCALE.length);
@@ -625,15 +698,28 @@ export class AudioSystem {
         return root + octave * 12 + MINOR_SCALE[idx];
     }
 
-    /** Pick the section for the current cycle from intensity + position */
+    /**
+     * Pick the section for the current cycle.
+     *
+     * Heat owns the extremes — a calm player gets the intro, a boss fight gets
+     * the finale — and in between the track walks the written FORM. Within a
+     * cycle the two halves can differ, so an eight-bar cycle is not just the
+     * same four bars twice: the second half lifts when the fight is hot.
+     */
     private sectionFor(cycleIndex: number, bar: number, heat: number): Section {
         if (heat >= 0.95) return SECTIONS.finale;
         if (heat < 0.22) return SECTIONS.intro;
-        // Every 4th cycle drops into a bridge to break the loop
-        if (cycleIndex % 4 === 3) return SECTIONS.bridge;
-        if (heat > 0.6) return SECTIONS.chorus;
-        // Below chorus heat the last bar of a cycle still lifts
-        return bar === 3 && heat > 0.45 ? SECTIONS.chorus : SECTIONS.verse;
+
+        const planned = SECTIONS[FORM[cycleIndex % FORM.length]] ?? SECTIONS.verse;
+
+        // Hot fight: the back half of any non-chorus cycle steps up
+        if (heat > 0.66 && bar >= 4 && planned !== SECTIONS.chorus) {
+            return planned === SECTIONS.bridge ? SECTIONS.chorus : SECTIONS.verseB;
+        }
+        // Quiet stretch: hold a chorus back so it still means something later
+        if (heat < 0.45 && planned === SECTIONS.chorus) return SECTIONS.verseB;
+
+        return planned;
     }
 
     private scheduleMusic() {
@@ -653,16 +739,25 @@ export class AudioSystem {
             const when = this.nextNoteTime - ctx.currentTime;
 
             const section = this.sectionFor(cycleIndex, bar, heat);
-            const chordDegree = song.progression[bar];
+            const chordDegree = song.progression[bar % song.progression.length];
             const chordRoot = this.degreeToMidi(song.root, chordDegree);
+            const isFillBar = bar === AudioSystem.BARS - 1 && cycleIndex % 4 === 3;
 
             // --- TRIANGLE: bass ---
             this.scheduleBass(section, chordRoot, step, stepDuration, when);
 
             // --- NOISE: drums ---
-            if (section.kick[step] === 'x') this.kick(when);
-            if (section.snare[step] === 'x') this.snare(when, 0.1 + 0.08 * heat);
-            if (section.hat[step] === 'x') this.hat(when, 0.022 + 0.03 * heat);
+            // The last bar of every fourth cycle is a fill instead of the
+            // pattern — the signpost that says "here comes the next section"
+            const filling = isFillBar && heat > 0.35;
+            if (filling) {
+                this.scheduleFill(step, stepDuration, when, heat);
+            } else {
+                if (section.kick[step] === 'x') this.kick(when);
+                if (section.snare[step] === 'x') this.snare(when, 0.1 + 0.08 * heat);
+                if (section.hat[step] === 'x') this.hat(when, 0.022 + 0.03 * heat);
+            }
+            if (section.openHat?.[step] === 'x') this.openHat(when, 0.02 + 0.025 * heat);
 
             // --- PULSE 2: arpeggio (chord tones at 16th speed) ---
             if (section.arp && step % 2 === 0) {
@@ -672,10 +767,23 @@ export class AudioSystem {
                 this.chipTone(noteFreq(midi), stepDuration * 0.8, 0.035, song.arpDuty, when, 0);
             }
 
+            // --- PULSE 2: countermelody in the lead's gaps ---
+            // Sections without an arpeggio used to leave this channel silent,
+            // which is most of the quiet half of the track. A held chord tone
+            // answering off the beat fills it without competing with the hook.
+            if (section.answer && step === 12) {
+                const d = [4, 2, 7, 0][bar % 4];
+                const midi = this.degreeToMidi(song.root, chordDegree + d) + 12;
+                this.chipTone(noteFreq(midi), stepDuration * 3, 0.03, 0.25, when, 12);
+            }
+
             // --- PULSE 1: lead motif (8th notes) ---
             if (step % 2 === 0) {
-                const motifIndex = (bar * 8 + step / 2) % song.motif.length;
-                const degree = song.motif[motifIndex];
+                // First half of the cycle asks with the hook, second half
+                // answers with its variation
+                const phrase = bar < AudioSystem.BARS / 2 ? song.motif : song.motifB;
+                const motifIndex = (bar * 8 + step / 2) % phrase.length;
+                const degree = phrase[motifIndex];
                 const density = section.lead;
                 if (degree >= 0 && this.musicRng() < density) {
                     const midi = this.degreeToMidi(song.root, chordDegree + degree)
@@ -697,8 +805,10 @@ export class AudioSystem {
                 }
             }
 
-            // --- Fills ---
-            if (cycleStep >= AudioSystem.CYCLE - 2 && heat > 0.4) {
+            // --- Turnaround ---
+            // A two-hit pickup into the next cycle. Skipped on fill bars, which
+            // already have a whole bar of roll of their own.
+            if (!filling && cycleStep >= AudioSystem.CYCLE - 2 && heat > 0.4) {
                 this.snare(when, 0.09);
                 this.snare(when + stepDuration / 2, 0.11);
             }
@@ -707,6 +817,24 @@ export class AudioSystem {
             this.nextNoteTime += stepDuration;
             this.musicStep++;
         }
+    }
+
+    /**
+     * One-bar drum fill: a snare roll that accelerates into the downbeat.
+     * Written as a ramp rather than a fixed pattern so it works at any tempo.
+     */
+    private scheduleFill(step: number, stepDuration: number, when: number, heat: number) {
+        if (step % 4 === 0) this.kick(when);
+
+        // Doubles up over the second half of the bar
+        const dense = step >= 8;
+        if (dense || step % 2 === 0) {
+            this.snare(when, 0.06 + 0.07 * (step / 16) + 0.03 * heat);
+        }
+        if (dense && step % 2 === 1) {
+            this.snare(when + stepDuration / 2, 0.05 + 0.05 * (step / 16));
+        }
+        if (step === 15) this.openHat(when, 0.05);
     }
 
     private scheduleBass(section: Section, chordRoot: number, step: number, stepDuration: number, when: number) {
@@ -722,11 +850,18 @@ export class AudioSystem {
             if (step === 6) play(7, 1.5, 0.14, 0);
             if (step === 8) play(0, 3.5, 0.18, 0);
             if (step === 14) play(12, 1.5, 0.13, 0);
-        } else {
+        } else if (section.bass === 2) {
             // Driving eighths with an octave bounce
             if (step % 2 === 0) {
                 const semi = step % 8 === 6 ? 12 : step % 4 === 2 ? 7 : 0;
                 play(semi, 1.6, step % 4 === 0 ? 0.2 : 0.15, 0);
+            }
+        } else {
+            // Walking line for the bridge: quarter notes climbing the chord and
+            // stepping back down, so the low end moves while the drums thin out
+            const walk = [0, 3, 7, 10, 12, 10, 7, 3];
+            if (step % 2 === 0) {
+                play(walk[(step / 2) % walk.length], 1.7, step % 8 === 0 ? 0.2 : 0.14, 0);
             }
         }
     }
@@ -827,6 +962,11 @@ export class AudioSystem {
         this.musicNoise(when, 0.035, volume, 'highpass', 8000);
     }
 
+    /** Open hi-hat: same voice, long enough to ring into the next beat */
+    private openHat(when: number, volume: number) {
+        this.musicNoise(when, 0.22, volume, 'highpass', 6800);
+    }
+
     private musicNoise(when: number, duration: number, volume: number, filterType: BiquadFilterType, freq: number) {
         const ctx = this.ctx!;
         const t = ctx.currentTime + Math.max(0, when);
@@ -844,16 +984,23 @@ export class AudioSystem {
         src.start(t, this.musicRng() * 0.5, duration + 0.02);
     }
 
-    /** Nudge one motif note each cycle so the hook evolves over a long run */
+    /**
+     * Nudge one note of one phrase each cycle so the hook drifts over a long
+     * run. Only one phrase per cycle, and only half the time — mutate both and
+     * the tune loses its shape after a few minutes instead of aging into a
+     * variation of itself.
+     */
     private mutateMotif() {
         const song = this.song;
         if (!song || this.musicRng() < 0.5) return;
-        const idx = Math.floor(this.musicRng() * song.motif.length);
+
+        const phrase = this.musicRng() < 0.5 ? song.motif : song.motifB;
+        const idx = Math.floor(this.musicRng() * phrase.length);
         if (this.musicRng() < 0.2) {
-            song.motif[idx] = -1;
+            phrase[idx] = -1;
         } else {
-            const base = song.motif[idx] < 0 ? 0 : song.motif[idx];
-            song.motif[idx] = Math.max(-2, Math.min(9, base + (this.musicRng() < 0.5 ? -1 : 1)));
+            const base = phrase[idx] < 0 ? 0 : phrase[idx];
+            phrase[idx] = Math.max(-2, Math.min(9, base + (this.musicRng() < 0.5 ? -1 : 1)));
         }
     }
 }
