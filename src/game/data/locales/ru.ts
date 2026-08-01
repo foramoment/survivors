@@ -53,6 +53,8 @@ export const RU: Record<string, string> = {
     'levelup.tabWeapons': '⚔️ Оружие',
     'levelup.tabEvolved': '🌟 Эволюции',
     'levelup.instantEvolve': '⚡ МГНОВЕННАЯ ЭВОЛЮЦИЯ',
+    'levelup.reroll': 'Перебросить карты',
+    'levelup.damage': 'УРОН',
 
     'result.gameOver': '💀 ИГРА ОКОНЧЕНА',
     'result.victory': '🏆 ПОБЕДА',
@@ -80,6 +82,7 @@ export const RU: Record<string, string> = {
     'bonus.regen': 'HP/с',
     'bonus.tick': 'с к тику зон',
     'bonus.discharge': 'заряд',
+    'bonus.reroll': 'переброс',
 
     'arena.meteors': 'МЕТЕОРИТНЫЙ ДОЖДЬ',
     'arena.blackout': 'ОТКАЗ ПИТАНИЯ',
@@ -206,6 +209,8 @@ export const RU: Record<string, string> = {
     'powerup.adrenal_surge.desc': 'На последнем издыхании бьёшь сильнее и бежишь быстрее',
     'powerup.vital_siphon.name': 'Сифон Жизни',
     'powerup.vital_siphon.desc': 'С убитых иногда падает ремкомплект',
+    'powerup.extra_roll.name': 'Запасной Патрон',
+    'powerup.extra_roll.desc': 'Ещё один переброс на каждом уровне',
 
     // ----------------------------------------------------------------- stages
     'stage.asteroid_fields.name': 'Пояс Астероидов',

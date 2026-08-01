@@ -52,6 +52,7 @@ src/game/
 └── ui/
     ├── ScreenManager.ts  # Менеджер экранов
     ├── BaseScreen.ts     # Базовый класс экрана + createPixelButton()
+    ├── components/       # HUD, BuildPanel (иконки оружий/перков), SettingsPanel
     ├── MenuBackdrop.ts   # 🌌 Анимированный пиксельный космос под всеми меню
     └── screens/          # MainMenu, ClassSelection, Game и т.д.
 ```

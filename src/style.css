@@ -951,6 +951,173 @@ h2.lucky {
 }
 
 /* =========================================================================
+   Build panel — the run's weapons and perks, always on screen
+   ========================================================================= */
+
+.build-panel {
+  position: absolute;
+  left: 10px;
+  bottom: 42px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: none;
+  /* Above the level-up overlay on purpose: "do I already own this?" is the
+     question the panel exists to answer, and that is exactly when you ask it.
+     It sits in the empty bottom-left corner, so it covers nothing. */
+  z-index: 20;
+}
+
+.build-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: min(420px, 55vw);
+}
+
+.build-slot {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 24, 0.78);
+  box-shadow: 0 0 0 2px #2f3a63;
+}
+
+.build-row--powerups .build-slot {
+  width: 24px;
+  height: 24px;
+}
+
+.build-slot--evolved {
+  box-shadow: 0 0 0 2px var(--c-yellow, #ffd23f);
+}
+
+/* One pick from evolving — worth flagging while you can still act on it */
+.build-slot--ready {
+  box-shadow: 0 0 0 2px var(--c-cyan, #38f2ff);
+  animation: build-ready 900ms steps(2) infinite alternate;
+}
+
+@keyframes build-ready {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.6); }
+}
+
+.build-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.build-row--powerups .build-icon {
+  font-size: 12px;
+}
+
+.build-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -4px;
+  min-width: 13px;
+  padding: 0 2px;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  line-height: 13px;
+  text-align: center;
+  color: #05040d;
+  background: var(--c-cyan, #38f2ff);
+}
+
+.build-slot--evolved .build-badge {
+  background: var(--c-yellow, #ffd23f);
+}
+
+@media (max-width: 560px) {
+  .build-panel {
+    bottom: 34px;
+  }
+
+  .build-slot {
+    width: 24px;
+    height: 24px;
+  }
+
+  .build-row--powerups .build-slot {
+    width: 19px;
+    height: 19px;
+  }
+}
+
+/* =========================================================================
+   Level-up reroll
+   ========================================================================= */
+
+.reroll-btn {
+  margin-top: 22px;
+  width: 62px;
+  height: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  font-family: var(--font-pixel);
+  color: var(--c-cyan);
+  background: var(--c-panel);
+  box-shadow:
+    0 0 0 var(--px) var(--c-cyan),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7);
+  transition: transform 90ms steps(2), background-color 90ms steps(2), color 90ms steps(2);
+}
+
+.reroll-btn:hover:not(:disabled),
+.reroll-btn:focus-visible:not(:disabled) {
+  outline: none;
+  background: var(--c-cyan);
+  color: #05040d;
+  transform: translate(calc(var(--px) * -1), calc(var(--px) * -1));
+}
+
+.reroll-btn:disabled {
+  cursor: default;
+  color: #4a5170;
+  box-shadow: 0 0 0 var(--px) #2f3a63;
+}
+
+.reroll-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.reroll-btn:hover:not(:disabled) .reroll-icon {
+  animation: reroll-spin 400ms steps(4) infinite;
+}
+
+@keyframes reroll-spin {
+  to { transform: rotate(360deg); }
+}
+
+.reroll-count {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+/* Before → after, under the flavour text on an upgrade card */
+.stat-preview {
+  margin-top: 6px;
+  font-family: var(--font-pixel);
+  font-size: 0.72em;
+  letter-spacing: 0.08em;
+  color: var(--c-yellow, #ffd23f);
+}
+
+/* =========================================================================
    Records (local leaderboard)
    ========================================================================= */
 

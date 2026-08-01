@@ -12,7 +12,9 @@
 
 import { BaseScreen } from '../BaseScreen';
 import { HUD, type HUDData } from '../components/HUD';
+import { BuildPanel } from '../components/BuildPanel';
 import { engine } from '../../core/Engine';
+import { i18n } from '../../core/I18n';
 
 export interface GameScreenParams {
     classIndex: number;
@@ -23,6 +25,8 @@ export interface GameScreenParams {
 
 export class GameScreen extends BaseScreen {
     private hud: HUD | null = null;
+    private buildPanel: BuildPanel | null = null;
+    private i18nUnsub: (() => void) | null = null;
     private classIndex: number = 0;
     private devMode: boolean = false;
     private stageIndex: number = 0;
@@ -37,6 +41,12 @@ export class GameScreen extends BaseScreen {
         // Create HUD
         this.hud = new HUD();
         this.hud.create(this.uiLayer);
+
+        this.buildPanel = new BuildPanel();
+        this.buildPanel.create(this.uiLayer);
+        // Slot tooltips carry translated names, so a language switch mid-run
+        // has to force the panel to redraw past its signature check
+        this.i18nUnsub = i18n.onChange(() => this.buildPanel?.invalidate());
 
         // Touch players have no Escape key
         document.getElementById('hud-pause')?.addEventListener('click', () => {
@@ -53,6 +63,10 @@ export class GameScreen extends BaseScreen {
     exit(): void {
         this.hud?.destroy();
         this.hud = null;
+        this.buildPanel?.destroy();
+        this.buildPanel = null;
+        this.i18nUnsub?.();
+        this.i18nUnsub = null;
         this.clearUI();
     }
 
@@ -62,6 +76,14 @@ export class GameScreen extends BaseScreen {
      */
     updateHUD(data: HUDData): void {
         this.hud?.update(data);
+
+        const manager = engine?.gameManager;
+        if (manager) {
+            this.buildPanel?.update({
+                weaponLevels: manager.weaponLevels,
+                powerupLevels: manager.powerupLevels,
+            });
+        }
     }
 
     /**

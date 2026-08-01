@@ -51,6 +51,8 @@ export class Player extends Entity {
         adrenaline: 0,
         /** Chance a kill drops a repair cell */
         siphon: 0,
+        /** Extra level-up rerolls on top of the free one */
+        reroll: 0,
     };
 
     classId: string = 'void_walker';

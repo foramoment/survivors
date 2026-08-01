@@ -27,6 +27,7 @@ export const VALID_PLAYER_STATS = [
     'killEcho',
     'adrenaline',
     'siphon',
+    'reroll',
 ] as const;
 
 export type PlayerStatType = typeof VALID_PLAYER_STATS[number];

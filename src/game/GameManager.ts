@@ -21,7 +21,7 @@ import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
 import { drawPixelText } from './core/PixelFont';
-import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, POWERUP_STACK_CAP } from './core/UpgradePool';
+import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, formatStatPreview, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { contactDamagePerSecond } from './core/ContactDamage';
 import { computeScore, submitScore, formatScore } from './core/Score';
 import { RepairCell } from './entities/RepairCell';
@@ -606,11 +606,45 @@ export class GameManager {
 
         const grid = document.createElement('div');
         grid.className = isLucky ? 'upgrade-grid-6' : 'upgrade-grid';
+        screen.appendChild(grid);
+
+        // One free reroll every level-up, plus one per Spare Cartridge stack.
+        //
+        // Three random cards with no way to say "not these" is a lottery, not a
+        // decision — and the pool already guarantees an owned weapon in every
+        // draw, so a reroll cannot lock you out of your evolution.
+        let rerollsLeft = 1 + (this.player?.stats.reroll ?? 0);
+
+        const reroll = document.createElement('button');
+        reroll.className = 'reroll-btn interactive';
+        const renderReroll = () => {
+            reroll.disabled = rerollsLeft <= 0;
+            reroll.innerHTML = `<span class="reroll-icon">⟳</span><span class="reroll-count">${rerollsLeft}</span>`;
+            reroll.title = t('levelup.reroll');
+        };
+        reroll.onclick = () => {
+            if (rerollsLeft <= 0) return;
+            rerollsLeft--;
+            audio.play('uiSelect');
+            renderReroll();
+            this.fillUpgradeGrid(grid, screen, upgradeCount);
+        };
+        reroll.addEventListener('pointerenter', () => audio.play('uiHover'));
+        renderReroll();
+
+        this.fillUpgradeGrid(grid, screen, upgradeCount);
+        screen.appendChild(reroll);
+        this.uiLayer.appendChild(screen);
+    }
+
+    /** (Re)draw the level-up offers into `grid` */
+    private fillUpgradeGrid(grid: HTMLElement, screen: HTMLElement, count: number) {
+        grid.innerHTML = '';
 
         const options = buildUpgradeOptions({
             weaponLevels: this.weaponLevels,
             powerupLevels: this.powerupLevels,
-            count: upgradeCount,
+            count,
         });
 
         options.forEach((opt, index) => {
@@ -643,6 +677,7 @@ export class GameManager {
                 <h3>${name}</h3>
                 <div class="level-indicator">${levelText}</div>
                 <p>${desc}</p>
+                ${this.weaponPreview(weaponData, currentLevel, canEvolve)}
               `;
 
                 card.onclick = () => {
@@ -653,7 +688,8 @@ export class GameManager {
             } else {
                 const powerup = opt.data;
                 const stack = this.powerupLevels.get(powerup.name) ?? 0;
-                const bonus = formatPowerupBonus(powerup.type, getPowerupValue(powerup.value, stack, powerup.stackGrowth));
+                const value = getPowerupValue(powerup.value, stack, powerup.stackGrowth);
+                const bonus = formatPowerupBonus(powerup.type, value);
                 const stackText = stack > 0
                     ? t('levelup.level', { from: stack, to: stack + 1 })
                     : t('common.new');
@@ -662,6 +698,7 @@ export class GameManager {
                 <h3>${powerupName(powerup)}</h3>
                 <div class="level-indicator">${stackText} · ${bonus}</div>
                 <p>${powerupDesc(powerup)}</p>
+                ${this.powerupPreview(powerup, value)}
               `;
                 card.onclick = () => {
                     this.applyPowerup(powerup);
@@ -672,9 +709,32 @@ export class GameManager {
 
             grid.appendChild(card);
         });
+    }
 
-        screen.appendChild(grid);
-        this.uiLayer.appendChild(screen);
+    /**
+     * "124% → 132%" under the flavour text.
+     *
+     * The description says what a powerup *is*; this says what taking it does to
+     * the number you already have, which is what actually decides the pick.
+     */
+    private powerupPreview(powerup: any, value: number): string {
+        if (!this.player) return '';
+
+        const stats = this.player.stats as Record<string, number>;
+        const current = powerup.type === 'maxHp' ? this.player.maxHp : (stats[powerup.type] ?? 0);
+        return `<div class="stat-preview">${formatStatPreview(powerup.type, current, current + value)}</div>`;
+    }
+
+    /** Damage before → after for a weapon card */
+    private weaponPreview(weaponData: any, currentLevel: number, canEvolve: boolean): string {
+        if (currentLevel === 0 || !this.player) return '';
+
+        const weapon = this.player.weapons.find((w: any) => w.weaponId === weaponData.id);
+        if (!weapon) return '';
+
+        // Upgrades scale damage by 1.2; evolving doubles it (see Weapon.upgrade)
+        const next = canEvolve ? weapon.damage * 2 : weapon.damage * 1.2;
+        return `<div class="stat-preview">${t('levelup.damage')} ${Math.round(weapon.damage)} → ${Math.round(next)}</div>`;
     }
 
     switchDevTab(tabId: string, screen: HTMLElement) {

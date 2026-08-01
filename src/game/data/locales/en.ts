@@ -49,6 +49,8 @@ export const EN: Record<string, string> = {
     'levelup.tabWeapons': '⚔️ Weapons',
     'levelup.tabEvolved': '🌟 Evolved',
     'levelup.instantEvolve': '⚡ INSTANT EVOLVE',
+    'levelup.reroll': 'Reroll these cards',
+    'levelup.damage': 'DMG',
 
     'result.gameOver': '💀 GAME OVER',
     'result.victory': '🏆 VICTORY',
@@ -77,6 +79,7 @@ export const EN: Record<string, string> = {
     'bonus.regen': 'HP/s',
     'bonus.tick': 's zone tick',
     'bonus.discharge': 'charge',
+    'bonus.reroll': 'reroll',
 
     // Arena event banners — drawn with the pixel font, uppercase only
     'arena.meteors': 'METEOR SHOWER',

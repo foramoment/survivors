@@ -13,6 +13,8 @@ import {
     buildUpgradeOptions,
     getPowerupValue,
     formatPowerupBonus,
+    formatStatValue,
+    formatStatPreview,
     WEAPON_SLOT_CAP,
     POWERUP_STACK_CAP,
 } from '../core/UpgradePool';
@@ -133,6 +135,21 @@ describe('UpgradePool', () => {
             expect(total).toBeLessThan(1);
         });
 
+        it('a powerup can cap its own stacks below the global cap', () => {
+            const spare = POWERUPS.find(p => p.id === 'extra_roll')!;
+            expect(spare.maxStacks).toBe(2);
+
+            // At its own cap it stops being offered, even though the global
+            // cap is 8 — otherwise the draw becomes a menu you shop in
+            const options = buildUpgradeOptions({
+                weaponLevels: new Map(),
+                powerupLevels: new Map([[spare.name, 2]]),
+                count: 40,
+                rng: mulberry32(7),
+            });
+            expect(options.some(o => o.data.id === 'extra_roll')).toBe(false);
+        });
+
         it('formats percent and flat bonuses', () => {
             // i18n picks the host locale by default, so pin it for this test
             i18n.setLang('en');
@@ -148,6 +165,23 @@ describe('UpgradePool', () => {
             expect(formatPowerupBonus('might', 0.08)).toBe('+8%'); // percentages are language-neutral
             i18n.setLang('en');
         });
+    });
+});
+
+describe('stat previews', () => {
+    it('shows multiplier stats as a percentage', () => {
+        // `might: 1.24` means nothing on a card; 124% does
+        expect(formatStatValue('might', 1.24)).toBe('124%');
+        expect(formatStatPreview('might', 1.24, 1.32)).toBe('124% → 132%');
+    });
+
+    it('shows flat stats as plain numbers', () => {
+        expect(formatStatValue('armor', 3)).toBe('3');
+        expect(formatStatPreview('maxHp', 130, 145)).toBe('130 → 145');
+    });
+
+    it('keeps one decimal on small flat values', () => {
+        expect(formatStatValue('regen', 0.3)).toBe('0.3');
     });
 });
 

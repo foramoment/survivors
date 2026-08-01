@@ -62,7 +62,7 @@ export function getPowerupValue(
 }
 
 /** Stat types shown as a flat amount with a unit instead of a percentage */
-const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'regen', 'tick', 'discharge'];
+const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'regen', 'tick', 'discharge', 'reroll'];
 
 /** Human-readable bonus string, e.g. "+8%" or "+15 Max HP" */
 export function formatPowerupBonus(type: string, value: number): string {
@@ -73,6 +73,31 @@ export function formatPowerupBonus(type: string, value: number): string {
         return `${sign}${rounded} ${t(`bonus.${type}`)}`;
     }
     return `${sign}${Math.round(abs * 100)}%`;
+}
+
+/**
+ * Stat types shown as a percentage of a baseline of 1 rather than a raw number.
+ * `might: 1.24` means nothing on a card; "124%" does.
+ */
+const PERCENT_TYPES = [
+    'might', 'area', 'cooldown', 'speed', 'duration', 'moveSpeed', 'growth',
+    'critChance', 'critDamage', 'killEcho', 'adrenaline', 'siphon',
+];
+
+/** Render one stat value the way a card should show it */
+export function formatStatValue(type: string, value: number): string {
+    if (PERCENT_TYPES.includes(type)) return `${Math.round(value * 100)}%`;
+    const rounded = Math.abs(value) >= 10 ? Math.round(value) : Math.round(value * 10) / 10;
+    return String(rounded);
+}
+
+/**
+ * "124% → 132%". The bonus line alone ("+8%") never said 8% of *what*, or what
+ * you already had — which is the number that decides whether the pick is worth
+ * taking over the other two cards.
+ */
+export function formatStatPreview(type: string, current: number, next: number): string {
+    return `${formatStatValue(type, current)} → ${formatStatValue(type, next)}`;
 }
 
 interface WeightedEntry {
@@ -99,7 +124,7 @@ function buildEntries(ctx: OfferContext): WeightedEntry[] {
 
     for (const powerup of POWERUPS) {
         const stack = ctx.powerupLevels.get(powerup.name) ?? 0;
-        if (stack >= POWERUP_STACK_CAP) continue;
+        if (stack >= (powerup.maxStacks ?? POWERUP_STACK_CAP)) continue;
         entries.push({ option: { type: 'powerup', data: powerup, stack }, weight: WEIGHT_POWERUP });
     }
 

@@ -93,6 +93,8 @@ export interface PowerupData {
     emoji: string;
     /** Per-stack multiplier. Omit for the global 25% curve; 1 = flat stacking. */
     stackGrowth?: number;
+    /** Overrides POWERUP_STACK_CAP for this powerup alone */
+    maxStacks?: number;
 }
 
 export const POWERUPS: PowerupData[] = [
@@ -131,6 +133,9 @@ export const POWERUPS: PowerupData[] = [
     { id: 'kill_echo', name: "Kill Echo", description: "The dead sometimes detonate", type: "killEcho", value: 0.06, stackGrowth: 1, emoji: "☠️" },
     { id: 'adrenal_surge', name: "Adrenal Surge", description: "Hit harder and move faster while nearly dead", type: "adrenaline", value: 0.1, stackGrowth: 1, emoji: "🩸" },
     { id: 'vital_siphon', name: "Vital Siphon", description: "Kills sometimes leave a repair cell behind", type: "siphon", value: 0.025, stackGrowth: 1, emoji: "💗" },
+    // Hard-capped at two: every level-up already comes with one free reroll, and
+    // past three the draw stops being a decision and becomes a menu you shop in
+    { id: 'extra_roll', name: "Spare Cartridge", description: "One more reroll on every level-up", type: "reroll", value: 1, stackGrowth: 1, maxStacks: 2, emoji: "🎲" },
 ];
 
 export const WEAPONS = [
