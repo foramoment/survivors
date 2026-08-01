@@ -47,6 +47,10 @@ import {
 const CONTACT_SOUND_MIN_GAP = 0.75;
 const CONTACT_SOUND_HP_SHARE = 0.05;
 
+/** Knockback on contact: the player barely moves, the enemy is shoved aside */
+const PLAYER_SHOVE_BACK = 55;
+const ENEMY_SHOVE = 190;
+
 export class GameManager {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
@@ -994,10 +998,17 @@ export class GameManager {
                 const nx = dx / dist;
                 const ny = dy / dist;
 
-                // Knockback force (player gets pushed away, enemy gets pushed back)
-                const knockbackForce = 150;
-                this.player.applyKnockback(nx, ny, knockbackForce);
-                e.applyKnockback(-nx, -ny, knockbackForce * 0.5); // Enemy pushed back less
+                // The player shoulders through; enemies give way.
+                //
+                // These used to be 150 on the player and 75 on the enemy, which
+                // is backwards for a pile: pushes from opposite sides cancel, so
+                // a surrounded player was pinned in place and could only wait
+                // for their weapons to chew an exit. Shoving the enemy harder
+                // than the player opens a gap you can walk out of, and the
+                // smaller self-knockback stops the pile from yanking the camera
+                // around while you steer.
+                this.player.applyKnockback(nx, ny, PLAYER_SHOVE_BACK);
+                e.applyKnockback(-nx, -ny, ENEMY_SHOVE);
             }
         }
 
