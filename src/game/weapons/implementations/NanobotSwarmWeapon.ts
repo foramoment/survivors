@@ -1,12 +1,17 @@
 /**
  * NANOBOT SWARM WEAPON
  *
- * An aura of nanites that grinds down anything standing next to the player.
+ * An aura of nanites that grinds down anything standing next to the player,
+ * with drones patrolling it that *lunge* at whatever comes close.
  *
- * Evolved — Nanite Hive: the aura stays, but four drones now orbit it and
- * *lunge* at whatever comes close, hitting far harder than the aura tick. The
- * old evolution was the same cloud with a bigger radius, which read as "no
- * change" — this one has a behaviour of its own.
+ * The drones used to be evolved-only, which left the base weapon as a silent
+ * circle of tick damage — the least interesting thing in the pool, and nothing
+ * about it hinted at what the evolution would become. The base swarm now flies
+ * two drones with a slower lunge; the evolution is a real escalation of a
+ * behaviour you already know rather than a surprise.
+ *
+ * Evolved — Nanite Hive: four faster drones, a heavier lunge, and each strike
+ * seeds a nanite infection that keeps eating after the drone pulls back.
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
@@ -15,6 +20,7 @@ import { type Vector2, distance } from '../../core/Utils';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { damageSystem } from '../../core/DamageSystem';
 import { particles } from '../../core/ParticleSystem';
+import { status } from '../../core/StatusEffects';
 
 interface Drone {
     /** Orbit angle */
@@ -33,14 +39,30 @@ interface Drone {
 export class NaniteHiveCloud extends NanobotCloud {
     private drones: Drone[] = [];
     private hitDamage: number;
+    private lungeCooldown: number;
+    private orbitSpeed: number;
+    /** Nanite DoT seeded by each strike; 0 on the base swarm */
+    private infectDps: number;
     private time: number = 0;
 
-    constructor(owner: any, radius: number, duration: number, damage: number, interval: number) {
+    constructor(
+        owner: any,
+        radius: number,
+        duration: number,
+        damage: number,
+        interval: number,
+        options: { droneCount?: number; hitMultiplier?: number; lungeCooldown?: number; orbitSpeed?: number; infectDps?: number } = {},
+    ) {
         super(owner, radius, duration, damage, interval);
-        this.hitDamage = damage * 3;
-        for (let i = 0; i < 4; i++) {
+        const droneCount = options.droneCount ?? 4;
+        this.hitDamage = damage * (options.hitMultiplier ?? 3);
+        this.lungeCooldown = options.lungeCooldown ?? 0.9;
+        this.orbitSpeed = options.orbitSpeed ?? 2.2;
+        this.infectDps = options.infectDps ?? 0;
+
+        for (let i = 0; i < droneCount; i++) {
             this.drones.push({
-                angle: (i / 4) * Math.PI * 2,
+                angle: (i / droneCount) * Math.PI * 2,
                 lunge: 0,
                 lungeDir: { x: 1, y: 0 },
                 cooldown: i * 0.25,
@@ -55,7 +77,7 @@ export class NaniteHiveCloud extends NanobotCloud {
         this.time += dt;
 
         for (const drone of this.drones) {
-            drone.angle += dt * 2.2;
+            drone.angle += dt * this.orbitSpeed;
 
             if (drone.lunge > 0) {
                 // Out and back; the hit lands at full extension
@@ -74,7 +96,7 @@ export class NaniteHiveCloud extends NanobotCloud {
             if (!target) continue;
 
             drone.target = target;
-            drone.cooldown = 0.9;
+            drone.cooldown = this.lungeCooldown;
             drone.lunge = 1;
             const dx = target.pos.x - this.pos.x;
             const dy = target.pos.y - this.pos.y;
@@ -87,6 +109,14 @@ export class NaniteHiveCloud extends NanobotCloud {
                 target,
                 position: target.pos,
             });
+            if (this.infectDps > 0) {
+                status.infect(target, {
+                    dps: this.infectDps,
+                    duration: 3,
+                    source: this.source,
+                    kind: 'acid',
+                });
+            }
             particles.emitHit(target.pos.x, target.pos.y, '#66ffe0');
         }
     }
@@ -190,9 +220,21 @@ export class NanobotSwarmWeapon extends Weapon {
             const baseInterval = Math.max(0.1, 0.5 - this.owner.stats.tick);
             const duration = this.duration * this.owner.stats.duration;
 
+            const interval = Math.max(0.05, baseInterval);
             const cloud = this.evolved
-                ? new NaniteHiveCloud(this.owner, radius, duration, this.damage, Math.max(0.05, baseInterval))
-                : new NanobotCloud(this.owner, radius, duration, this.damage, Math.max(0.05, baseInterval));
+                ? new NaniteHiveCloud(this.owner, radius, duration, this.damage, interval, {
+                    droneCount: 4,
+                    hitMultiplier: 3,
+                    lungeCooldown: 0.9,
+                    orbitSpeed: 2.2,
+                    infectDps: this.damage * 0.8,
+                })
+                : new NaniteHiveCloud(this.owner, radius, duration, this.damage, interval, {
+                    droneCount: 2,
+                    hitMultiplier: 2,
+                    lungeCooldown: 1.5,
+                    orbitSpeed: 1.5,
+                });
             cloud.source = this;
             this.onSpawn(cloud);
             this.activeCloud = cloud;

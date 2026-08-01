@@ -102,13 +102,16 @@ const EXPECTED_STATS: Record<string, any> = {
         pierce: 3,
     },
     spinning_ember: {
-        damage: 15,
-        cooldown: 3.0,
-        area: 100,
-        speed: 3,
-        duration: 4,
+        // Reworked into a permanent ring: the "cooldown" is a re-light check,
+        // and damage went up because a pass now lands one gated tick instead of
+        // one hit per frame of overlap
+        damage: 26,
+        cooldown: 0.5,
+        area: 96,
+        speed: 2.6,
+        duration: 6,
         count: 2,
-        countScaling: 1,
+        countScaling: 0.5,
     },
     frost_nova: {
         damage: 8,

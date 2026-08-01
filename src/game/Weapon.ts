@@ -110,6 +110,51 @@ export abstract class Weapon {
         return this.findEnemies({ maxRange, count: Infinity });
     }
 
+    /**
+     * The spot inside `maxRange` covered by the most enemies.
+     *
+     * Weapons that drop something on the ground used to either pick a random
+     * offset (Frost Nova) or the single closest enemy (Acid Pool). Both waste
+     * an area effect: a puddle is worth throwing where the pack is, not where
+     * one straggler happens to stand.
+     *
+     * Candidates are enemy positions rather than a grid — the best cluster
+     * centre is always near a body — and the candidate list is capped so this
+     * stays O(candidates x neighbours) no matter how many enemies are alive.
+     */
+    protected findDensestSpot(maxRange: number, clusterRadius: number): Vector2 | null {
+        const nearby = levelSpatialHash.getWithinRadius(this.owner.pos, maxRange);
+        if (nearby.length === 0) return null;
+
+        const MAX_CANDIDATES = 12;
+        const step = Math.max(1, Math.floor(nearby.length / MAX_CANDIDATES));
+
+        let best: Entity | null = null;
+        let bestScore = -1;
+        for (let i = 0; i < nearby.length; i += step) {
+            const candidate = nearby[i];
+            let score = 0;
+            for (const other of levelSpatialHash.getWithinRadius(candidate.pos, clusterRadius)) {
+                if (distance(candidate.pos, other.pos) <= clusterRadius) score++;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                best = candidate;
+            }
+        }
+
+        return best ? { x: best.pos.x, y: best.pos.y } : null;
+    }
+
+    /** How many enemies are pressed within `radius` of the player */
+    protected countEnemiesAround(radius: number): number {
+        let count = 0;
+        for (const enemy of levelSpatialHash.getWithinRadius(this.owner.pos, radius)) {
+            if (distance(this.owner.pos, enemy.pos) <= radius) count++;
+        }
+        return count;
+    }
+
     // ============================================
     // VELOCITY CALCULATION
     // ============================================

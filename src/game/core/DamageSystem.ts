@@ -80,21 +80,28 @@ class DamageSystemClass {
      */
     private applyDamage(damage: number, target: any, position: Vector2, isCrit: boolean): DamageResult {
         const wasAlive = !target.isDead;
-        target.takeDamage(damage);
+
+        // Corrosion amplifies EVERY source, including infection ticks and
+        // environmental hazards — applied here rather than in dealDamage so a
+        // `skipModifiers` hit still benefits. That is what makes acid a setup
+        // tool instead of just another damage-over-time.
+        const finalDamage = damage * (1 + (target.corrosion?.amp ?? 0));
+
+        target.takeDamage(finalDamage);
         const killed = wasAlive && target.isDead;
 
         // Emit event for damage tracking
         events.emit({
             type: 'ENEMY_DAMAGED',
             enemy: target,
-            damage: damage,
+            damage: finalDamage,
             source: null
         });
 
         // Emit damage number
-        this.emitDamageNumber(position, damage, isCrit);
+        this.emitDamageNumber(position, finalDamage, isCrit);
 
-        return { finalDamage: damage, isCrit, killed };
+        return { finalDamage, isCrit, killed };
     }
 
     /**

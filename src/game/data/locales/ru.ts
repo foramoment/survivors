@@ -82,7 +82,7 @@ export const RU: Record<string, string> = {
     'weapon.void_ray.evoDesc': 'Простреливает цель насквозь и схлопывает точку удара',
 
     'weapon.phantom_slash.name': 'Фантомный Разрез',
-    'weapon.phantom_slash.desc': 'Мгновенно переносится между ближайшими врагами и рассекает их',
+    'weapon.phantom_slash.desc': 'Бьёт тем сильнее, чем плотнее враги вокруг тебя',
     'weapon.phantom_slash.evoName': 'Клинок Измерений',
     'weapon.phantom_slash.evoDesc': 'Каждый разрез рвёт разлом, который замедляет и перемалывает',
 
@@ -92,12 +92,12 @@ export const RU: Record<string, string> = {
     'weapon.plasma_cannon.evoDesc': 'Заряды создают чёрные дыры при попадании',
 
     'weapon.nanobot_swarm.name': 'Рой Нанитов',
-    'weapon.nanobot_swarm.desc': 'Аура нанитов, перемалывающая всё вблизи',
+    'weapon.nanobot_swarm.desc': 'Аура нанитов с дронами, что бросаются на всё рядом',
     'weapon.nanobot_swarm.evoName': 'Улей Нанитов',
-    'weapon.nanobot_swarm.evoDesc': 'Дроны кружат вокруг ауры и бросаются на всё рядом',
+    'weapon.nanobot_swarm.evoDesc': 'Вдвое больше дронов, и каждый удар сеет нанитную гниль',
 
     'weapon.spore_cloud.name': 'Облако Спор',
-    'weapon.spore_cloud.desc': 'Грибница, заражающая всех, кто в неё зашёл',
+    'weapon.spore_cloud.desc': 'Грибница заражает всех внутри и ширится с каждым уровнем',
     'weapon.spore_cloud.evoName': 'Грибной Цвет',
     'weapon.spore_cloud.evoDesc': 'Инфекция становится заразной и расходится от погибших',
 
@@ -122,9 +122,9 @@ export const RU: Record<string, string> = {
     'weapon.chrono_disc.evoDesc': 'Диск распадается на временные отголоски',
 
     'weapon.acid_pool.name': 'Кислотная Лужа',
-    'weapon.acid_pool.desc': 'Бросает колбы с кислотой',
+    'weapon.acid_pool.desc': 'Разъедает толпу, чтобы всё остальное било по ней сильнее',
     'weapon.acid_pool.evoName': 'Токсичный Потоп',
-    'weapon.acid_pool.evoDesc': 'Лужи кислоты при ударе, урон продолжает капать',
+    'weapon.acid_pool.evoDesc': 'Три колбы, сильнее коррозия и въедливый кислотный ожог',
 
     'weapon.lightning_chain.name': 'Цепная Молния',
     'weapon.lightning_chain.desc': 'Разряд с неба перескакивает между ближними врагами',
@@ -132,19 +132,19 @@ export const RU: Record<string, string> = {
     'weapon.lightning_chain.evoDesc': 'Более медленные дуги оставляют трещащие поля статики',
 
     'weapon.spinning_ember.name': 'Кружащие Угли',
-    'weapon.spinning_ember.desc': 'Огненные шары, вращающиеся вокруг тебя',
+    'weapon.spinning_ember.desc': 'Кольцо углей, которое не гаснет и поджигает всё вокруг',
     'weapon.spinning_ember.evoName': 'Плеть Инферно',
-    'weapon.spinning_ember.evoDesc': 'Оставляет горящие следы',
+    'weapon.spinning_ember.evoDesc': 'Кольцо хлещет наружу и выжигает землю',
 
     'weapon.frost_nova.name': 'Ледяная Новая',
-    'weapon.frost_nova.desc': 'Морозная аура, замедляющая врагов',
+    'weapon.frost_nova.desc': 'Ледяное поле, брошенное в самую гущу толпы',
     'weapon.frost_nova.evoName': 'Абсолютный Ноль',
-    'weapon.frost_nova.evoDesc': 'Замораживает врагов насмерть, огромный урон',
+    'weapon.frost_nova.evoDesc': 'Вмораживает врагов в лёд, а потом разбивает их',
 
     'weapon.plasma_grenade.name': 'Плазменная Граната',
-    'weapon.plasma_grenade.desc': 'Бросает плазменные гранаты, взрывающиеся при ударе',
+    'weapon.plasma_grenade.desc': 'Гранаты взрываются и оглушают всех, кого зацепят',
     'weapon.plasma_grenade.evoName': 'Кассетная Бомба',
-    'weapon.plasma_grenade.evoDesc': 'Три заряда за бросок с цепочкой вторичных взрывов',
+    'weapon.plasma_grenade.evoDesc': 'Три заряда, оглушение дольше, цепочка вторичных взрывов',
 
     // ---------------------------------------------------------------- classes
     'class.void_walker.name': 'Странник Пустоты',

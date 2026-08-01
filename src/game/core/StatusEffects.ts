@@ -5,11 +5,17 @@
  * the enemy walks out, which is what makes fungal/psionic weapons feel
  * different from "another circle of damage".
  *
- * Two effects so far:
- *   infection — damage over time. Can be *contagious*: when a carrier dies it
- *               bursts and infects everything nearby, so a fungal build snowballs
- *               through a crowd. Spread generations are capped so one cloud
- *               cannot chain across the entire arena forever.
+ * Three effects:
+ *   infection — damage over time, in three flavours (`kind`) that differ only
+ *               in how they read on screen: spores, acid, fire. Can be
+ *               *contagious*: when a carrier dies it bursts and infects
+ *               everything nearby, so a fungal build snowballs through a crowd.
+ *               Spread generations are capped so one cloud cannot chain across
+ *               the entire arena forever.
+ *   corrosion — the enemy takes MORE damage from every source while it lasts.
+ *               This is the one effect that does no damage itself: it is a
+ *               setup, which is what makes acid worth building around next to
+ *               a big single hitter like Orbital Strike.
  *   stun      — the enemy stops moving (it still animates and takes damage).
  *
  * The state lives on the Enemy (one object, no map lookups); all the logic
@@ -27,6 +33,9 @@ const TICK = 0.6;
 /** How many times a contagious infection may jump before it burns out */
 const MAX_GENERATIONS = 3;
 
+/** Purely cosmetic — picks the colour of the orbiting motes on the enemy */
+export type InfectionKind = 'spore' | 'acid' | 'burn';
+
 export interface Infection {
     /** Base damage per second (goes through DamageSystem, so might/crit apply) */
     dps: number;
@@ -37,6 +46,7 @@ export interface Infection {
     contagious: boolean;
     spreadRadius: number;
     generation: number;
+    kind: InfectionKind;
     source: any;
 }
 
@@ -47,6 +57,22 @@ export interface InfectParams {
     contagious?: boolean;
     spreadRadius?: number;
     generation?: number;
+    kind?: InfectionKind;
+}
+
+/**
+ * Damage amplification. Does no damage on its own — it makes everything else
+ * hit harder, so acid pays off through whatever else you are running.
+ */
+export interface Corrosion {
+    /** 0.25 = the enemy takes +25% damage from every source */
+    amp: number;
+    timer: number;
+}
+
+export interface CorrodeParams {
+    amp: number;
+    duration: number;
 }
 
 export class StatusSystem {
@@ -59,6 +85,7 @@ export class StatusSystem {
             current.contagious = current.contagious || !!params.contagious;
             current.spreadRadius = Math.max(current.spreadRadius, params.spreadRadius ?? 0);
             current.generation = Math.min(current.generation, params.generation ?? 0);
+            current.kind = params.kind ?? current.kind;
             current.source = params.source;
             return;
         }
@@ -69,8 +96,28 @@ export class StatusSystem {
             contagious: !!params.contagious,
             spreadRadius: params.spreadRadius ?? 0,
             generation: params.generation ?? 0,
+            kind: params.kind ?? 'spore',
             source: params.source,
         };
+    }
+
+    /**
+     * Apply (or refresh) corrosion. The stronger amp and longer timer win, so
+     * two acid sources never multiply into something absurd.
+     */
+    corrode(enemy: Enemy, params: CorrodeParams) {
+        const current = enemy.corrosion;
+        if (current) {
+            current.amp = Math.max(current.amp, params.amp);
+            current.timer = Math.max(current.timer, params.duration);
+            return;
+        }
+        enemy.corrosion = { amp: params.amp, timer: params.duration };
+    }
+
+    /** Multiplier every incoming hit is scaled by (see DamageSystem) */
+    damageTakenMultiplier(enemy: Enemy): number {
+        return 1 + (enemy.corrosion?.amp ?? 0);
     }
 
     /** Freeze an enemy in place for `seconds` (longest wins) */
@@ -78,11 +125,19 @@ export class StatusSystem {
         enemy.stunTimer = Math.max(enemy.stunTimer, seconds);
     }
 
-    /** Tick every active infection. Stun counts down inside Enemy.update. */
+    /** Tick infections and corrosion. Stun counts down inside Enemy.update. */
     update(dt: number, enemies: Enemy[]) {
         for (const enemy of enemies) {
+            if (enemy.isDead) continue;
+
+            const corrosion = enemy.corrosion;
+            if (corrosion) {
+                corrosion.timer -= dt;
+                if (corrosion.timer <= 0) enemy.corrosion = null;
+            }
+
             const infection = enemy.infection;
-            if (!infection || enemy.isDead) continue;
+            if (!infection) continue;
 
             infection.timer -= dt;
             infection.tick -= dt;
@@ -125,6 +180,7 @@ export class StatusSystem {
                 contagious: true,
                 spreadRadius: infection.spreadRadius,
                 generation: infection.generation + 1,
+                kind: infection.kind,
             });
         }
     }
@@ -133,6 +189,7 @@ export class StatusSystem {
     clear(enemies: Enemy[]) {
         for (const enemy of enemies) {
             enemy.infection = null;
+            enemy.corrosion = null;
             enemy.stunTimer = 0;
         }
     }

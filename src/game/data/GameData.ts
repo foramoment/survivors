@@ -87,7 +87,7 @@ export const WEAPONS = [
         id: 'phantom_slash',
         name: "Phantom Slash",
         emoji: "⚔️",
-        description: "Blinks between the closest enemies and cuts them",
+        description: "Cuts harder the more enemies are pressed against you",
         class: PhantomSlashWeapon,
         evolution: {
             name: "Dimensional Blade",
@@ -111,19 +111,19 @@ export const WEAPONS = [
         id: 'nanobot_swarm',
         name: "Nanobot Swarm",
         emoji: "🦠",
-        description: "Aura of nanites that grinds down anything close",
+        description: "Aura of nanites with drones that lunge at what comes close",
         class: NanobotSwarmWeapon,
         evolution: {
             name: "Nanite Hive",
             emoji: "☣️",
-            description: "Drones orbit the aura and lunge at anything close"
+            description: "Twice the drones, and every strike seeds a nanite rot"
         }
     },
     {
         id: 'spore_cloud',
         name: "Spore Cloud",
         emoji: "🍄",
-        description: "Fungal patch that infects anything walking through it",
+        description: "Fungal patch that infects, and widens with every level",
         class: SporeCloudWeapon,
         evolution: {
             name: "Fungal Bloom",
@@ -183,12 +183,12 @@ export const WEAPONS = [
         id: 'acid_pool',
         name: "Acid Pool",
         emoji: "🧪",
-        description: "Throws acid flasks",
+        description: "Corrodes a crowd so everything else hits it harder",
         class: AcidPoolWeapon,
         evolution: {
             name: "Toxic Deluge",
             emoji: "☢️",
-            description: "Acid puddles on impact, lingering damage"
+            description: "Three flasks, deeper corrosion and a lingering acid burn"
         }
     },
     {
@@ -207,36 +207,36 @@ export const WEAPONS = [
         id: 'spinning_ember',
         name: "Spinning Ember",
         emoji: "🔥",
-        description: "Fireballs that orbit you",
+        description: "A ring of embers that never goes out and sets things alight",
         class: SpinningEmberWeapon,
         evolution: {
             name: "Inferno Lash",
             emoji: "🌋",
-            description: "Leaves burning trails"
+            description: "The ring whips outward and lays burning ground"
         }
     },
     {
         id: 'frost_nova',
         name: "Frost Nova",
         emoji: "❄️",
-        description: "Freezing aura that slows enemies",
+        description: "Freezing field dropped on the thickest part of the crowd",
         class: FrostNovaWeapon,
         evolution: {
             name: "Absolute Zero",
             emoji: "🧊",
-            description: "Freezes enemies solid, massive damage"
+            description: "Freezes enemies in place, then shatters them"
         }
     },
     {
         id: 'plasma_grenade',
         name: "Plasma Grenade",
         emoji: "💣",
-        description: "Throws plasma grenades that explode on impact",
+        description: "Grenades that blow up and concuss whatever they catch",
         class: PlasmaGrenadeWeapon,
         evolution: {
             name: "Cluster Bomb",
             emoji: "💥",
-            description: "Three canisters per throw with chained secondaries"
+            description: "Three canisters, longer concussion, chained secondaries"
         }
     },
 ];

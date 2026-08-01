@@ -5,20 +5,32 @@
  * spinning canister with a ground shadow and a closing marker ring, so you can
  * see it coming and read the blast before it happens.
  *
+ * Every blast also *concusses*: anything caught is stunned briefly. The grenade
+ * used to be pure damage in a genre where damage is cheap, and it read as the
+ * weakest thing in the pool; a short stun makes it the button you press to stop
+ * a charge, the way Mind Blast does but on a much shorter cooldown.
+ *
  * Evolved — Cluster Bomb: three canisters per throw, fanned around the target
- * and staggered by a few frames, each with a smaller blast. Chain detonations
- * are capped and delayed rather than fired all at once: a full-screen volley
- * used to spawn dozens of `emitExplosion` bursts in a single frame, which is
- * what made the game hitch.
+ * and staggered by a few frames, each with a smaller blast and a longer stun.
+ * Chain detonations are capped and delayed rather than fired all at once: a
+ * full-screen volley used to spawn dozens of `emitExplosion` bursts in a single
+ * frame, which is what made the game hitch.
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
 import { LobbedProjectile, PlasmaExplosionZone } from '../base';
 import { particles } from '../../core/ParticleSystem';
 import { juice } from '../../core/JuiceSystem';
+import { status } from '../../core/StatusEffects';
+import { levelSpatialHash } from '../../core/SpatialHash';
+import { distance } from '../../core/Utils';
 
 /** Chain explosions allowed per detonation (evolved only) */
 const MAX_CHAINS = 3;
+
+/** Seconds of stun on a direct blast. Bosses get a quarter of it. */
+const STUN_BASE = 0.55;
+const STUN_EVOLVED = 0.9;
 
 export class PlasmaGrenadeWeapon extends Weapon {
     name = "Plasma Grenade";
@@ -103,6 +115,15 @@ export class PlasmaGrenadeWeapon extends Weapon {
         particles.emitPlasmaBurst(x, y, explosionRadius, this.evolved);
         juice.addTrauma(0.1 * power);
         juice.shockwave(x, y, explosionRadius * 1.5, this.evolved ? '#ffb03c' : '#66ff88', 0.3, 4);
+
+        // Concussion. Scaled by `power` so a cluster's smaller canisters stun
+        // for less than a single well-placed grenade.
+        const stun = (this.evolved ? STUN_EVOLVED : STUN_BASE) * power * this.owner.stats.duration;
+        for (const enemy of levelSpatialHash.getWithinRadius({ x, y }, explosionRadius)) {
+            if (distance({ x, y }, enemy.pos) > explosionRadius) continue;
+            // A boss that can be perma-stunned by a 2.5s cooldown is not a boss
+            status.stun(enemy, enemy.isBoss ? stun * 0.25 : stun);
+        }
 
         // Evolved: a few secondary blasts, spread over the next third of a
         // second so the damage numbers and particles don't land in one frame

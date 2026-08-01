@@ -199,10 +199,17 @@ export class DimensionalRiftZone extends Zone {
     }
 }
 
+/** Radius counted as "pressed against the player" for the crowd bonus */
+const PRESSURE_RADIUS = 110;
+/** Extra damage per enemy inside that radius, past the first */
+const PRESSURE_PER_ENEMY = 0.14;
+/** Ceiling on the bonus (+140% at ~11 bodies on top of you) */
+const PRESSURE_CAP = 1.4;
+
 export class PhantomSlashWeapon extends Weapon {
     name = "Phantom Slash";
     emoji = "⚔️";
-    description = "Blinks between the closest enemies and cuts them.";
+    description = "Cuts harder the more enemies are pressed against you.";
 
     readonly stats = {
         damage: 15,
@@ -221,6 +228,21 @@ export class PhantomSlashWeapon extends Weapon {
         this.area = this.stats.area;
     }
 
+    /**
+     * Melee's answer to area weapons.
+     *
+     * Lightning and Orbital Strike scale with crowd size for free — they hit
+     * everything at once — while a blade that cuts three targets does not care
+     * whether there are four enemies or forty. So the blade scales the other
+     * way: the tighter the pack around *you*, the harder every cut lands. It is
+     * strongest exactly when contact damage is killing you, which makes it the
+     * tool you use to get out of a pile rather than a weaker Lightning.
+     */
+    private pressureMultiplier(): number {
+        const packed = this.countEnemiesAround(PRESSURE_RADIUS * this.owner.stats.area);
+        return 1 + Math.min(PRESSURE_CAP, Math.max(0, packed - 1) * PRESSURE_PER_ENEMY);
+    }
+
     update(dt: number) {
         this.cooldown -= dt;
         if (this.cooldown > 0) return;
@@ -233,17 +255,26 @@ export class PhantomSlashWeapon extends Weapon {
         const targets = this.findEnemies({ mode: 'closest', count });
         if (targets.length === 0) return;
 
-        const color = isEvolved ? '#c58cff' : '#c8f5ff';
-        const areaScale = this.owner.stats.area;
+        const pressure = this.pressureMultiplier();
+        // A crowded swing reads hotter and cuts wider
+        const color = isEvolved ? '#c58cff' : (pressure > 1.5 ? '#ffd27a' : '#c8f5ff');
+        const areaScale = this.owner.stats.area * (1 + (pressure - 1) * 0.25);
         let previous: Vector2 = { ...this.owner.pos };
 
         targets.forEach((target, index) => {
             const result = damageSystem.dealDamage({
-                baseDamage: this.damage,
+                baseDamage: this.damage * pressure,
                 source: this,
                 target,
                 position: target.pos,
             });
+
+            // Cuts shove the pack back — the blade has to actually make room
+            const push = 190 * pressure;
+            const dx = target.pos.x - this.owner.pos.x;
+            const dy = target.pos.y - this.owner.pos.y;
+            const len = Math.hypot(dx, dy) || 1;
+            (target as any).applyKnockback?.(dx / len, dy / len, push);
 
             // The cut faces the direction the blade travelled in
             const angle = Math.atan2(target.pos.y - previous.y, target.pos.x - previous.x);

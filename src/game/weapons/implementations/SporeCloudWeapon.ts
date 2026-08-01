@@ -84,9 +84,21 @@ export class SporeCloudWeapon extends ZoneWeapon {
         this.area = this.stats.area;
     }
 
+    /**
+     * The patch itself gets bigger with every level, not just harder-hitting.
+     *
+     * Standard weapon upgrades only touch damage, and area comes from powerups —
+     * but a fungal patch that never grows is a patch enemies can walk around,
+     * so its whole delivery mechanism stops working as the crowd gets thicker.
+     * +8% per level compounds with the area powerups rather than replacing them.
+     */
+    private zoneRadius(): number {
+        return this.area * this.owner.stats.area * (1 + (this.level - 1) * 0.08);
+    }
+
     spawnZone() {
         const baseInterval = Math.max(0.1, this.interval - this.owner.stats.tick);
-        const radius = this.area * this.owner.stats.area;
+        const radius = this.zoneRadius();
 
         if (this.evolved) {
             const zone = new FungalBloomZone(

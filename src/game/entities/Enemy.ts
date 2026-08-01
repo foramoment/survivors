@@ -1,7 +1,14 @@
 import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
 import { sprites } from '../core/SpriteFactory';
-import type { Infection } from '../core/StatusEffects';
+import type { Infection, Corrosion, InfectionKind } from '../core/StatusEffects';
+
+/** Mote colour per DoT flavour: [plain, contagious] */
+const INFECTION_COLORS: Record<InfectionKind, [string, string]> = {
+    spore: ['#8fd642', '#b6ff4d'],
+    acid: ['#5fe08a', '#8dffb0'],
+    burn: ['#ff9a3c', '#ffd35c'],
+};
 
 export class Enemy extends Entity {
     hp: number;
@@ -29,6 +36,7 @@ export class Enemy extends Entity {
 
     // Status effects — owned by core/StatusEffects, stored here so lookups are free
     infection: Infection | null = null;
+    corrosion: Corrosion | null = null;
     /** Seconds of stun left; while > 0 the enemy cannot move */
     stunTimer: number = 0;
 
@@ -195,7 +203,7 @@ export class Enemy extends Entity {
         // Status markers: spores orbiting an infected host, psi ring on a stun.
         // Both are a handful of rects — cheap enough for a screen full of enemies.
         if (this.infection) {
-            ctx.fillStyle = this.infection.contagious ? '#b6ff4d' : '#8fd642';
+            ctx.fillStyle = INFECTION_COLORS[this.infection.kind][this.infection.contagious ? 1 : 0];
             for (let i = 0; i < 3; i++) {
                 const a = this.animTimer * 2.4 + (i / 3) * Math.PI * 2;
                 const r = this.radius * 0.9;
@@ -205,6 +213,16 @@ export class Enemy extends Entity {
                     3, 3
                 );
             }
+        }
+
+        // Corrosion does no damage of its own, so it has to be visible for the
+        // player to know this target is the one worth hitting hard.
+        if (this.corrosion) {
+            ctx.strokeStyle = `rgba(180, 255, 60, ${0.35 + 0.25 * Math.sin(this.animTimer * 9)})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius * 1.05, 0, Math.PI * 2);
+            ctx.stroke();
         }
 
         if (this.stunTimer > 0) {
