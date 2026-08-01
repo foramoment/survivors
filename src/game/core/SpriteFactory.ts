@@ -165,11 +165,11 @@ export class SpriteFactory {
      * `classId` (not the display name) keys the sprite: the name is
      * user-visible and gets translated, the id does not.
      */
-    getPlayerSprite(classId: string, frame: number): HTMLCanvasElement {
-        const key = `player:${classId}:${frame % 2}`;
+    getPlayerSprite(classId: string, frame: number, hurt: boolean = false): HTMLCanvasElement {
+        const key = `player:${classId}:${frame % 2}:${hurt ? 'h' : 'n'}`;
         let sprite = this.cache.get(key);
         if (!sprite) {
-            sprite = this.generatePlayerSprite(classId, frame % 2);
+            sprite = this.generatePlayerSprite(classId, frame % 2, hurt);
             this.cache.set(key, sprite);
         }
         return sprite;
@@ -180,16 +180,20 @@ export class SpriteFactory {
         return this.getPlayerSprite(classId, 0).toDataURL();
     }
 
-    private generatePlayerSprite(classId: string, frame: number): HTMLCanvasElement {
+    private generatePlayerSprite(classId: string, frame: number, hurt: boolean): HTMLCanvasElement {
         const template = CHARACTER_SPRITES[classId] ?? CHARACTER_SPRITES[FALLBACK_SPRITE_ID];
         const p = template.palette;
 
         const rows = [...template.body, ...template.legs[frame]];
 
-        const colorFor: Record<string, string> = {
-            h: p.shell, v: p.visor, s: p.mid, S: p.light, d: p.dark,
-            a: p.accent, b: p.boots,
-        };
+        // Hurt variant is a flat red silhouette, the same language enemies use
+        // when they take a hit — it reads instantly and needs no legend
+        const colorFor: Record<string, string> = hurt
+            ? { h: '#ff6a72', v: '#ffd7d7', s: '#e02030', S: '#ff6a72', d: '#8c1020', a: '#ffd7d7', b: '#6a0a16' }
+            : {
+                h: p.shell, v: p.visor, s: p.mid, S: p.light, d: p.dark,
+                a: p.accent, b: p.boots,
+            };
 
         const w = rows[0].length;
         const h = rows.length;

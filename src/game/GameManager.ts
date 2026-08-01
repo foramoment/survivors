@@ -31,14 +31,21 @@ import {
 } from './core/Tactics';
 import { screenManager } from './ui/ScreenManager';
 
-/** Seconds between hurt beats (sound + shake) while enemies are on the player */
-const CONTACT_FX_INTERVAL = 0.28;
 import { createSettingsPanel } from './ui/components/SettingsPanel';
 import { i18n, t } from './core/I18n';
 import {
     weaponName, weaponDesc, weaponEvoName, weaponEvoDesc,
     powerupName, powerupDesc, stageName,
 } from './core/Labels';
+
+/**
+ * Contact hurt cue: play at most this often, and only once this share of max
+ * HP has actually been lost since the last one. Two gates rather than a timer
+ * because the cue has to be rare when you are grazed and frequent when you are
+ * being eaten — without ever turning into a machine-gun.
+ */
+const CONTACT_SOUND_MIN_GAP = 0.75;
+const CONTACT_SOUND_HP_SHARE = 0.05;
 
 export class GameManager {
     canvas: HTMLCanvasElement;
@@ -85,8 +92,10 @@ export class GameManager {
     currentStage: StageConfig = STAGES[0];
     private finalBoss: Enemy | null = null;
     private finalBossSpawned: boolean = false;
-    /** Countdown to the next hurt beat while standing in contact */
+    /** Cooldown before the next hurt cue may play */
     private contactFxTimer: number = 0;
+    /** Contact damage taken since the last hurt cue */
+    private contactDamageBank: number = 0;
     /** Absorbed damage banked toward the next Static Discharge */
     private capacitorCharge: number = 0;
     repairCells: RepairCell[] = [];
@@ -412,26 +421,34 @@ export class GameManager {
     /**
      * Hurt feedback while enemies are on the player.
      *
-     * Contact damage now ticks every frame, so the old "did HP go down?" check
-     * would fire the hurt sound and a screen flash 60 times a second. Instead
-     * the feedback fires on a fixed beat, and how hard it hits scales with the
-     * incoming DPS — a light graze reads differently from being buried.
+     * Getting stuck in a pack is a *sustained state*, not an event, and every
+     * event-shaped cue is wrong for it. Earlier versions fired a beat every
+     * 0.28s carrying camera shake and a hurt blip: buried in a crowd that became
+     * a machine-gun of "tk-tk-tk-tk" with the arena shaking too hard to read —
+     * exactly when the player most needs to see where the gap is.
+     *
+     * So: no camera shake from contact at all, and the sound is gated on damage
+     * actually taken rather than on a clock. A graze beeps rarely; being eaten
+     * beeps often, but never faster than CONTACT_SOUND_MIN_GAP. The continuous
+     * readouts — the HP bar, the edge vignette and the player flashing red —
+     * carry the rest.
      */
     private emitContactFeedback(dps: number, dt: number) {
-        this.contactFxTimer -= dt;
-        if (this.contactFxTimer > 0 || !this.player) return;
-        this.contactFxTimer = CONTACT_FX_INTERVAL;
+        if (!this.player) return;
 
-        // 0 at a graze, 1 when a beat costs ~15% of max HP
-        const severity = Math.min(1, (dps * CONTACT_FX_INTERVAL) / (this.player.maxHp * 0.15));
+        this.contactDamageBank += dps * dt;
+        this.contactFxTimer -= dt;
+
+        const beat = this.player.maxHp * CONTACT_SOUND_HP_SHARE;
+        if (this.contactDamageBank < beat || this.contactFxTimer > 0) return;
+
+        this.contactDamageBank = 0;
+        this.contactFxTimer = CONTACT_SOUND_MIN_GAP;
 
         audio.play('hurt');
-        juice.addTrauma(0.14 + 0.26 * severity);
-        // No full-screen flash and no hit-stop here on purpose: those read as a
-        // single event, and firing them on every beat of a sustained contact
-        // paints the arena solid red and stutters the frame. The vignette only
-        // darkens the edges, so the fight stays visible while the danger reads.
-        juice.pulseVignette(0.4 + (1 - this.player.hp / this.player.maxHp) * 0.6);
+        // Edge-only, and it deepens as HP drops — readable without hiding the
+        // middle of the screen where the enemies are
+        juice.pulseVignette(0.3 + (1 - this.player.hp / this.player.maxHp) * 0.5);
     }
 
     /**
@@ -991,6 +1008,7 @@ export class GameManager {
             this.chargeCapacitor(dps, dt);
         } else {
             this.contactFxTimer = 0;
+            this.contactDamageBank = 0;
         }
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {

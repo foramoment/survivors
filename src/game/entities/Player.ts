@@ -177,24 +177,16 @@ export class Player extends Entity {
             ctx.globalAlpha = alpha;
         }
 
-        // Procedural pixel sprite (astronaut tinted by class)
+        // Procedural pixel sprite (per-class template, red while taking contact
+        // damage). The flash is the whole "you are being hurt" signal: an
+        // earlier version drew a pulsing ring around the player instead, which
+        // read as a perk indicator rather than damage.
         const frame = this.isMoving ? Math.floor(this.animTimer * 8) % 2 : 0;
-        const sprite = sprites.getPlayerSprite(this.classId, frame);
+        const hurt = this.contactTimer > 0 && Math.sin(this.pulseClock * 22) > -0.2;
+        const sprite = sprites.getPlayerSprite(this.classId, frame, hurt);
         const height = this.radius * 2.6;
         const width = height * (sprite.width / sprite.height);
         const bob = this.isMoving ? Math.sin(this.animTimer * 16) * 1.2 : 0;
-
-        // Contact damage has no i-frame flash to read, so a red ring pulses
-        // under the player while enemies are on them — otherwise HP just
-        // drains with no visible cause.
-        if (this.contactTimer > 0) {
-            const pulse = 0.55 + 0.45 * Math.sin(this.pulseClock * 26);
-            ctx.beginPath();
-            ctx.arc(0, 0, this.radius + 4, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255, 48, 68, ${0.35 + 0.4 * pulse})`;
-            ctx.lineWidth = 3;
-            ctx.stroke();
-        }
 
         ctx.imageSmoothingEnabled = false;
         if (this.facingLeft) ctx.scale(-1, 1);
