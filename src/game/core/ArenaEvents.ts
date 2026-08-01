@@ -17,6 +17,7 @@
  * can hurt the player — hazards that arrive unannounced just feel like bugs.
  */
 
+import { t } from './I18n';
 import { damageSystem } from './DamageSystem';
 import { levelSpatialHash } from './SpatialHash';
 import { particles } from './ParticleSystem';
@@ -61,11 +62,8 @@ interface Rift {
 const METEOR_FUSE = 1.1;
 const BANNER_TIME = 2.6;
 
-const LABELS: Record<ArenaEventKind, string> = {
-    meteors: 'METEOR SHOWER',
-    blackout: 'POWER FAILURE',
-    rifts: 'VOID RIFTS',
-};
+/** Banner text, resolved at draw time so a language switch takes effect */
+const label = (kind: ArenaEventKind): string => t(`arena.${kind}`);
 
 export class ArenaEventSystem {
     kind: ArenaEventKind | null = null;
@@ -321,7 +319,7 @@ export class ArenaEventSystem {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.imageSmoothingEnabled = false;
         ctx.globalAlpha = alpha;
-        drawPixelText(ctx, LABELS[this.kind], width / 2 - slide * width * 0.4, height * 0.17, {
+        drawPixelText(ctx, label(this.kind), width / 2 - slide * width * 0.4, height * 0.17, {
             scale: Math.max(2, Math.round(width / 320)),
             align: 'center',
             spacing: 1,

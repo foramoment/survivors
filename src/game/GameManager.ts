@@ -24,6 +24,11 @@ import { drawPixelText } from './core/PixelFont';
 import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { screenManager } from './ui/ScreenManager';
 import { createSettingsPanel } from './ui/components/SettingsPanel';
+import { i18n, t } from './core/I18n';
+import {
+    weaponName, weaponDesc, weaponEvoName, weaponEvoDesc,
+    powerupName, powerupDesc, stageName,
+} from './core/Labels';
 
 export class GameManager {
     canvas: HTMLCanvasElement;
@@ -67,6 +72,9 @@ export class GameManager {
     private finalBoss: Enemy | null = null;
     private finalBossSpawned: boolean = false;
     private pauseOverlay: HTMLElement | null = null;
+    /** Survives a pause-overlay rebuild so a language switch keeps the panel open */
+    private pauseSettingsOpen: boolean = false;
+    private pauseI18nUnsub: (() => void) | null = null;
 
 
 
@@ -80,69 +88,7 @@ export class GameManager {
             this.spawnDamageNumber(pos, amount, isCrit);
         });
 
-        // Note: showClassSelection is now handled by ScreenManager
-    }
-
-    showClassSelection() {
-        this.uiLayer.innerHTML = '';
-        const screen = document.createElement('div');
-        screen.className = 'screen';
-
-        const title = document.createElement('h1');
-        title.textContent = 'COSMOS SURVIVORS';
-        screen.appendChild(title);
-
-        // Dev Mode Checkbox
-        const devModeContainer = document.createElement('div');
-        devModeContainer.className = 'dev-mode-container interactive';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = 'dev-mode-checkbox';
-        checkbox.className = 'dev-mode-checkbox';
-        checkbox.checked = this.devMode;
-
-        const label = document.createElement('label');
-        label.htmlFor = 'dev-mode-checkbox';
-        label.className = 'dev-mode-label';
-        label.textContent = '🛠️ Developer Mode (Weapons Only, 6 Options)';
-
-        // Toggle handler
-        const toggle = () => {
-            this.devMode = !this.devMode;
-            checkbox.checked = this.devMode;
-        };
-
-        checkbox.onclick = toggle;
-        label.onclick = toggle;
-
-        devModeContainer.appendChild(checkbox);
-        devModeContainer.appendChild(label);
-        screen.appendChild(devModeContainer);
-
-        const grid = document.createElement('div');
-        grid.className = 'class-grid';
-
-        CLASSES.forEach((cls, index) => {
-            const weaponData = WEAPONS.find(w => w.id === cls.weaponId);
-            const weaponName = weaponData ? weaponData.name : 'Unknown';
-            const weaponEmoji = weaponData ? weaponData.emoji : '❓';
-
-            const card = document.createElement('div');
-            card.className = 'class-card interactive';
-            card.innerHTML = `
-        <div class="class-icon">${cls.emoji}</div>
-        <div class="class-name">${cls.name}</div>
-        <div class="class-bonus">❤️ ${cls.hp} HP</div>
-        <div class="class-bonus">${weaponEmoji} ${weaponName}</div>
-        <div class="class-bonus">${cls.bonus}</div>
-      `;
-            card.onclick = () => this.startGame(index);
-            grid.appendChild(card);
-        });
-
-        screen.appendChild(grid);
-        this.uiLayer.appendChild(screen);
+        // Note: class selection is owned by ui/screens/ClassSelectionScreen
     }
 
     startGame(classIndex: number, stageIndex: number = 0) {
@@ -369,38 +315,55 @@ export class GameManager {
     private pauseGame() {
         this.state = 'PAUSED';
         audio.pauseMusic();
+        this.buildPauseOverlay();
 
+        // Switching language from the pause panel relabels the whole overlay.
+        // Rebuilding it is simpler (and cheaper, once) than tracking every node.
+        this.pauseI18nUnsub = i18n.onChange(() => {
+            if (this.state !== 'PAUSED') return;
+            this.pauseOverlay?.remove();
+            this.buildPauseOverlay();
+        });
+    }
+
+    private buildPauseOverlay() {
         const screen = document.createElement('div');
         screen.className = 'screen pause-screen';
         this.pauseOverlay = screen;
 
         const heading = document.createElement('h2');
-        heading.textContent = 'PAUSED';
+        heading.textContent = t('pause.title');
         screen.appendChild(heading);
 
         const info = document.createElement('p');
         info.className = 'pause-hint';
-        info.textContent = `${this.currentStage.name} · ${this.formatTime(this.gameTime)} · ${this.killCount} kills`;
+        info.textContent = t('pause.status', {
+            stage: stageName(this.currentStage),
+            time: this.formatTime(this.gameTime),
+            kills: this.killCount,
+        });
         screen.appendChild(info);
 
         const actions = document.createElement('div');
         actions.className = 'pause-actions';
-        actions.appendChild(this.createPauseButton('▶ RESUME', 'primary', () => this.resumeGame()));
+        actions.appendChild(this.createPauseButton(t('pause.resume'), 'primary', () => this.resumeGame()));
 
         // Settings fold out in place. Routing to the Options screen would tear
         // down the game screen (and the run with it), so the same panel is
         // mounted here instead.
         const settings = createSettingsPanel(true);
-        settings.hidden = true;
+        settings.hidden = !this.pauseSettingsOpen;
 
-        const settingsBtn = this.createPauseButton('⚙ SETTINGS', 'ghost', () => {
+        const label = () => t('pause.settings') + (settings.hidden ? '' : ' ▴');
+        const settingsBtn = this.createPauseButton(label(), 'ghost', () => {
             settings.hidden = !settings.hidden;
-            settingsBtn.textContent = settings.hidden ? '⚙ SETTINGS' : '⚙ SETTINGS ▴';
+            this.pauseSettingsOpen = !settings.hidden;
+            settingsBtn.textContent = label();
         });
         actions.appendChild(settingsBtn);
         actions.appendChild(settings);
 
-        actions.appendChild(this.createPauseButton('✖ QUIT TO MENU', 'danger', () => {
+        actions.appendChild(this.createPauseButton(t('pause.quit'), 'danger', () => {
             this.resumeGame();
             audio.stopMusic();
             this.state = 'MENU';
@@ -412,6 +375,8 @@ export class GameManager {
     }
 
     private resumeGame() {
+        this.pauseI18nUnsub?.();
+        this.pauseI18nUnsub = null;
         this.pauseOverlay?.remove();
         this.pauseOverlay = null;
         if (this.state === 'PAUSED') this.state = 'PLAYING';
@@ -461,16 +426,16 @@ export class GameManager {
 
         // Developer Mode with Tabs
         if (this.devMode) {
-            heading.textContent = '🛠️ DEVELOPER MODE 🛠️';
+            heading.textContent = t('levelup.devMode');
 
             // Create tabs
             const tabs = document.createElement('div');
             tabs.className = 'dev-tabs interactive';
 
             const tabData = [
-                { id: 'powerups', label: '⚡ Powerups' },
-                { id: 'weapons', label: '⚔️ Weapons' },
-                { id: 'evolved', label: '🌟 Evolved' }
+                { id: 'powerups', label: t('levelup.tabPowerups') },
+                { id: 'weapons', label: t('levelup.tabWeapons') },
+                { id: 'evolved', label: t('levelup.tabEvolved') }
             ];
 
             tabData.forEach((tab, index) => {
@@ -501,7 +466,7 @@ export class GameManager {
         const isLucky = Math.random() < 0.1;
         const upgradeCount = isLucky ? 6 : 3;
 
-        heading.textContent = isLucky ? '✨ LUCKY LEVEL UP! ✨' : 'LEVEL UP!';
+        heading.textContent = isLucky ? t('levelup.lucky') : t('levelup.title');
         if (isLucky) heading.classList.add('lucky');
 
         const grid = document.createElement('div');
@@ -532,9 +497,11 @@ export class GameManager {
                 }
 
                 const emoji = canEvolve ? weaponData.evolution.emoji : weaponData.emoji;
-                const name = canEvolve ? weaponData.evolution.name : weaponData.name;
-                const desc = canEvolve ? weaponData.evolution.description : weaponData.description;
-                const levelText = canEvolve ? 'EVOLVE!' : (currentLevel > 0 ? `lv ${currentLevel} → ${newLevel}` : 'NEW');
+                const name = canEvolve ? weaponEvoName(weaponData) : weaponName(weaponData);
+                const desc = canEvolve ? weaponEvoDesc(weaponData) : weaponDesc(weaponData);
+                const levelText = canEvolve
+                    ? t('levelup.evolve')
+                    : (currentLevel > 0 ? t('levelup.level', { from: currentLevel, to: newLevel }) : t('common.new'));
 
                 card.innerHTML = `
                 <div style="font-size: 3em">${emoji}</div>
@@ -552,12 +519,14 @@ export class GameManager {
                 const powerup = opt.data;
                 const stack = this.powerupLevels.get(powerup.name) ?? 0;
                 const bonus = formatPowerupBonus(powerup.type, getPowerupValue(powerup.value, stack, powerup.stackGrowth));
-                const stackText = stack > 0 ? `lv ${stack} → ${stack + 1}` : 'NEW';
+                const stackText = stack > 0
+                    ? t('levelup.level', { from: stack, to: stack + 1 })
+                    : t('common.new');
                 card.innerHTML = `
                 <div style="font-size: 3em">${powerup.emoji}</div>
-                <h3>${powerup.name}</h3>
+                <h3>${powerupName(powerup)}</h3>
                 <div class="level-indicator">${stackText} · ${bonus}</div>
-                <p>${powerup.description}</p>
+                <p>${powerupDesc(powerup)}</p>
               `;
                 card.onclick = () => {
                     this.applyPowerup(powerup);
@@ -590,8 +559,8 @@ export class GameManager {
             POWERUPS.forEach(powerup => {
                 const card = this.createDevCard(
                     powerup.emoji,
-                    powerup.name,
-                    powerup.description,
+                    powerupName(powerup),
+                    powerupDesc(powerup),
                     '',
                     () => {
                         this.applyPowerup(powerup);
@@ -611,11 +580,13 @@ export class GameManager {
 
                 const canEvolve = currentLevel === 5;
                 const newLevel = currentLevel + 1;
-                const levelText = canEvolve ? 'EVOLVE!' : (currentLevel > 0 ? `lv ${currentLevel} → ${newLevel}` : 'NEW');
+                const levelText = canEvolve
+                    ? t('levelup.evolve')
+                    : (currentLevel > 0 ? t('levelup.level', { from: currentLevel, to: newLevel }) : t('common.new'));
 
                 const emoji = canEvolve ? weaponData.evolution.emoji : weaponData.emoji;
-                const name = canEvolve ? weaponData.evolution.name : weaponData.name;
-                const desc = canEvolve ? weaponData.evolution.description : weaponData.description;
+                const name = canEvolve ? weaponEvoName(weaponData) : weaponName(weaponData);
+                const desc = canEvolve ? weaponEvoDesc(weaponData) : weaponDesc(weaponData);
 
                 const card = this.createDevCard(
                     emoji,
@@ -641,9 +612,9 @@ export class GameManager {
 
                 const card = this.createDevCard(
                     weaponData.evolution.emoji,
-                    weaponData.evolution.name,
-                    weaponData.evolution.description,
-                    '⚡ INSTANT EVOLVE',
+                    weaponEvoName(weaponData),
+                    weaponEvoDesc(weaponData),
+                    t('levelup.instantEvolve'),
                     () => {
                         this.addEvolvedWeapon(weaponData.id);
                         screen.remove();
@@ -993,9 +964,9 @@ export class GameManager {
         const stats = document.createElement('div');
         stats.className = 'result-stats';
         stats.innerHTML = `
-            <div class="result-stat"><span>⏱ TIME</span><strong>${mins}:${secs}</strong></div>
-            <div class="result-stat"><span>💀 KILLS</span><strong>${this.killCount}</strong></div>
-            <div class="result-stat"><span>📊 LEVEL</span><strong>${this.player?.level ?? 1}</strong></div>
+            <div class="result-stat"><span>${t('result.time')}</span><strong>${mins}:${secs}</strong></div>
+            <div class="result-stat"><span>${t('result.kills')}</span><strong>${this.killCount}</strong></div>
+            <div class="result-stat"><span>${t('result.level')}</span><strong>${this.player?.level ?? 1}</strong></div>
         `;
         screen.appendChild(stats);
 
@@ -1004,7 +975,7 @@ export class GameManager {
 
         const again = document.createElement('button');
         again.className = 'pixel-btn pixel-btn--primary interactive';
-        again.textContent = '↻ PLAY AGAIN';
+        again.textContent = t('result.again');
         again.addEventListener('pointerenter', () => audio.play('uiHover'));
         again.onclick = () => {
             audio.play('uiSelect');
@@ -1013,7 +984,7 @@ export class GameManager {
 
         const menu = document.createElement('button');
         menu.className = 'pixel-btn interactive';
-        menu.textContent = '⌂ MAIN MENU';
+        menu.textContent = t('result.menu');
         menu.addEventListener('pointerenter', () => audio.play('uiHover'));
         menu.onclick = () => {
             audio.play('uiBack');
@@ -1037,8 +1008,8 @@ export class GameManager {
             particles.emitExplosion(this.player.pos.x, this.player.pos.y, 90, ['#ff3344', '#ffffff', '#661122']);
         }
         this.showRunSummary({
-            title: 'GAME OVER',
-            subtitle: `${this.currentStage.name} — the void wins this time`,
+            title: t('result.gameOver'),
+            subtitle: t('result.defeatSubtitle', { stage: stageName(this.currentStage) }),
             variant: 'defeat',
         });
     }
@@ -1050,8 +1021,8 @@ export class GameManager {
         juice.zoomPunch(0.8);
         juice.slowMo(0.3, 1);
         this.showRunSummary({
-            title: '🏆 VICTORY',
-            subtitle: `${this.currentStage.name} cleared`,
+            title: t('result.victory'),
+            subtitle: t('result.victorySubtitle', { stage: stageName(this.currentStage) }),
             variant: 'victory',
         });
     }

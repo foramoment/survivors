@@ -21,7 +21,9 @@ src/game/
 │   ├── PropField.ts      # 🪨 Препятствия: чанковая генерация, коллизии, отрисовка
 │   ├── ArenaEvents.ts    # ☄️ События арены: метеориты, блэкаут, разломы
 │   ├── StatusEffects.ts  # 🍄 Дебаффы на врагах: infection (DoT, заразный) и stun
-│   ├── PixelFont.ts      # 🔤 Битмап-шрифт 5×7 в коде (титры, damage numbers)
+│   ├── I18n.ts           # 🌐 Языки (en/ru): t() для UI, tf() для игровых данных
+│   ├── Labels.ts         # 🏷️ Отображаемые имена оружий/классов/бонусов/стейджей
+│   ├── PixelFont.ts      # 🔤 Битмап-шрифт 5×7 в коде (латиница + кириллица)
 │   ├── AudioSystem.ts    # 🔊 Процедурный чиптюн Web Audio (SFX + генеративная музыка)
 │   ├── JuiceSystem.ts    # 💥 Game feel: тряска, hit-stop, вспышки, zoom, ударные волны
 │   ├── StateMachine.ts   # Состояния игры: PLAYING, LEVEL_UP, PAUSED
@@ -30,7 +32,8 @@ src/game/
 │   ├── Input.ts          # WASD/мышь/тач ввод
 │   └── Utils.ts          # Vector2, distance, normalize
 ├── data/
-│   └── GameData.ts       # 📊 Конфиг: классы, powerups, враги, оружия
+│   ├── GameData.ts       # 📊 Конфиг: классы, powerups, враги, оружия
+│   └── locales/          # 🌐 en.ts (UI) + ru.ts (UI + переводы игровых данных)
 ├── entities/
 │   ├── Player.ts         # Игрок со статами
 │   ├── Enemy.ts          # Враги с сепарацией
@@ -142,6 +145,30 @@ BRIDGE → FINALE) выбираются по `setMusicIntensity(0..1)`.
 
 Шина музыки: waveshaper drive → delay с обратной связью → lowpass, который
 открывается с интенсивностью → компрессор. Никаких ассетов и библиотек.
+
+### I18n (Singleton)
+**Файлы:** `core/I18n.ts`, `core/Labels.ts`, `data/locales/`
+
+Два вида строк — и это принципиально:
+
+```typescript
+t('pause.resume')                       // UI: английский лежит в locales/en.ts
+tf('weapon.void_ray.name', w.name)      // данные: английский остаётся в GameData
+```
+
+Игровые данные (оружия, классы, бонусы, стейджи) **не дублируются** в `en.ts`:
+английский берётся прямо из `GameData`/`StageData` как fallback, `ru.ts` —
+единственная вторая копия. Обращаться к ним через `core/Labels.ts`
+(`weaponName`, `classBonus`, `stageDesc`, …), а не через `.name` напрямую.
+
+- Язык определяется как `localStorage` → `navigator.language` → `en`.
+- Экраны строят DOM в `enter()`, поэтому смена языка = `screenManager.reload()`
+  (подписка в `Engine`). Игровой экран исключён — перезаход бы рестартнул забег;
+  `GameManager` пересобирает свой оверлей паузы сам.
+- Пропущенный ключ падает по цепочке ru → en → сам ключ, а не кидает ошибку.
+- Кириллица в `PixelFont` есть (баннеры арены, слоган меню). Одинаковые с
+  латиницей буквы (А В Е К М Н О Р С Т Х) — алиасы, Ё = Е. Тест
+  `i18n.test.ts` проверяет, что для каждого символа canvas-строк есть глиф.
 
 ### ParticleSystem (Singleton)
 **Файл:** `core/ParticleSystem.ts`

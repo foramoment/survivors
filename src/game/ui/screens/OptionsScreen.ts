@@ -8,6 +8,7 @@
 import { BaseScreen } from '../BaseScreen';
 import { screenManager } from '../ScreenManager';
 import { createSettingsPanel } from '../components/SettingsPanel';
+import { t } from '../../core/I18n';
 
 export class OptionsScreen extends BaseScreen {
     enter(): void {
@@ -24,12 +25,12 @@ export class OptionsScreen extends BaseScreen {
         screen.className = 'screen';
 
         const title = document.createElement('h1');
-        title.textContent = '⚙️ OPTIONS';
+        title.textContent = t('options.title');
         screen.appendChild(title);
 
         screen.appendChild(createSettingsPanel());
 
-        screen.appendChild(this.createPixelButton('← BACK', () => screenManager.goBack()));
+        screen.appendChild(this.createPixelButton(t('common.back'), () => screenManager.goBack()));
 
         this.uiLayer.appendChild(screen);
     }

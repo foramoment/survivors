@@ -2,6 +2,8 @@ import { BaseScreen } from '../BaseScreen';
 import { CLASSES, WEAPONS } from '../../data/GameData';
 import { screenManager } from '../ScreenManager';
 import { audio } from '../../core/AudioSystem';
+import { t } from '../../core/I18n';
+import { classLabel, classBonus, weaponName } from '../../core/Labels';
 
 export interface ClassSelectionParams {
     devMode?: boolean;
@@ -38,7 +40,7 @@ export class ClassSelectionScreen extends BaseScreen {
         const grid = this.createClassGrid();
         screen.appendChild(grid);
 
-        const back = this.createPixelButton('← BACK', () => screenManager.goto('main_menu'), 'ghost');
+        const back = this.createPixelButton(t('common.back'), () => screenManager.goto('main_menu'), 'ghost');
         back.style.marginTop = '22px';
         screen.appendChild(back);
 
@@ -58,7 +60,7 @@ export class ClassSelectionScreen extends BaseScreen {
         const label = document.createElement('label');
         label.htmlFor = 'dev-mode-checkbox';
         label.className = 'dev-mode-label';
-        label.textContent = '🛠️ Developer Mode (Weapons Only, 6 Options)';
+        label.textContent = t('classes.devMode');
 
         const toggle = () => {
             this.devMode = !this.devMode;
@@ -80,17 +82,17 @@ export class ClassSelectionScreen extends BaseScreen {
 
         CLASSES.forEach((cls, index) => {
             const weaponData = WEAPONS.find(w => w.id === cls.weaponId);
-            const weaponName = weaponData ? weaponData.name : 'Unknown';
+            const weapon = weaponData ? weaponName(weaponData) : '???';
             const weaponEmoji = weaponData ? weaponData.emoji : '❓';
 
             const card = document.createElement('div');
             card.className = 'class-card interactive';
             card.innerHTML = `
                 <div class="class-icon">${cls.emoji}</div>
-                <div class="class-name">${cls.name}</div>
-                <div class="class-bonus">❤️ ${cls.hp} HP</div>
-                <div class="class-bonus">${weaponEmoji} ${weaponName}</div>
-                <div class="class-bonus">${cls.bonus}</div>
+                <div class="class-name">${classLabel(cls)}</div>
+                <div class="class-bonus">❤️ ${t('classes.hp', { n: cls.hp })}</div>
+                <div class="class-bonus">${weaponEmoji} ${weapon}</div>
+                <div class="class-bonus">${classBonus(cls)}</div>
             `;
             // Staggered entrance so the grid cascades in
             card.style.animationDelay = `${(index * 0.045).toFixed(3)}s`;

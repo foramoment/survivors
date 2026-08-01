@@ -7,6 +7,8 @@ import { BaseScreen } from '../BaseScreen';
 import { STAGES } from '../../data/StageData';
 import { screenManager } from '../ScreenManager';
 import { audio } from '../../core/AudioSystem';
+import { t } from '../../core/I18n';
+import { stageName, stageDesc } from '../../core/Labels';
 
 export interface StageSelectionParams {
     classIndex: number;
@@ -34,7 +36,7 @@ export class StageSelectionScreen extends BaseScreen {
         screen.className = 'screen';
 
         const title = document.createElement('h1');
-        title.textContent = 'SELECT STAGE';
+        title.textContent = t('stages.title');
         screen.appendChild(title);
 
         const grid = document.createElement('div');
@@ -46,10 +48,10 @@ export class StageSelectionScreen extends BaseScreen {
             card.className = 'class-card interactive';
             card.innerHTML = `
                 <div class="class-icon">${stage.emoji}</div>
-                <div class="class-name">${stage.name}</div>
-                <div class="class-bonus">⏱️ ${minutes} min + boss</div>
-                <div class="class-bonus">☠️ Threat ×${stage.hpScale.toFixed(1)}</div>
-                <div class="class-bonus">${stage.description}</div>
+                <div class="class-name">${stageName(stage)}</div>
+                <div class="class-bonus">⏱️ ${t('stages.duration', { n: minutes })}</div>
+                <div class="class-bonus">☠️ ${t('stages.threat', { n: stage.hpScale.toFixed(1) })}</div>
+                <div class="class-bonus">${stageDesc(stage)}</div>
             `;
             card.style.animationDelay = `${(index * 0.06).toFixed(3)}s`;
             card.addEventListener('pointerenter', () => audio.play('uiHover'));
@@ -62,7 +64,7 @@ export class StageSelectionScreen extends BaseScreen {
 
         screen.appendChild(grid);
 
-        const back = this.createPixelButton('← BACK', () => screenManager.goto('class_selection'), 'ghost');
+        const back = this.createPixelButton(t('common.back'), () => screenManager.goto('class_selection'), 'ghost');
         back.style.marginTop = '22px';
         screen.appendChild(back);
 

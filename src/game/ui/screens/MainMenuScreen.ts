@@ -10,6 +10,7 @@
 import { BaseScreen } from '../BaseScreen';
 import { screenManager } from '../ScreenManager';
 import { drawPixelText, measurePixelText, PIXEL_GLYPH_HEIGHT } from '../../core/PixelFont';
+import { t } from '../../core/I18n';
 
 export class MainMenuScreen extends BaseScreen {
     private time: number = 0;
@@ -94,7 +95,7 @@ export class MainMenuScreen extends BaseScreen {
         // Blinking tagline under the logo
         const blink = Math.sin(this.time * 3.4) > -0.3;
         if (blink) {
-            drawPixelText(ctx, 'SURVIVE THE COSMIC CHAOS', cx, topY + lineHeight * 2 + scale * 4, {
+            drawPixelText(ctx, t('menu.tagline'), cx, topY + lineHeight * 2 + scale * 4, {
                 scale: Math.max(1, Math.floor(scale / 3)),
                 align: 'center',
                 spacing: 1,
@@ -114,20 +115,20 @@ export class MainMenuScreen extends BaseScreen {
         buttonContainer.className = 'menu-buttons';
 
         buttonContainer.appendChild(
-            this.createPixelButton('▶ START', () => screenManager.goto('class_selection'), 'primary')
+            this.createPixelButton(t('menu.start'), () => screenManager.goto('class_selection'), 'primary')
         );
         buttonContainer.appendChild(
-            this.createPixelButton('⚙ OPTIONS', () => screenManager.goto('options'))
+            this.createPixelButton(t('menu.options'), () => screenManager.goto('options'))
         );
         buttonContainer.appendChild(
-            this.createPixelButton('🔬 PARTICLE LAB', () => screenManager.goto('particle_debug'), 'ghost')
+            this.createPixelButton(t('menu.particleLab'), () => screenManager.goto('particle_debug'), 'ghost')
         );
 
         screen.appendChild(buttonContainer);
 
         const footer = document.createElement('div');
         footer.className = 'menu-footer';
-        footer.textContent = 'WASD / DRAG TO MOVE · WEAPONS FIRE THEMSELVES';
+        footer.textContent = t('menu.hint');
         screen.appendChild(footer);
 
         this.uiLayer.appendChild(screen);

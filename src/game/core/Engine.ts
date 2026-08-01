@@ -19,6 +19,7 @@ import { ParticleDebugScreen } from '../ui/screens/ParticleDebugScreen';
 import { StageSelectionScreen } from '../ui/screens/StageSelectionScreen';
 import { menuBackdrop } from '../ui/MenuBackdrop';
 import { juice } from './JuiceSystem';
+import { i18n } from './I18n';
 
 export class Engine {
     canvas: HTMLCanvasElement;
@@ -44,6 +45,14 @@ export class Engine {
             if (screenManager.currentScreenId !== 'game') return;
             e.preventDefault();
             this.gameManager.togglePause();
+        });
+
+        // Menus build their DOM in enter(), so a language switch just re-enters
+        // the current screen. The game screen is excluded on purpose: re-entering
+        // it would restart the run. GameManager rebuilds its own pause overlay.
+        i18n.onChange(() => {
+            if (screenManager.currentScreenId === 'game') return;
+            screenManager.reload();
         });
 
         // Start at main menu

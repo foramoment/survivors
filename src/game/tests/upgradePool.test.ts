@@ -17,6 +17,7 @@ import {
     POWERUP_STACK_CAP,
 } from '../core/UpgradePool';
 import { WEAPONS, POWERUPS } from '../data/GameData';
+import { i18n } from '../core/I18n';
 import { Player } from '../entities/Player';
 
 function mulberry32(seed: number): () => number {
@@ -133,10 +134,19 @@ describe('UpgradePool', () => {
         });
 
         it('formats percent and flat bonuses', () => {
+            // i18n picks the host locale by default, so pin it for this test
+            i18n.setLang('en');
             expect(formatPowerupBonus('might', 0.08)).toBe('+8%');
             expect(formatPowerupBonus('cooldown', -0.06)).toBe('−6%');
             expect(formatPowerupBonus('maxHp', 15)).toBe('+15 Max HP');
             expect(formatPowerupBonus('magnet', 30)).toBe('+30 pull range');
+        });
+
+        it('flat bonus units follow the active language', () => {
+            i18n.setLang('ru');
+            expect(formatPowerupBonus('maxHp', 15)).toBe('+15 к макс. HP');
+            expect(formatPowerupBonus('might', 0.08)).toBe('+8%'); // percentages are language-neutral
+            i18n.setLang('en');
         });
     });
 });

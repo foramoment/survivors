@@ -938,6 +938,19 @@ h2.lucky {
   text-align: right;
 }
 
+/* Language picker: the options share the row the sliders use */
+.option-choices {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+}
+
+.option-choices .pixel-btn {
+  flex: 1;
+  padding: 8px 4px;
+  font-size: 0.85em;
+}
+
 .option-row input[type="range"] {
   flex: 1;
   appearance: none;

@@ -28,6 +28,7 @@ class ScreenManagerClass {
     private screens: Map<ScreenId, BaseScreen> = new Map();
     private _currentScreen: BaseScreen | null = null;
     private _currentScreenId: ScreenId | null = null;
+    private _currentParams: ScreenParams | undefined;
     private _previousScreenId: ScreenId | null = null;
 
     /**
@@ -63,9 +64,21 @@ class ScreenManagerClass {
         // Enter new screen
         this._currentScreenId = id;
         this._currentScreen = nextScreen;
+        this._currentParams = params;
         this._currentScreen.enter(params);
 
         console.log(`[ScreenManager] ${this._previousScreenId ?? 'null'} → ${id}`);
+    }
+
+    /**
+     * Re-enter the current screen with the params it was opened with.
+     * Used to redraw menus after a language switch — screens build their DOM
+     * in enter(), so there is nothing finer-grained to invalidate.
+     */
+    reload(): void {
+        if (!this._currentScreen) return;
+        this._currentScreen.exit();
+        this._currentScreen.enter(this._currentParams);
     }
 
     /**

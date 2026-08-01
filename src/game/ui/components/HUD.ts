@@ -10,6 +10,8 @@
  *   - Power boost indicator (center, when active)
  */
 
+import { t } from '../../core/I18n';
+
 export interface HUDData {
     hp: number;
     maxHp: number;
@@ -46,7 +48,7 @@ export class HUD {
             <div class="xp-bar-container">
                 <div class="xp-bar-fill" id="xp-bar"></div>
             </div>
-            <div class="stats" style="position:absolute; bottom: 10px; left: 10px;" id="level-display">LVL 1</div>
+            <div class="stats" style="position:absolute; bottom: 10px; left: 10px;" id="level-display">${t('hud.level', { n: 1 })}</div>
             <div class="stats" style="position:absolute; top: 60px; left: 50%; transform: translateX(-50%); display: none; background: rgba(255, 215, 0, 0.3); padding: 10px 20px; border: 2px solid gold; border-radius: 10px; font-size: 20px; animation: pulse 0.5s infinite;" id="power-boost-indicator">⭐ POWER BOOST x10 ⭐</div>
         `;
 
@@ -95,7 +97,7 @@ export class HUD {
         }
 
         if (this.levelDisplay) {
-            this.levelDisplay.textContent = `LVL ${data.level}`;
+            this.levelDisplay.textContent = t('hud.level', { n: data.level });
         }
 
         if (this.powerBoostIndicator) {

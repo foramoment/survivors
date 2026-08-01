@@ -17,6 +17,7 @@
  */
 
 import { POWERUPS, WEAPONS } from '../data/GameData';
+import { t } from './I18n';
 
 export const WEAPON_SLOT_CAP = 5;
 export const POWERUP_STACK_CAP = 8;
@@ -60,20 +61,16 @@ export function getPowerupValue(
     return baseValue * Math.pow(growth, stack);
 }
 
-/** Human-readable bonus string, e.g. "+8% might" or "+15 Max HP" */
+/** Stat types shown as a flat amount with a unit instead of a percentage */
+const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'regen', 'tick'];
+
+/** Human-readable bonus string, e.g. "+8%" or "+15 Max HP" */
 export function formatPowerupBonus(type: string, value: number): string {
-    const flat: Record<string, string> = {
-        magnet: 'pull range',
-        maxHp: 'Max HP',
-        armor: 'armor',
-        regen: 'HP/s',
-        tick: 's zone tick',
-    };
     const sign = value >= 0 ? '+' : '−';
     const abs = Math.abs(value);
-    if (type in flat) {
+    if (FLAT_TYPES.includes(type)) {
         const rounded = abs >= 10 ? Math.round(abs) : Math.round(abs * 10) / 10;
-        return `${sign}${rounded} ${flat[type]}`;
+        return `${sign}${rounded} ${t(`bonus.${type}`)}`;
     }
     return `${sign}${Math.round(abs * 100)}%`;
 }

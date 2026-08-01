@@ -4,6 +4,7 @@
 
 import { BaseScreen } from '../BaseScreen';
 import { screenManager } from '../ScreenManager';
+import { t } from '../../core/I18n';
 
 export interface GameOverParams {
     gameTime: number;
@@ -34,7 +35,7 @@ export class GameOverScreen extends BaseScreen {
         screen.className = 'screen result-screen result-screen--defeat';
 
         const title = document.createElement('h1');
-        title.textContent = '💀 GAME OVER';
+        title.textContent = t('result.gameOver');
         screen.appendChild(title);
 
         const mins = Math.floor(this.gameTime / 60);
@@ -44,19 +45,19 @@ export class GameOverScreen extends BaseScreen {
         const stats = document.createElement('div');
         stats.className = 'result-stats';
         stats.innerHTML = `
-            <div class="result-stat"><span>⏱ TIME</span><strong>${timeStr}</strong></div>
-            <div class="result-stat"><span>💀 KILLS</span><strong>${this.killCount}</strong></div>
-            <div class="result-stat"><span>📊 LEVEL</span><strong>${this.level}</strong></div>
+            <div class="result-stat"><span>${t('result.time')}</span><strong>${timeStr}</strong></div>
+            <div class="result-stat"><span>${t('result.kills')}</span><strong>${this.killCount}</strong></div>
+            <div class="result-stat"><span>${t('result.level')}</span><strong>${this.level}</strong></div>
         `;
         screen.appendChild(stats);
 
         const buttonContainer = document.createElement('div');
         buttonContainer.className = 'menu-buttons menu-buttons--row';
         buttonContainer.appendChild(
-            this.createPixelButton('↻ PLAY AGAIN', () => screenManager.goto('class_selection'), 'primary')
+            this.createPixelButton(t('result.again'), () => screenManager.goto('class_selection'), 'primary')
         );
         buttonContainer.appendChild(
-            this.createPixelButton('⌂ MAIN MENU', () => screenManager.goto('main_menu'))
+            this.createPixelButton(t('result.menu'), () => screenManager.goto('main_menu'))
         );
 
         screen.appendChild(buttonContainer);
