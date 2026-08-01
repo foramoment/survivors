@@ -83,7 +83,9 @@ describe('OrbitalStrikeWeapon', () => {
         weapon.cooldown = 0;
         weapon.update(0.016);
 
-        expect(spawned.length).toBe(7); // 6 shells + heavy finisher
+        // Three shells plus the heavy finisher. Six read as visual spam — the
+        // finisher that is meant to be the payoff was lost among the reticles.
+        expect(spawned.length).toBe(4);
         const delays = spawned.map((z: any) => z.delay);
         // Fuses are staggered, so the salvo rolls across the field
         expect(new Set(delays).size).toBe(delays.length);

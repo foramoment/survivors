@@ -355,7 +355,6 @@ export class SporeZone extends Zone {
 // NANOBOT CLOUD - Follows owner
 // ============================================
 export class NanobotCloud extends Zone {
-    private particleTimer: number = 0;
     owner: any;
 
     constructor(owner: any, radius: number, duration: number, damage: number, interval: number) {
@@ -368,47 +367,19 @@ export class NanobotCloud extends Zone {
         this.pos.y = this.owner.pos.y;
 
         super.update(dt);
-
-        this.particleTimer += dt;
-        if (this.particleTimer > 0.05) {
-            this.particleTimer = 0;
-            particles.emitNanoSwarm(this.pos.x, this.pos.y, this.radius);
-        }
     }
 
-    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        ctx.save();
-        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-
-        const time = Date.now() / 500;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(0, 255, 255, ${0.3 + Math.sin(time) * 0.1})`;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([3, 6]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
-        gradient.addColorStop(0, 'rgba(0, 200, 200, 0.15)');
-        gradient.addColorStop(0.7, 'rgba(0, 150, 150, 0.08)');
-        gradient.addColorStop(1, 'rgba(0, 100, 100, 0)');
-
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        ctx.fillStyle = 'rgba(0, 255, 200, 0.6)';
-        for (let i = 0; i < 12; i++) {
-            const angle = time * 0.5 + i * Math.PI / 6;
-            const dist = this.radius * 0.3 + Math.sin(time * 2 + i) * 10;
-            ctx.beginPath();
-            ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        ctx.restore();
+    /**
+     * Deliberately draws nothing.
+     *
+     * The cloud used to paint a dashed ring, a radial haze and twelve orbiting
+     * dots centred on the player — a permanent disc of glow sitting under the
+     * one thing you need to keep track of, and doing it for the whole run. The
+     * drones the weapon actually flies (see NaniteHiveCloud) read far better on
+     * their own, so the aura is invisible and only its effect is felt.
+     */
+    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) {
+        // intentionally empty — see the comment above
     }
 }
 

@@ -23,7 +23,19 @@ vi.mock('../core/ParticleSystem', () => ({
         emitPoison: vi.fn(),
         emitPlasmaEnergy: vi.fn(),
         emitSingularityDistortion: vi.fn(),
-        emitLightning: vi.fn()
+        emitLightning: vi.fn(),
+        emitPlasmaBurst: vi.fn(),
+        emitTrail: vi.fn()
+    }
+}));
+
+vi.mock('../core/JuiceSystem', () => ({
+    juice: {
+        shockwave: vi.fn(),
+        addTrauma: vi.fn(),
+        hitStop: vi.fn(),
+        flash: vi.fn(),
+        zoomPunch: vi.fn(),
     }
 }));
 
@@ -36,7 +48,7 @@ vi.mock('../core/DamageSystem', () => ({
 
 import { levelSpatialHash } from '../core/SpatialHash';
 import { VoidRayWeapon } from '../weapons/implementations/VoidRayWeapon';
-import { PlasmaCannonWeapon } from '../weapons/implementations/PlasmaCannonWeapon';
+import { PlasmaCannonWeapon, FusionCoreSingularity } from '../weapons/implementations/PlasmaCannonWeapon';
 import { AcidPoolWeapon } from '../weapons/implementations/AcidPoolWeapon';
 import { ChronoDiscWeapon } from '../weapons/implementations/ChronoDiscWeapon';
 import { LightningChainWeapon } from '../weapons/implementations/LightningChainWeapon';
@@ -168,7 +180,9 @@ describe('PlasmaCannonWeapon', () => {
         expect((spawnedEntities[0] as any).source).toBe(weapon);
     });
 
-    it('should NOT create FusionCoreSingularity when NOT evolved', () => {
+    it('detonates into shards at both tiers, not only when evolved', () => {
+        // The round used to be pure travel until it exploded at maximum range;
+        // both tiers now burst so it works at the range you actually fight at
         const enemy = createMockEnemy(200, 100);
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
 
@@ -176,7 +190,13 @@ describe('PlasmaCannonWeapon', () => {
         weapon.update(0.1);
 
         const plasma = spawnedEntities[0] as PlasmaProjectile;
-        expect(plasma.onExplosion).toBeUndefined();
+        expect(plasma.onExplosion).toBeDefined();
+
+        spawnedEntities.length = 0;
+        plasma.onExplosion!(0, 0);
+        expect(spawnedEntities.length).toBeGreaterThan(0);
+        // Base tier bursts but leaves no singularity behind
+        expect(spawnedEntities.some(e => e instanceof FusionCoreSingularity)).toBe(false);
     });
 
     it('should create FusionCoreSingularity on explosion when evolved', () => {

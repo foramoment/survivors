@@ -103,7 +103,7 @@ export const POWERUPS: PowerupData[] = [
     // 8-stack cap is 0.8 HP/s — noticeable between fights, never a substitute
     // for moving. It used to compound to ~1.4 HP/s, which did exactly that.
     { id: 'nano_repair', name: "Nano-Repair", description: "Hull nanites knit you back together", type: "regen", value: 0.1, stackGrowth: 1, emoji: "❤️" },
-    { id: 'targeting_hud', name: "Targeting HUD", description: "Weak-point overlay for your visor", type: "critChance", value: 0.06, emoji: "🎯" },
+    { id: 'targeting_hud', name: "Targeting HUD", description: "Chance for a hit to land as a critical", type: "critChance", value: 0.06, emoji: "🎯" },
     { id: 'plasma_core', name: "Plasma Core", description: "Raw damage amplifier", type: "might", value: 0.08, emoji: "💪" },
     { id: 'cooling_system', name: "Cooling System", description: "Weapons fire more often", type: "cooldown", value: -0.06, emoji: "❄️" },
 
@@ -162,12 +162,12 @@ export const WEAPONS = [
         id: 'plasma_cannon',
         name: "Plasma Cannon",
         emoji: "🔋",
-        description: "Fires massive explosive plasma rounds",
+        description: "Heavy round that burns through a column and bursts into shards",
         class: PlasmaCannonWeapon,
         evolution: {
             name: "Fusion Core",
             emoji: "⚛️",
-            description: "Plasma rounds create black holes on impact"
+            description: "A wider burst that leaves a singularity where it lands"
         }
     },
     {
@@ -198,12 +198,12 @@ export const WEAPONS = [
         id: 'singularity_orb',
         name: "Singularity Orb",
         emoji: "⚫",
-        description: "Slow moving destruction",
+        description: "Slow orb that drags everything toward it",
         class: SingularityOrbWeapon,
         evolution: {
             name: "Black Hole",
             emoji: "🕳️",
-            description: "Sucks in and crushes all enemies"
+            description: "Collapses into an event horizon, then implodes"
         }
     },
     {
@@ -215,7 +215,7 @@ export const WEAPONS = [
         evolution: {
             name: "Orbital Barrage",
             emoji: "☄️",
-            description: "A rolling salvo of shells, heavy round last"
+            description: "Three shells, then one heavy round on the thickest crowd"
         }
     },
     {
@@ -234,12 +234,12 @@ export const WEAPONS = [
         id: 'chrono_disc',
         name: "Chrono Disc",
         emoji: "💿",
-        description: "Boomerang disc",
+        description: "Ricochet saw that bounces between enemies",
         class: ChronoDiscWeapon,
         evolution: {
             name: "Time Shatter",
             emoji: "⏰",
-            description: "Disc splits into temporal echoes"
+            description: "Cuts stack into a wound that bleeds"
         }
     },
     {

@@ -1,8 +1,19 @@
 /**
  * SINGULARITY ORB WEAPON
- * Slow moving orb that pulls enemies.
- * 
- * Evolved: Black Hole - Creates black hole zone on death
+ *
+ * A slow orb that drags everything toward it as it drifts.
+ *
+ * Evolved — Black Hole. The old evolution collapsed into a fixed 100px zone
+ * dealing 20% of the weapon's damage for three seconds: it neither scaled with
+ * the weapon nor looked like the thing the name promises, and on a doubled
+ * cooldown it was a downgrade you had to work for.
+ *
+ * The rework gives it the one idea a black hole actually has — an **event
+ * horizon**. The outer field only pulls; anything dragged past the horizon is
+ * being torn apart and takes heavy damage per second. That makes the weapon a
+ * *trap* rather than another damage circle: it is strongest when it has had a
+ * second to gather a crowd, and the pull tightens as the hole collapses, so the
+ * crowd it gathered is exactly what the final implosion catches.
  */
 import { ProjectileWeapon, SingularityProjectile, Zone } from '../base';
 import type { Player } from '../../entities/Player';
@@ -11,76 +22,126 @@ import { distance, type Vector2 } from '../../core/Utils';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { damageSystem } from '../../core/DamageSystem';
 import { particles } from '../../core/ParticleSystem';
+import { juice } from '../../core/JuiceSystem';
+
+/** Fraction of the pull radius that counts as inside the horizon */
+const HORIZON_RATIO = 0.42;
+/** Seconds between dark-lightning discharges */
+const ARC_INTERVAL = 0.3;
+
+/** One baked lightning path, in world space */
+interface DarkArc {
+    points: Vector2[];
+    alpha: number;
+}
+
+/**
+ * Zig-zag between two points, computed once.
+ *
+ * Recomputing the jitter every frame is what made the old arcs "boil"; baking
+ * the path at creation and only fading its alpha is both cheaper and reads as
+ * a single discharge rather than static.
+ */
+function bakeArc(start: Vector2, end: Vector2): DarkArc {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const segments = Math.max(3, Math.floor(dist / 26));
+    const perpX = -dy / dist;
+    const perpY = dx / dist;
+
+    const points: Vector2[] = [{ ...start }];
+    for (let i = 1; i < segments; i++) {
+        const t = i / segments;
+        const offset = (Math.random() - 0.5) * 22;
+        points.push({
+            x: start.x + dx * t + perpX * offset,
+            y: start.y + dy * t + perpY * offset,
+        });
+    }
+    points.push({ ...end });
+    return { points, alpha: 1 };
+}
+
+function drawArcs(ctx: CanvasRenderingContext2D, camera: Vector2, arcs: DarkArc[]) {
+    if (arcs.length === 0) return;
+
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+    ctx.lineCap = 'round';
+
+    // One shadowBlur pass for every arc, not one per arc — see the VFX rules
+    ctx.shadowColor = '#6a00cc';
+    ctx.shadowBlur = 12;
+    for (const arc of arcs) {
+        ctx.globalAlpha = arc.alpha;
+        ctx.strokeStyle = '#2b0050';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(arc.points[0].x, arc.points[0].y);
+        for (let i = 1; i < arc.points.length; i++) ctx.lineTo(arc.points[i].x, arc.points[i].y);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#c98cff';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    ctx.restore();
+}
 
 // ============================================
-// EVOLVED SINGULARITY ORB - BLACK HOLE
-// Dark lightning, stronger pull, collapses into zone
+// BLACK HOLE PROJECTILE - the orb on its way in
 // ============================================
 
 export class BlackHoleProjectile extends SingularityProjectile {
-    private darkLightningTimer: number = 0;
-    private darkLightningInterval: number = 0.5;
-    private darkLightnings: { start: Vector2; end: Vector2; alpha: number }[] = [];
-    onDeathCallback?: (x: number, y: number) => void;
+    private arcTimer: number = 0;
+    private arcs: DarkArc[] = [];
+    private spin: number = 0;
+    onCollapse?: (x: number, y: number) => void;
 
     constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number) {
         super(x, y, velocity, duration, damage, pierce);
-        this.radius = 35; // Larger
-        this.pullStrength = 200; // Stronger pull
+        this.radius = 32;
+        this.pullStrength = 260;
     }
 
     update(dt: number) {
         super.update(dt);
+        this.spin += dt * 2.6;
 
-        // Dark lightning timer
-        this.darkLightningTimer += dt;
-        if (this.darkLightningTimer >= this.darkLightningInterval) {
-            this.darkLightningTimer = 0;
-            this.fireDarkLightning();
+        this.arcTimer += dt;
+        if (this.arcTimer >= ARC_INTERVAL) {
+            this.arcTimer = 0;
+            this.discharge();
         }
 
-        // Update existing dark lightnings
-        for (let i = this.darkLightnings.length - 1; i >= 0; i--) {
-            this.darkLightnings[i].alpha -= dt * 4;
-            if (this.darkLightnings[i].alpha <= 0) {
-                this.darkLightnings.splice(i, 1);
-            }
-        }
-
-        // On death, trigger black hole zone
-        if (this.isDead && this.onDeathCallback) {
-            this.onDeathCallback(this.pos.x, this.pos.y);
+        for (let i = this.arcs.length - 1; i >= 0; i--) {
+            this.arcs[i].alpha -= dt * 3.2;
+            if (this.arcs[i].alpha <= 0) this.arcs.splice(i, 1);
         }
     }
 
-    private fireDarkLightning() {
-        // Find closest enemy in range
-        let closest: any = null;
-        let minDist = 150;
+    /** Collapse fires from the projectile's own death hook, so it runs once */
+    protected onDeath(): void {
+        this.onCollapse?.(this.pos.x, this.pos.y);
+    }
 
-        const potentialTargets = levelSpatialHash.getWithinRadius(this.pos, 150);
-
-        for (const enemy of potentialTargets) {
-            const d = distance(this.pos, enemy.pos);
-            if (d < minDist) {
-                minDist = d;
-                closest = enemy;
-            }
-        }
-
-        if (closest) {
-            this.darkLightnings.push({
-                start: { ...this.pos },
-                end: { ...closest.pos },
-                alpha: 1
-            });
+    private discharge() {
+        const reach = 190;
+        let struck = 0;
+        for (const enemy of levelSpatialHash.getWithinRadius(this.pos, reach)) {
+            if (struck >= 2 || enemy.isDead) continue;
+            if (distance(this.pos, enemy.pos) > reach) continue;
+            struck++;
+            this.arcs.push(bakeArc(this.pos, enemy.pos));
             damageSystem.dealDamage({
                 baseDamage: this.damage * 0.3,
                 source: this.source,
-                target: closest,
-                position: closest.pos
+                target: enemy,
+                position: enemy.pos,
             });
-            particles.emitHit(closest.pos.x, closest.pos.y, '#8800ff');
         }
     }
 
@@ -88,183 +149,208 @@ export class BlackHoleProjectile extends SingularityProjectile {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        // Distortion field - larger
-        ctx.strokeStyle = 'rgba(80, 0, 160, 0.5)';
+        // Lensing ring: light bent around the hole
+        ctx.rotate(this.spin);
+        ctx.strokeStyle = 'rgba(160, 90, 255, 0.45)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([14, 9]);
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 1.9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.rotate(-this.spin);
+
+        // Accretion disc — an ellipse edge-on, so it reads as a disc not a ball
+        ctx.rotate(this.spin * 0.6);
+        ctx.strokeStyle = 'rgba(210, 130, 255, 0.75)';
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 3, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, this.radius * 1.35, this.radius * 0.42, 0, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.rotate(-this.spin * 0.6);
 
-        // Swirling effect
-        const time = Date.now() / 200;
-        ctx.rotate(time);
-        for (let i = 0; i < 6; i++) {
-            ctx.rotate(Math.PI / 3);
-            ctx.beginPath();
-            ctx.arc(this.radius * 0.7, 0, 6, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(150, 50, 255, 0.7)`;
-            ctx.fill();
-        }
-        ctx.rotate(-time);
-
-        // Dark core - gradient
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
-        gradient.addColorStop(0.4, 'rgba(40, 0, 80, 0.9)');
-        gradient.addColorStop(1, 'rgba(80, 0, 160, 0.4)');
-
+        // The hole itself: genuinely black in the middle
+        const core = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+        core.addColorStop(0, '#000000');
+        core.addColorStop(0.62, '#000000');
+        core.addColorStop(0.8, 'rgba(60, 0, 120, 0.85)');
+        core.addColorStop(1, 'rgba(120, 40, 220, 0)');
         ctx.beginPath();
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.shadowColor = '#6600cc';
-        ctx.shadowBlur = 30;
+        ctx.fillStyle = core;
         ctx.fill();
 
-        // Event horizon ring
-        ctx.strokeStyle = 'rgba(200, 100, 255, 0.9)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.8, 0, Math.PI * 2);
-        ctx.stroke();
-
         ctx.restore();
 
-        // Draw dark lightnings
-        ctx.save();
-        ctx.translate(-camera.x, -camera.y);
-        for (const lightning of this.darkLightnings) {
-            this.drawDarkLightning(ctx, lightning.start, lightning.end, lightning.alpha);
-        }
-        ctx.restore();
-    }
-
-    private drawDarkLightning(ctx: CanvasRenderingContext2D, start: Vector2, end: Vector2, alpha: number) {
-        const dx = end.x - start.x;
-        const dy = end.y - start.y;
-        const dist = distance(start, end);
-        if (dist < 5) return;
-
-        ctx.save();
-
-        const segments = Math.max(3, Math.floor(dist / 30));
-        const points: Vector2[] = [{ ...start }];
-        const perpX = -dy / dist;
-        const perpY = dx / dist;
-
-        for (let i = 1; i < segments; i++) {
-            const t = i / segments;
-            const offset = (Math.random() - 0.5) * 20;
-            points.push({
-                x: start.x + dx * t + perpX * offset,
-                y: start.y + dy * t + perpY * offset
-            });
-        }
-        points.push({ ...end });
-
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.strokeStyle = `rgba(100, 0, 200, ${alpha})`;
-        ctx.lineWidth = 3;
-        ctx.shadowColor = '#6600cc';
-        ctx.shadowBlur = 10;
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.strokeStyle = `rgba(200, 150, 255, ${alpha})`;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        ctx.restore();
+        drawArcs(ctx, camera, this.arcs);
     }
 }
 
-// Black hole zone that appears after projectile dies
+// ============================================
+// BLACK HOLE ZONE - the collapse
+// ============================================
+
 export class BlackHoleZone extends Zone {
-    private rotationAngle: number = 0;
-    pullStrength: number = 300;
+    /** Pull at the start; it tightens as the hole collapses */
+    pullStrength: number = 340;
+    /** Damage per second to anything past the horizon */
+    horizonDps: number = 0;
+    /** Damage of the implosion when the hole finally closes */
+    implosionDamage: number = 0;
+
+    private readonly maxDuration: number;
+    private spin: number = 0;
+    private arcTimer: number = 0;
+    private arcs: DarkArc[] = [];
+    private imploded: boolean = false;
+    /** Accretion spiral baked in unit space, scaled at draw time */
+    private readonly spiral: Vector2[] = [];
 
     constructor(x: number, y: number, radius: number, duration: number, damage: number) {
-        super(x, y, radius, duration, damage, 0.2, '', 0);
+        super(x, y, radius, duration, damage, 0.25, '', 0);
+        this.maxDuration = duration;
+
+        for (let a = 0; a <= Math.PI * 5; a += 0.2) {
+            const r = 0.25 + 0.75 * (a / (Math.PI * 5));
+            this.spiral.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+        }
+    }
+
+    private get horizon(): number {
+        return this.radius * HORIZON_RATIO;
+    }
+
+    /** 0 at birth → 1 as the hole closes; drives pull and visual tightening */
+    private get collapse(): number {
+        return 1 - Math.max(0, Math.min(1, this.duration / this.maxDuration));
     }
 
     update(dt: number) {
         super.update(dt);
-        this.rotationAngle += dt * 2;
+        this.spin += dt * (2 + 4 * this.collapse);
 
-        // Pull enemies
-        const enemiesInPullRange = levelSpatialHash.getWithinRadius(this.pos, this.radius * 2);
+        const pullRadius = this.radius * 2;
+        const pull = this.pullStrength * (1 + this.collapse * 1.4);
 
-        for (const enemy of enemiesInPullRange) {
+        for (const enemy of levelSpatialHash.getWithinRadius(this.pos, pullRadius)) {
             const dx = this.pos.x - enemy.pos.x;
             const dy = this.pos.y - enemy.pos.y;
             const dist = distance(this.pos, enemy.pos);
+            if (dist > pullRadius || dist < 1) continue;
 
-            if (dist < this.radius * 2 && dist > 5) {
-                const pullForce = this.pullStrength / dist;
-                (enemy as any).pos.x += (dx / dist) * pullForce * dt;
-                (enemy as any).pos.y += (dy / dist) * pullForce * dt;
+            enemy.pos.x += (dx / dist) * (pull / dist) * dt;
+            enemy.pos.y += (dy / dist) * (pull / dist) * dt;
+
+            // Past the horizon it stops being a pull and starts being a grave.
+            // Continuous, so a target held in the middle melts while one
+            // skimming the edge only gets dragged.
+            if (dist < this.horizon && this.horizonDps > 0) {
+                damageSystem.dealDamage({
+                    baseDamage: this.horizonDps * dt,
+                    source: this.source,
+                    target: enemy,
+                    position: enemy.pos,
+                });
             }
         }
 
-        // Emit particles
-        if (Math.random() > 0.7) {
-            particles.emitSingularityDistortion(this.pos.x, this.pos.y, this.radius);
+        this.arcTimer += dt;
+        if (this.arcTimer >= ARC_INTERVAL) {
+            this.arcTimer = 0;
+            this.discharge(pullRadius);
+        }
+        for (let i = this.arcs.length - 1; i >= 0; i--) {
+            this.arcs[i].alpha -= dt * 3;
+            if (this.arcs[i].alpha <= 0) this.arcs.splice(i, 1);
+        }
+
+        if (this.duration <= 0 && !this.imploded) {
+            this.imploded = true;
+            this.implode();
+        }
+    }
+
+    private discharge(reach: number) {
+        let struck = 0;
+        for (const enemy of levelSpatialHash.getWithinRadius(this.pos, reach)) {
+            if (struck >= 3 || enemy.isDead) continue;
+            if (distance(this.pos, enemy.pos) > reach) continue;
+            struck++;
+            this.arcs.push(bakeArc(this.pos, enemy.pos));
+        }
+    }
+
+    /** The hole closing is the payoff for everything it dragged in */
+    private implode() {
+        if (this.implosionDamage <= 0) return;
+
+        particles.emitNuclear(this.pos.x, this.pos.y, this.radius);
+        juice.addTrauma(0.45);
+        juice.zoomPunch(-0.5);
+        juice.shockwave(this.pos.x, this.pos.y, this.radius * 2.6, '#b26cff', 0.55, 8);
+
+        for (const enemy of levelSpatialHash.getWithinRadius(this.pos, this.radius * 1.6)) {
+            if (distance(this.pos, enemy.pos) > this.radius * 1.6) continue;
+            damageSystem.dealDamage({
+                baseDamage: this.implosionDamage,
+                source: this.source,
+                target: enemy,
+                position: enemy.pos,
+            });
         }
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        const fade = Math.min(1, this.duration * 3);
+        if (fade <= 0) return;
+
+        const collapse = this.collapse;
+        const scale = this.radius * (1 - collapse * 0.25);
+
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        // Fade based on remaining duration
-        const fade = Math.min(1, this.duration);
-
-        // Outer distortion
-        ctx.strokeStyle = `rgba(80, 0, 160, ${0.3 * fade})`;
-        ctx.lineWidth = 3;
-        ctx.setLineDash([10, 5]);
+        // Pull field: a dashed boundary that spins faster as the hole tightens
+        ctx.rotate(this.spin * 0.4);
+        ctx.globalAlpha = fade * 0.35;
+        ctx.strokeStyle = '#7a3cff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([12, 10]);
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 1.5, 0, Math.PI * 2);
+        ctx.arc(0, 0, this.radius * 2, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.rotate(-this.spin * 0.4);
 
-        // Spinning arms
-        ctx.rotate(this.rotationAngle);
-        for (let i = 0; i < 4; i++) {
-            ctx.rotate(Math.PI / 2);
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.quadraticCurveTo(
-                this.radius * 0.5, this.radius * 0.3,
-                this.radius, 0
-            );
-            ctx.strokeStyle = `rgba(150, 50, 255, ${0.5 * fade})`;
-            ctx.lineWidth = 4;
-            ctx.stroke();
-        }
-        ctx.rotate(-this.rotationAngle);
-
-        // Dark core
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * 0.7);
-        gradient.addColorStop(0, `rgba(0, 0, 0, ${0.9 * fade})`);
-        gradient.addColorStop(0.5, `rgba(40, 0, 80, ${0.6 * fade})`);
-        gradient.addColorStop(1, `rgba(80, 0, 160, 0)`);
-
+        // Accretion spiral, baked once
+        ctx.rotate(this.spin);
+        ctx.globalAlpha = fade * 0.85;
+        ctx.strokeStyle = '#d08cff';
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.shadowColor = '#6600cc';
-        ctx.shadowBlur = 25 * fade;
-        ctx.fill();
+        for (let i = 0; i < this.spiral.length; i++) {
+            const px = this.spiral[i].x * scale * 1.7;
+            const py = this.spiral[i].y * scale * 1.7;
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.rotate(-this.spin);
 
+        // Event horizon: the line the player has to read, so it is the brightest
+        // thing here and it pulses
+        ctx.globalAlpha = fade;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.horizon, 0, Math.PI * 2);
+        ctx.fillStyle = '#000000';
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255, 210, 255, ${0.55 + 0.35 * Math.sin(this.spin * 3)})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.globalAlpha = 1;
         ctx.restore();
+
+        drawArcs(ctx, camera, this.arcs);
     }
 }
 
@@ -284,7 +370,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
         pierce: 999,
     };
 
-    private activeBlackHole: any = null;
+    private activeBlackHole: Zone | null = null;
     private waitingForCollapse: boolean = false;
 
     constructor(owner: Player) {
@@ -315,7 +401,9 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
 
             if (target) {
                 this.fire(target);
-                const cdMultiplier = isEvolved ? 2.0 : 1.0;
+                // Evolved fires half as often but the hole is on the field for
+                // most of that gap, so uptime is comparable
+                const cdMultiplier = isEvolved ? 1.6 : 1.0;
                 this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
             }
         }
@@ -323,9 +411,8 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
 
     fire(target: Entity) {
         const velocity = this.calculateVelocityToTarget(target);
-        const isEvolved = this.evolved;
 
-        if (isEvolved) {
+        if (this.evolved) {
             const proj = new BlackHoleProjectile(
                 this.owner.pos.x,
                 this.owner.pos.y,
@@ -335,13 +422,7 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
                 this.pierce
             );
             proj.source = this;
-
-            proj.onDeathCallback = (x: number, y: number) => {
-                const zone = new BlackHoleZone(x, y, 100, 3.0, this.damage * 0.2);
-                zone.source = this;
-                this.activeBlackHole = zone;
-                this.onSpawn(zone);
-            };
+            proj.onCollapse = (x, y) => this.collapse(x, y);
 
             this.waitingForCollapse = true;
             this.onSpawn(proj);
@@ -358,5 +439,22 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
             proj.source = this;
             this.onSpawn(proj);
         }
+    }
+
+    /** Everything about the hole scales with the weapon, unlike the old fixed 100px/3s */
+    private collapse(x: number, y: number) {
+        const radius = (110 + this.level * 12) * this.owner.stats.area;
+        const duration = 3.2 * this.owner.stats.duration;
+
+        const zone = new BlackHoleZone(x, y, radius, duration, this.damage * 0.18);
+        zone.horizonDps = this.damage * 1.6;
+        zone.implosionDamage = this.damage * 2.4;
+        zone.source = this;
+
+        particles.emitSingularityDistortion(x, y, radius);
+        juice.shockwave(x, y, radius * 1.4, '#8a3cff', 0.4, 5);
+
+        this.activeBlackHole = zone;
+        this.onSpawn(zone);
     }
 }

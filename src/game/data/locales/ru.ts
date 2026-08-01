@@ -97,9 +97,9 @@ export const RU: Record<string, string> = {
     'weapon.phantom_slash.evoDesc': 'Каждый разрез рвёт разлом, который замедляет и перемалывает',
 
     'weapon.plasma_cannon.name': 'Плазменная Пушка',
-    'weapon.plasma_cannon.desc': 'Стреляет тяжёлыми взрывными плазменными зарядами',
+    'weapon.plasma_cannon.desc': 'Тяжёлый заряд прожигает строй насквозь и разлетается осколками',
     'weapon.plasma_cannon.evoName': 'Термоядерное Ядро',
-    'weapon.plasma_cannon.evoDesc': 'Заряды создают чёрные дыры при попадании',
+    'weapon.plasma_cannon.evoDesc': 'Залп шире, а на месте взрыва остаётся сингулярность',
 
     'weapon.nanobot_swarm.name': 'Рой Нанитов',
     'weapon.nanobot_swarm.desc': 'Аура нанитов с дронами, что бросаются на всё рядом',
@@ -112,14 +112,14 @@ export const RU: Record<string, string> = {
     'weapon.spore_cloud.evoDesc': 'Инфекция становится заразной и расходится от погибших',
 
     'weapon.singularity_orb.name': 'Сфера Сингулярности',
-    'weapon.singularity_orb.desc': 'Медленно ползущее разрушение',
+    'weapon.singularity_orb.desc': 'Медленная сфера, тянущая всё к себе',
     'weapon.singularity_orb.evoName': 'Чёрная Дыра',
-    'weapon.singularity_orb.evoDesc': 'Затягивает и раздавливает всех врагов',
+    'weapon.singularity_orb.evoDesc': 'Схлопывается в горизонт событий, а потом взрывается внутрь',
 
     'weapon.orbital_strike.name': 'Орбитальный Удар',
     'weapon.orbital_strike.desc': 'Отмечает точку и роняет на неё кинетический снаряд',
     'weapon.orbital_strike.evoName': 'Орбитальный Залп',
-    'weapon.orbital_strike.evoDesc': 'Череда снарядов, самый тяжёлый — последний',
+    'weapon.orbital_strike.evoDesc': 'Три снаряда, а потом один тяжёлый — в самую гущу',
 
     'weapon.mind_blast.name': 'Псионный Взрыв',
     'weapon.mind_blast.desc': 'Псионная детонация, оглушающая всех, кого зацепит',
@@ -127,9 +127,9 @@ export const RU: Record<string, string> = {
     'weapon.mind_blast.evoDesc': 'Взрыв прыгает от разума к разуму, оглушая на ходу',
 
     'weapon.chrono_disc.name': 'Хронодиск',
-    'weapon.chrono_disc.desc': 'Диск-бумеранг',
+    'weapon.chrono_disc.desc': 'Пила-рикошет, скачущая от врага к врагу',
     'weapon.chrono_disc.evoName': 'Раскол Времени',
-    'weapon.chrono_disc.evoDesc': 'Диск распадается на временные отголоски',
+    'weapon.chrono_disc.evoDesc': 'Порезы копятся в рану, и она начинает кровоточить',
 
     'weapon.acid_pool.name': 'Кислотная Лужа',
     'weapon.acid_pool.desc': 'Разъедает толпу, чтобы всё остальное било по ней сильнее',
@@ -174,7 +174,7 @@ export const RU: Record<string, string> = {
     'powerup.nano_repair.name': 'Наноремонт',
     'powerup.nano_repair.desc': 'Нанороботы латают корпус',
     'powerup.targeting_hud.name': 'Прицельный Визор',
-    'powerup.targeting_hud.desc': 'Подсветка уязвимых точек',
+    'powerup.targeting_hud.desc': 'Шанс, что удар станет критическим',
     'powerup.plasma_core.name': 'Плазменное Ядро',
     'powerup.plasma_core.desc': 'Чистое усиление урона',
     'powerup.cooling_system.name': 'Система Охлаждения',
@@ -188,7 +188,7 @@ export const RU: Record<string, string> = {
     'powerup.temporal_flux.name': 'Временной Поток',
     'powerup.temporal_flux.desc': 'Эффекты держатся дольше',
     'powerup.berserker_rage.name': 'Ярость Берсерка',
-    'powerup.berserker_rage.desc': 'Криты бьют как товарный поезд',
+    'powerup.berserker_rage.desc': 'Множитель урона критов — они бьют как товарный поезд',
     'powerup.barrier_field.name': 'Барьерное Поле',
     'powerup.barrier_field.desc': 'Усиленная обшивка корпуса',
     'powerup.phase_shift.name': 'Фазовый Сдвиг',
