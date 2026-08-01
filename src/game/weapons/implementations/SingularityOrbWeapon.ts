@@ -280,14 +280,25 @@ export class BlackHoleZone extends Zone {
         }
     }
 
-    /** The hole closing is the payoff for everything it dragged in */
+    /**
+     * The hole closing is the payoff for everything it dragged in.
+     *
+     * Deliberately NOT an explosion. This used to call `emitNuclear` — ~390
+     * particles thrown outward, borrowed from Orbital Strike — which is the
+     * wrong gesture entirely: a black hole collapses *inward*, and a fireball
+     * at the end of it read as a different weapon going off. Two rings snapping
+     * shut say "it closed" for the price of two strokes.
+     */
     private implode() {
         if (this.implosionDamage <= 0) return;
 
-        particles.emitNuclear(this.pos.x, this.pos.y, this.radius);
-        juice.addTrauma(0.45);
-        juice.zoomPunch(-0.5);
-        juice.shockwave(this.pos.x, this.pos.y, this.radius * 2.6, '#b26cff', 0.55, 8);
+        juice.addTrauma(0.25);
+        juice.zoomPunch(-0.35);
+        // Collapsing rings: the outer one arrives late, so they read as
+        // something falling in rather than blowing out
+        juice.shockwave(this.pos.x, this.pos.y, this.horizon * 0.4, '#e0b3ff', 0.35, 5);
+        juice.shockwave(this.pos.x, this.pos.y, this.horizon, '#7a3cff', 0.5, 3);
+        particles.emitHit(this.pos.x, this.pos.y, '#c98cff');
 
         for (const enemy of levelSpatialHash.getWithinRadius(this.pos, this.radius * 1.6)) {
             if (distance(this.pos, enemy.pos) > this.radius * 1.6) continue;

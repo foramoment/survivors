@@ -2,18 +2,31 @@ import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
 import { sprites } from '../core/SpriteFactory';
 
+/**
+ * A dropped XP shard.
+ *
+ * Crystals used to expire after 30 seconds, which punished exactly the play the
+ * game asks for: clear a pack, kite out of the next wave, come back — and the
+ * XP you earned was gone. They are permanent now. GameManager keeps the cost
+ * bounded instead, by only updating and drawing the ones on screen and merging
+ * distant ones when the field gets crowded (see `consolidateCrystals`).
+ */
 export class XPCrystal extends Entity {
     value: number;
-    lifetime: number = 30;
     pulseTimer: number = 0;
     private fontSize: number;
 
     constructor(x: number, y: number, value: number) {
-        // Dynamic radius based on value (6-12px)
-        const baseRadius = 6 + Math.min(value / 10, 6);
-        super(x, y, baseRadius);
+        super(x, y, 0);
         this.value = value;
-        // Dynamic font size (12-22px)
+        this.fontSize = 0;
+        this.setValue(value);
+    }
+
+    /** Radius and glyph size follow the value, so a merged crystal reads bigger */
+    setValue(value: number) {
+        this.value = value;
+        this.radius = 6 + Math.min(value / 10, 6);
         this.fontSize = 12 + Math.min(value / 6, 10);
     }
 
@@ -25,11 +38,6 @@ export class XPCrystal extends Entity {
     }
 
     update(dt: number, playerPos?: Vector2, magnetRange?: number) {
-        this.lifetime -= dt;
-        if (this.lifetime <= 0) {
-            this.isDead = true;
-        }
-
         this.pulseTimer += dt;
 
         // Magnet effect

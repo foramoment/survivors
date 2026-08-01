@@ -21,6 +21,7 @@ import {
     type RunSnapshot,
 } from '../core/Achievements';
 import { RunStatsTracker, MULTIKILL_WINDOW } from '../core/RunStats';
+import { XPCrystal } from '../entities/XPCrystal';
 
 function snapshot(overrides: Partial<RunSnapshot> = {}): RunSnapshot {
     return {
@@ -124,5 +125,21 @@ describe('RunStatsTracker', () => {
         tracker.reset();
         expect(tracker.stats.bestHit).toBe(0);
         expect(tracker.stats.bestHitWeaponId).toBeNull();
+    });
+});
+
+describe('XP crystals', () => {
+    it('never expire — the drops you kite away from must still be there', () => {
+        const crystal = new XPCrystal(0, 0, 5);
+        crystal.update(120);
+        expect(crystal.isDead).toBe(false);
+    });
+
+    it('a merged crystal carries the combined value and reads bigger', () => {
+        const crystal = new XPCrystal(0, 0, 5);
+        const smallRadius = crystal.radius;
+        crystal.setValue(60);
+        expect(crystal.value).toBe(60);
+        expect(crystal.radius).toBeGreaterThan(smallRadius);
     });
 });

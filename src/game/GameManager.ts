@@ -49,6 +49,15 @@ import {
 const CONTACT_SOUND_MIN_GAP = 0.75;
 const CONTACT_SOUND_HP_SHARE = 0.05;
 
+/**
+ * XP crystal housekeeping. Crystals are permanent, so the cost is capped by
+ * ignoring the ones nobody can see and merging the ones far behind you.
+ */
+const CRYSTAL_ACTIVE_MARGIN = 120;
+const CRYSTAL_SOFT_CAP = 900;
+const CRYSTAL_MERGE_DISTANCE = 1400;
+const CRYSTAL_MERGE_CELL = 190;
+
 /** Knockback on contact: the player barely moves, the enemy is shoved aside */
 const PLAYER_SHOVE_BACK = 55;
 const ENEMY_SHOVE = 190;
@@ -106,6 +115,8 @@ export class GameManager {
     private contactDamageBank: number = 0;
     /** Absorbed damage banked toward the next Static Discharge */
     private capacitorCharge: number = 0;
+    /** Countdown to the next distant-crystal merge pass */
+    private crystalMergeTimer: number = 1;
     repairCells: RepairCell[] = [];
     private pauseOverlay: HTMLElement | null = null;
     /** Survives a pause-overlay rebuild so a language switch keeps the panel open */
@@ -1236,21 +1247,7 @@ export class GameManager {
             }
         }
 
-        // Update XP crystals
-        for (let i = this.xpCrystals.length - 1; i >= 0; i--) {
-            const crystal = this.xpCrystals[i];
-            crystal.update(dt, this.player.pos, this.player.stats.magnet);
-
-            // Check collision with player
-            if (checkCollision(crystal, this.player)) {
-                // Give XP
-                this.player.gainXp(crystal.value);
-                audio.play('pickup');
-                this.xpCrystals.splice(i, 1);
-            } else if (crystal.isDead) {
-                this.xpCrystals.splice(i, 1);
-            }
-        }
+        this.updateCrystals(dt);
 
         if (this.player.isDead) {
             this.state = 'GAME_OVER';
@@ -1270,6 +1267,81 @@ export class GameManager {
         this.updateDamageNumbers(dt);
         this.updateParticles(dt);
         this.updateHUD();
+    }
+
+    /**
+     * XP crystals never expire — clearing a pack, kiting out and coming back
+     * for the drops is the loop the game is built on, and a 30s timer punished
+     * exactly that.
+     *
+     * The cost of keeping them is bounded here rather than by deleting them:
+     * a crystal off screen does not move (nothing but the magnet moves one) and
+     * nobody can see it bob, so it is skipped entirely. Iterating the array is
+     * a couple of thousand cheap distance checks; *drawing* is what costs.
+     */
+    private updateCrystals(dt: number) {
+        if (!this.player) return;
+
+        const magnet = this.player.stats.magnet;
+        const halfW = this.canvas.width / 2 + CRYSTAL_ACTIVE_MARGIN;
+        const halfH = this.canvas.height / 2 + CRYSTAL_ACTIVE_MARGIN;
+        const px = this.player.pos.x;
+        const py = this.player.pos.y;
+
+        for (let i = this.xpCrystals.length - 1; i >= 0; i--) {
+            const crystal = this.xpCrystals[i];
+            if (Math.abs(crystal.pos.x - px) > halfW || Math.abs(crystal.pos.y - py) > halfH) continue;
+
+            crystal.update(dt, this.player.pos, magnet);
+
+            if (checkCollision(crystal, this.player)) {
+                this.player.gainXp(crystal.value);
+                audio.play('pickup');
+                this.xpCrystals.splice(i, 1);
+            }
+        }
+
+        this.crystalMergeTimer -= dt;
+        if (this.crystalMergeTimer <= 0) {
+            this.crystalMergeTimer = 1;
+            this.consolidateCrystals();
+        }
+    }
+
+    /**
+     * Safety valve for a very long run: once the field is crowded, distant
+     * crystals are merged cell by cell into one bigger crystal carrying the
+     * combined XP. Nothing is lost, and the array cannot grow without bound.
+     * Only crystals well away from the player are touched, so this never
+     * rearranges anything you are looking at.
+     */
+    private consolidateCrystals() {
+        if (!this.player || this.xpCrystals.length <= CRYSTAL_SOFT_CAP) return;
+
+        const px = this.player.pos.x;
+        const py = this.player.pos.y;
+        const buckets = new Map<string, XPCrystal>();
+        const kept: XPCrystal[] = [];
+
+        for (const crystal of this.xpCrystals) {
+            const dx = crystal.pos.x - px;
+            const dy = crystal.pos.y - py;
+            if (dx * dx + dy * dy < CRYSTAL_MERGE_DISTANCE * CRYSTAL_MERGE_DISTANCE) {
+                kept.push(crystal);
+                continue;
+            }
+
+            const key = `${Math.floor(crystal.pos.x / CRYSTAL_MERGE_CELL)}:${Math.floor(crystal.pos.y / CRYSTAL_MERGE_CELL)}`;
+            const existing = buckets.get(key);
+            if (existing) {
+                existing.setValue(existing.value + crystal.value);
+            } else {
+                buckets.set(key, crystal);
+                kept.push(crystal);
+            }
+        }
+
+        this.xpCrystals = kept;
     }
 
     /** Everything the achievement conditions are allowed to see */
@@ -1690,7 +1762,16 @@ export class GameManager {
         });
 
         // Draw XP crystals
-        this.xpCrystals.forEach(c => c.draw(ctx, camera));
+        // Same screen-bounds cull as the update: drawing is the expensive part,
+        // and a run can leave thousands of crystals lying around the arena
+        const cullW = this.canvas.width + CRYSTAL_ACTIVE_MARGIN;
+        const cullH = this.canvas.height + CRYSTAL_ACTIVE_MARGIN;
+        for (const crystal of this.xpCrystals) {
+            const sx = crystal.pos.x - camera.x;
+            const sy = crystal.pos.y - camera.y;
+            if (sx < -CRYSTAL_ACTIVE_MARGIN || sy < -CRYSTAL_ACTIVE_MARGIN || sx > cullW || sy > cullH) continue;
+            crystal.draw(ctx, camera);
+        }
         this.repairCells.forEach(c => c.draw(ctx, camera));
 
         this.enemies.forEach(e => e.draw(ctx, camera));
