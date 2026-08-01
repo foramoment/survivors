@@ -15,6 +15,7 @@ export const EN: Record<string, string> = {
 
     'menu.start': '▶ START',
     'menu.options': '⚙ OPTIONS',
+    'menu.records': '🏅 RECORDS',
     'menu.particleLab': '🔬 PARTICLE LAB',
     'menu.tagline': 'SURVIVE THE COSMIC CHAOS',
     'menu.hint': 'WASD / DRAG TO MOVE · WEAPONS FIRE THEMSELVES',
@@ -56,10 +57,18 @@ export const EN: Record<string, string> = {
     'result.time': '⏱ TIME',
     'result.kills': '💀 KILLS',
     'result.level': '📊 LEVEL',
+    'result.score': 'SCORE',
+    'result.newRecord': 'NEW RECORD · #{rank}',
     'result.again': '↻ PLAY AGAIN',
     'result.menu': '⌂ MAIN MENU',
 
     'hud.level': 'LVL {n}',
+
+    'records.title': '🏅 RECORDS',
+    'records.empty': 'No runs yet. Go and die a few times.',
+    'records.clear': '🗑 CLEAR',
+    'records.kills': '{n} kills',
+    'records.won': 'CLEARED',
 
     // Suffixes for flat powerup bonuses (see UpgradePool.formatPowerupBonus)
     'bonus.magnet': 'pull range',

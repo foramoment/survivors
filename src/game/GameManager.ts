@@ -23,6 +23,7 @@ import { juice } from './core/JuiceSystem';
 import { drawPixelText } from './core/PixelFont';
 import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { contactDamagePerSecond } from './core/ContactDamage';
+import { computeScore, submitScore, formatScore } from './core/Score';
 import { RepairCell } from './entities/RepairCell';
 import {
     dischargeThreshold, DISCHARGE_RADIUS, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
@@ -76,6 +77,10 @@ export class GameManager {
 
     devMode: boolean = false;
     killCount: number = 0;
+    /** Tier-weighted kill total (sum of xpValue) — the score's kill term */
+    killScore: number = 0;
+    /** Which class this run was started with, recorded on the leaderboard */
+    classId: string = CLASSES[0].id;
 
     currentStage: StageConfig = STAGES[0];
     private finalBoss: Enemy | null = null;
@@ -122,6 +127,7 @@ export class GameManager {
         this.weaponLevels.clear();
 
         const cls = CLASSES[classIndex];
+        this.classId = cls.id;
         this.player = new Player(0, 0);
 
         // Apply Class Stats
@@ -146,6 +152,7 @@ export class GameManager {
         this.capacitorCharge = 0;
         this.damageNumbers = [];
         this.killCount = 0;
+        this.killScore = 0;
         this.gameTime = 0;
         difficultyDirector.reset();
         this.camera.x = this.player.pos.x - this.canvas.width / 2;
@@ -1019,6 +1026,7 @@ export class GameManager {
                 this.spawnXPCrystal(enemy.pos.x, enemy.pos.y, crystalValue);
                 this.enemies.splice(i, 1);
                 this.killCount++;
+                this.killScore += enemy.xpValue;
             }
         }
 
@@ -1073,6 +1081,46 @@ export class GameManager {
         this.updateHUD();
     }
 
+    /** Arena threat used as the score multiplier — see core/Score */
+    private get stageThreat(): number {
+        return (this.currentStage.hpScale + this.currentStage.damageScale) / 2;
+    }
+
+    /** Score as it stands right now (HUD reads this every frame) */
+    get liveScore(): number {
+        return computeScore({
+            killScore: this.killScore,
+            seconds: this.gameTime,
+            level: this.player?.level ?? 1,
+            threat: this.stageThreat,
+            victory: false,
+        });
+    }
+
+    /** Finalise the run's score and put it on the local leaderboard */
+    private submitRunScore(victory: boolean): { score: number; rank: number } {
+        const score = computeScore({
+            killScore: this.killScore,
+            seconds: this.gameTime,
+            level: this.player?.level ?? 1,
+            threat: this.stageThreat,
+            victory,
+        });
+
+        const { rank } = submitScore({
+            score,
+            stageId: this.currentStage.id,
+            classId: this.classId,
+            seconds: this.gameTime,
+            kills: this.killCount,
+            level: this.player?.level ?? 1,
+            victory,
+            date: Date.now(),
+        });
+
+        return { score, rank };
+    }
+
     /** Shared end-of-run panel for both defeat and victory */
     private showRunSummary(opts: { title: string; subtitle: string; variant: 'defeat' | 'victory' }) {
         const mins = Math.floor(this.gameTime / 60).toString().padStart(2, '0');
@@ -1089,6 +1137,18 @@ export class GameManager {
         subtitle.className = 'result-subtitle';
         subtitle.textContent = opts.subtitle;
         screen.appendChild(subtitle);
+
+        // Score is the headline: it is the only number that makes two runs
+        // comparable, so it gets its own panel above the breakdown
+        const { score, rank } = this.submitRunScore(opts.variant === 'victory');
+        const scoreBox = document.createElement('div');
+        scoreBox.className = 'result-score';
+        scoreBox.innerHTML = `
+            <span>${t('result.score')}</span>
+            <strong>${formatScore(score)}</strong>
+            ${rank > 0 ? `<em class="result-rank">${t('result.newRecord', { rank })}</em>` : ''}
+        `;
+        screen.appendChild(scoreBox);
 
         const stats = document.createElement('div');
         stats.className = 'result-stats';

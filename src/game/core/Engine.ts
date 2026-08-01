@@ -17,6 +17,7 @@ import { OptionsScreen } from '../ui/screens/OptionsScreen';
 import { GameOverScreen } from '../ui/screens/GameOverScreen';
 import { ParticleDebugScreen } from '../ui/screens/ParticleDebugScreen';
 import { StageSelectionScreen } from '../ui/screens/StageSelectionScreen';
+import { RecordsScreen } from '../ui/screens/RecordsScreen';
 import { menuBackdrop } from '../ui/MenuBackdrop';
 import { juice } from './JuiceSystem';
 import { i18n } from './I18n';
@@ -80,6 +81,9 @@ export class Engine {
         // Options
         screenManager.register('options', new OptionsScreen(this.canvas, this.ctx));
 
+        // Local leaderboard
+        screenManager.register('records', new RecordsScreen(this.canvas, this.ctx));
+
         // Game Over
         screenManager.register('game_over', new GameOverScreen(this.canvas, this.ctx));
 
@@ -140,7 +144,8 @@ export class Engine {
                     xpToLevel: this.gameManager.player.nextLevelXp,
                     level: this.gameManager.player.level,
                     gameTime: this.gameManager.gameTime,
-                    killCount: this.gameManager.killCount
+                    killCount: this.gameManager.killCount,
+                    score: this.gameManager.liveScore,
                 });
             }
         }

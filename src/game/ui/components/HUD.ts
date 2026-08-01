@@ -11,6 +11,7 @@
  */
 
 import { t } from '../../core/I18n';
+import { formatScore } from '../../core/Score';
 
 export interface HUDData {
     hp: number;
@@ -20,6 +21,7 @@ export interface HUDData {
     level: number;
     gameTime: number;
     killCount: number;
+    score: number;
     powerBoostActive?: boolean;
 }
 
@@ -29,6 +31,7 @@ export class HUD {
     private xpBar: HTMLElement | null = null;
     private timer: HTMLElement | null = null;
     private killCount: HTMLElement | null = null;
+    private score: HTMLElement | null = null;
     private levelDisplay: HTMLElement | null = null;
     private powerBoostIndicator: HTMLElement | null = null;
 
@@ -43,6 +46,7 @@ export class HUD {
                 </div>
                 <div class="stats" id="timer">00:00</div>
                 <div class="stats" id="kill-count">💀 0</div>
+                <div class="stats hud-score" id="score-display">0</div>
                 <button class="hud-pause interactive" id="hud-pause" aria-label="Pause">II</button>
             </div>
             <div class="xp-bar-container">
@@ -60,6 +64,7 @@ export class HUD {
         this.xpBar = document.getElementById('xp-bar');
         this.timer = document.getElementById('timer');
         this.killCount = document.getElementById('kill-count');
+        this.score = document.getElementById('score-display');
         this.levelDisplay = document.getElementById('level-display');
         this.powerBoostIndicator = document.getElementById('power-boost-indicator');
     }
@@ -71,6 +76,7 @@ export class HUD {
         this.xpBar = null;
         this.timer = null;
         this.killCount = null;
+        this.score = null;
         this.levelDisplay = null;
         this.powerBoostIndicator = null;
     }
@@ -94,6 +100,10 @@ export class HUD {
 
         if (this.killCount) {
             this.killCount.textContent = `💀 ${data.killCount}`;
+        }
+
+        if (this.score) {
+            this.score.textContent = formatScore(data.score);
         }
 
         if (this.levelDisplay) {

@@ -11,7 +11,7 @@
  */
 
 import { BaseScreen } from '../BaseScreen';
-import { HUD } from '../components/HUD';
+import { HUD, type HUDData } from '../components/HUD';
 import { engine } from '../../core/Engine';
 
 export interface GameScreenParams {
@@ -60,16 +60,7 @@ export class GameScreen extends BaseScreen {
      * Update HUD with current game state
      * Called from GameManager.update() or Engine loop
      */
-    updateHUD(data: {
-        hp: number;
-        maxHp: number;
-        xp: number;
-        xpToLevel: number;
-        level: number;
-        gameTime: number;
-        killCount: number;
-        powerBoostActive?: boolean;
-    }): void {
+    updateHUD(data: HUDData): void {
         this.hud?.update(data);
     }
 

@@ -19,6 +19,7 @@ export const RU: Record<string, string> = {
 
     'menu.start': '▶ ИГРАТЬ',
     'menu.options': '⚙ НАСТРОЙКИ',
+    'menu.records': '🏅 РЕКОРДЫ',
     'menu.particleLab': '🔬 ЛАБОРАТОРИЯ ЧАСТИЦ',
     'menu.tagline': 'ВЫЖИВИ В КОСМИЧЕСКОМ ХАОСЕ',
     'menu.hint': 'WASD / ТЯНИ МЫШЬЮ · ОРУЖИЕ СТРЕЛЯЕТ САМО',
@@ -60,10 +61,18 @@ export const RU: Record<string, string> = {
     'result.time': '⏱ ВРЕМЯ',
     'result.kills': '💀 УБИЙСТВ',
     'result.level': '📊 УРОВЕНЬ',
+    'result.score': 'ОЧКИ',
+    'result.newRecord': 'НОВЫЙ РЕКОРД · №{rank}',
     'result.again': '↻ ЕЩЁ РАЗ',
     'result.menu': '⌂ ГЛАВНОЕ МЕНЮ',
 
     'hud.level': 'УР {n}',
+
+    'records.title': '🏅 РЕКОРДЫ',
+    'records.empty': 'Забегов пока нет. Иди и умри пару раз.',
+    'records.clear': '🗑 ОЧИСТИТЬ',
+    'records.kills': 'убийств: {n}',
+    'records.won': 'ЗАЧИЩЕНО',
 
     'bonus.magnet': 'к радиусу притяжения',
     'bonus.maxHp': 'к макс. HP',

@@ -852,6 +852,44 @@ h2.lucky {
   color: var(--c-dim);
 }
 
+/* Score is the headline of a run — bigger than the breakdown below it */
+.result-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 16px 32px;
+  background: var(--c-panel);
+  box-shadow: 0 0 0 var(--px) var(--c-yellow, #ffd23f);
+}
+
+.result-score span {
+  font-size: 0.7em;
+  letter-spacing: 0.18em;
+  color: var(--c-dim);
+}
+
+.result-score strong {
+  font-size: 2.4em;
+  color: var(--c-yellow, #ffd23f);
+  text-shadow: 3px 3px 0 #000;
+  letter-spacing: 0.04em;
+}
+
+.result-rank {
+  font-size: 0.68em;
+  font-style: normal;
+  letter-spacing: 0.14em;
+  color: var(--c-cyan);
+  animation: rank-blink 900ms steps(2, jump-none) infinite;
+}
+
+@keyframes rank-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
 .result-stats {
   display: flex;
   gap: 14px;
@@ -881,6 +919,87 @@ h2.lucky {
   font-size: 1.5em;
   color: var(--c-ink);
   text-shadow: 2px 2px 0 #000;
+}
+
+/* =========================================================================
+   Records (local leaderboard)
+   ========================================================================= */
+
+.records-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(620px, 92vw);
+  margin: 8px 0 24px;
+}
+
+.records-row {
+  display: grid;
+  grid-template-columns: 34px minmax(96px, auto) 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--c-panel);
+  box-shadow: 0 0 0 var(--px) #2f3a63;
+  font-size: 0.72em;
+  text-align: left;
+  animation: card-rise 220ms steps(4) both;
+}
+
+.records-row--victory {
+  box-shadow: 0 0 0 var(--px) var(--c-yellow, #ffd23f);
+}
+
+.records-rank {
+  color: var(--c-dim);
+  font-size: 1.1em;
+}
+
+.records-score {
+  color: var(--c-yellow, #ffd23f);
+  font-size: 1.25em;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.records-meta {
+  color: var(--c-ink);
+  letter-spacing: 0.06em;
+}
+
+.records-detail {
+  color: var(--c-dim);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.records-badge {
+  color: var(--c-yellow, #ffd23f);
+  letter-spacing: 0.18em;
+  font-size: 0.9em;
+}
+
+.records-empty {
+  margin: 30px 0;
+  color: var(--c-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.8em;
+}
+
+/* Score sits between the kill count and the pause button */
+.hud-score {
+  color: var(--c-yellow, #ffd23f);
+}
+
+@media (max-width: 560px) {
+  .records-row {
+    grid-template-columns: 28px 1fr;
+  }
+
+  .records-detail,
+  .records-meta {
+    grid-column: 2;
+  }
 }
 
 /* =========================================================================

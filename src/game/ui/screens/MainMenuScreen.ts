@@ -118,6 +118,9 @@ export class MainMenuScreen extends BaseScreen {
             this.createPixelButton(t('menu.start'), () => screenManager.goto('class_selection'), 'primary')
         );
         buttonContainer.appendChild(
+            this.createPixelButton(t('menu.records'), () => screenManager.goto('records'))
+        );
+        buttonContainer.appendChild(
             this.createPixelButton(t('menu.options'), () => screenManager.goto('options'))
         );
         buttonContainer.appendChild(
