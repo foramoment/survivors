@@ -23,6 +23,7 @@ import { juice } from './core/JuiceSystem';
 import { drawPixelText } from './core/PixelFont';
 import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { screenManager } from './ui/ScreenManager';
+import { createSettingsPanel } from './ui/components/SettingsPanel';
 
 export class GameManager {
     canvas: HTMLCanvasElement;
@@ -385,6 +386,20 @@ export class GameManager {
         const actions = document.createElement('div');
         actions.className = 'pause-actions';
         actions.appendChild(this.createPauseButton('▶ RESUME', 'primary', () => this.resumeGame()));
+
+        // Settings fold out in place. Routing to the Options screen would tear
+        // down the game screen (and the run with it), so the same panel is
+        // mounted here instead.
+        const settings = createSettingsPanel(true);
+        settings.hidden = true;
+
+        const settingsBtn = this.createPauseButton('⚙ SETTINGS', 'ghost', () => {
+            settings.hidden = !settings.hidden;
+            settingsBtn.textContent = settings.hidden ? '⚙ SETTINGS' : '⚙ SETTINGS ▴';
+        });
+        actions.appendChild(settingsBtn);
+        actions.appendChild(settings);
+
         actions.appendChild(this.createPauseButton('✖ QUIT TO MENU', 'danger', () => {
             this.resumeGame();
             audio.stopMusic();
@@ -536,7 +551,7 @@ export class GameManager {
             } else {
                 const powerup = opt.data;
                 const stack = this.powerupLevels.get(powerup.name) ?? 0;
-                const bonus = formatPowerupBonus(powerup.type, getPowerupValue(powerup.value, stack));
+                const bonus = formatPowerupBonus(powerup.type, getPowerupValue(powerup.value, stack, powerup.stackGrowth));
                 const stackText = stack > 0 ? `lv ${stack} → ${stack + 1}` : 'NEW';
                 card.innerHTML = `
                 <div style="font-size: 3em">${powerup.emoji}</div>
@@ -708,7 +723,7 @@ export class GameManager {
 
         // Stacking: each repeat pick of the same powerup is stronger
         const stack = this.powerupLevels.get(opt.name) ?? 0;
-        const value = getPowerupValue(opt.value, stack);
+        const value = getPowerupValue(opt.value, stack, opt.stackGrowth);
         this.powerupLevels.set(opt.name, Math.min(POWERUP_STACK_CAP, stack + 1));
 
         // Apply stat boost

@@ -115,6 +115,23 @@ describe('UpgradePool', () => {
             expect(getPowerupValue(-0.06, 3)).toBeLessThan(-0.06);
         });
 
+        it('stackGrowth: 1 makes a powerup stack flat', () => {
+            expect(getPowerupValue(0.1, 0, 1)).toBeCloseTo(0.1);
+            expect(getPowerupValue(0.1, 7, 1)).toBeCloseTo(0.1);
+        });
+
+        it('regen is flat and caps below 1 HP/s at max stacks', () => {
+            const regen = POWERUPS.find(p => p.type === 'regen')!;
+            expect(regen.stackGrowth).toBe(1);
+
+            let total = 0;
+            for (let stack = 0; stack < POWERUP_STACK_CAP; stack++) {
+                total += getPowerupValue(regen.value, stack, regen.stackGrowth);
+            }
+            expect(total).toBeCloseTo(0.8);
+            expect(total).toBeLessThan(1);
+        });
+
         it('formats percent and flat bonuses', () => {
             expect(formatPowerupBonus('might', 0.08)).toBe('+8%');
             expect(formatPowerupBonus('cooldown', -0.06)).toBe('−6%');

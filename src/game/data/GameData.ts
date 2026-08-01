@@ -10,7 +10,9 @@ export const CLASSES = [
     { name: "Cyber Samurai", emoji: "🤖", bonus: "Crit +10%", weaponId: 'phantom_slash', hp: 85, stats: { critChance: 0.15 } },
     { name: "Heavy Gunner", emoji: "🦍", bonus: "Might +20%, Speed -10%", weaponId: 'plasma_cannon', hp: 110, stats: { might: 1.2, moveSpeed: 0.9 } },
     { name: "Technomancer", emoji: "🧙‍♂️", bonus: "Duration +20%", weaponId: 'nanobot_swarm', hp: 100, stats: { duration: 1.2 } },
-    { name: "Astro Biologist", emoji: "👨‍🔬", bonus: "Regen +0.6", weaponId: 'spore_cloud', hp: 95, stats: { regen: 0.6 } },
+    // Kept in step with the flat Nano-Repair stack (0.1 HP/s): a class perk is
+    // worth ~2.5 picks, not 6.
+    { name: "Astro Biologist", emoji: "👨‍🔬", bonus: "Regen +0.25", weaponId: 'spore_cloud', hp: 95, stats: { regen: 0.25 } },
     { name: "Quantum Physicist", emoji: "⚛️", bonus: "Cooldown -10%", weaponId: 'singularity_orb', hp: 80, stats: { cooldown: 0.9 } },
     { name: "Exo Marine", emoji: "👮", bonus: "Armor +2", weaponId: 'orbital_strike', hp: 130, stats: { armor: 2 } },
     { name: "Psionicist", emoji: "🧠", bonus: "Area +20%", weaponId: 'mind_blast', hp: 75, stats: { area: 1.2 } },
@@ -23,13 +25,27 @@ export const CLASSES = [
 ];
 
 // Base values are the FIRST pick; repeat picks stack and grow 25% per stack
-// (see core/UpgradePool.ts getPowerupValue)
-export const POWERUPS = [
+// (see core/UpgradePool.ts getPowerupValue). `stackGrowth: 1` opts a powerup
+// out of that curve — every stack is then worth exactly `value`.
+export interface PowerupData {
+    name: string;
+    description: string;
+    /** Key in Player.stats (plus the special-cased `maxHp`) */
+    type: string;
+    value: number;
+    emoji: string;
+    /** Per-stack multiplier. Omit for the global 25% curve; 1 = flat stacking. */
+    stackGrowth?: number;
+}
+
+export const POWERUPS: PowerupData[] = [
     // Basic
-    // Regen stacks additively AND grows 25% per stack, so a low base is
-    // deliberate: at the 8-stack cap this is still ~1.4 HP/s, which used to be
-    // over 3 HP/s and made the player effectively unkillable.
-    { name: "Nano-Repair", description: "Hull nanites knit you back together", type: "regen", value: 0.3, emoji: "❤️" },
+    // Regen is the one powerup that can invalidate the whole game: enough of it
+    // and standing still inside a crowd out-heals the incoming damage. It is
+    // deliberately FLAT (no 25% compounding) at 0.1 HP/s per stack, so the
+    // 8-stack cap is 0.8 HP/s — noticeable between fights, never a substitute
+    // for moving. It used to compound to ~1.4 HP/s, which did exactly that.
+    { name: "Nano-Repair", description: "Hull nanites knit you back together", type: "regen", value: 0.1, stackGrowth: 1, emoji: "❤️" },
     { name: "Targeting HUD", description: "Weak-point overlay for your visor", type: "critChance", value: 0.06, emoji: "🎯" },
     { name: "Plasma Core", description: "Raw damage amplifier", type: "might", value: 0.08, emoji: "💪" },
     { name: "Cooling System", description: "Weapons fire more often", type: "cooldown", value: -0.06, emoji: "❄️" },

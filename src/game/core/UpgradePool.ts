@@ -44,9 +44,20 @@ export interface OfferContext {
     rng?: () => number;
 }
 
-/** Effective bonus of a powerup at a given stack (0 = first pick) */
-export function getPowerupValue(baseValue: number, stack: number): number {
-    return baseValue * Math.pow(POWERUP_STACK_GROWTH, stack);
+/**
+ * Effective bonus of a powerup at a given stack (0 = first pick).
+ *
+ * `growth` defaults to the global 25%-per-stack curve. A powerup can opt out by
+ * declaring `stackGrowth: 1` in GameData, which makes every stack worth exactly
+ * the base value — see Nano-Repair, where compounding regen out-healed the whole
+ * game.
+ */
+export function getPowerupValue(
+    baseValue: number,
+    stack: number,
+    growth: number = POWERUP_STACK_GROWTH
+): number {
+    return baseValue * Math.pow(growth, stack);
 }
 
 /** Human-readable bonus string, e.g. "+8% might" or "+15 Max HP" */
