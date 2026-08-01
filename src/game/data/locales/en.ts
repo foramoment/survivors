@@ -67,6 +67,7 @@ export const EN: Record<string, string> = {
     'bonus.armor': 'armor',
     'bonus.regen': 'HP/s',
     'bonus.tick': 's zone tick',
+    'bonus.discharge': 'charge',
 
     // Arena event banners — drawn with the pixel font, uppercase only
     'arena.meteors': 'METEOR SHOWER',

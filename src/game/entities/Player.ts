@@ -3,6 +3,7 @@ import { type Vector2, normalize, distance } from '../core/Utils';
 import { input } from '../core/Input';
 import { Weapon } from '../Weapon';
 import { sprites } from '../core/SpriteFactory';
+import { adrenalineMultiplier } from '../core/Tactics';
 
 export class Player extends Entity {
     speed: number = 200;
@@ -38,7 +39,17 @@ export class Player extends Entity {
         regen: 0,
         critChance: 0,
         critDamage: 2,
-        tick: 0
+        tick: 0,
+
+        // Tactics — behaviour switches, not multipliers (see core/Tactics.ts)
+        /** Capacitor stacks: absorbed damage detonates around the player */
+        discharge: 0,
+        /** Chance a killed enemy detonates */
+        killEcho: 0,
+        /** Bonus to damage and move speed while below the HP threshold */
+        adrenaline: 0,
+        /** Chance a kill drops a repair cell */
+        siphon: 0,
     };
 
     className: string = "Survivor";
@@ -54,6 +65,23 @@ export class Player extends Entity {
 
     constructor(x: number, y: number) {
         super(x, y, 15);
+    }
+
+    /**
+     * Adrenal Surge: one "cornered animal" state driving both damage and move
+     * speed, so the perk reads as a single thing rather than two.
+     */
+    get adrenaline(): number {
+        return adrenalineMultiplier(this.hp, this.maxHp, this.stats.adrenaline);
+    }
+
+    /**
+     * Damage multiplier including conditional bonuses.
+     * DamageSystem reads this rather than `stats.might` directly, so anything
+     * that boosts damage situationally has exactly one place to live.
+     */
+    get effectiveMight(): number {
+        return this.stats.might * this.adrenaline;
     }
 
     /**
@@ -90,9 +118,10 @@ export class Player extends Entity {
         if (this.isMoving) this.animTimer += dt;
         if (moveDir.x !== 0) this.facingLeft = moveDir.x < 0;
 
-        // Apply movement
-        let moveX = moveDir.x * this.speed * this.stats.moveSpeed;
-        let moveY = moveDir.y * this.speed * this.stats.moveSpeed;
+        // Apply movement (adrenaline speeds you up while bloodied)
+        const moveSpeed = this.speed * this.stats.moveSpeed * this.adrenaline;
+        let moveX = moveDir.x * moveSpeed;
+        let moveY = moveDir.y * moveSpeed;
 
         // Add knockback
         moveX += this.knockback.x;

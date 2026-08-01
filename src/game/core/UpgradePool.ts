@@ -62,7 +62,7 @@ export function getPowerupValue(
 }
 
 /** Stat types shown as a flat amount with a unit instead of a percentage */
-const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'regen', 'tick'];
+const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'regen', 'tick', 'discharge'];
 
 /** Human-readable bonus string, e.g. "+8%" or "+15 Max HP" */
 export function formatPowerupBonus(type: string, value: number): string {

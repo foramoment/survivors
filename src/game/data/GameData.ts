@@ -60,7 +60,6 @@ export const POWERUPS: PowerupData[] = [
     { id: 'temporal_flux', name: "Temporal Flux", description: "Effects linger longer", type: "duration", value: 0.18, emoji: "⏰" },
     { id: 'berserker_rage', name: "Berserker Rage", description: "Crits hit like a freight train", type: "critDamage", value: 0.3, emoji: "😡" },
     { id: 'barrier_field', name: "Barrier Field", description: "Reinforced hull plating", type: "maxHp", value: 15, emoji: "🔮" },
-    { id: 'overclock', name: "Overclock", description: "Projectiles travel faster", type: "speed", value: 0.12, emoji: "⏩" },
     { id: 'phase_shift', name: "Phase Shift", description: "Move faster between phases", type: "moveSpeed", value: 0.1, emoji: "👻" },
     { id: 'rapid_tick', name: "Rapid Tick", description: "Zones damage more frequently", type: "tick", value: 0.1, emoji: "⏱️" },
     // Armor is subtracted from every touching enemy's damage-per-second, so it
@@ -68,6 +67,16 @@ export const POWERUPS: PowerupData[] = [
     // cap would be ~20 armor and shrug off a late-game swarm entirely; flat
     // stacking caps it at 8, which is a real but survivable wall.
     { id: 'void_shield', name: "Void Shield", description: "Flat damage reduction", type: "armor", value: 1, stackGrowth: 1, emoji: "🌌" },
+
+    // Tactics — these switch a behaviour on instead of nudging a number, so
+    // they all stack FLAT: a compounding chance-to-trigger runs past 100% long
+    // before the 8-pick cap and stops meaning anything. Rules and numbers live
+    // in core/Tactics.ts. Overclock (+projectile speed) was removed to make
+    // room: it was the one powerup whose effect you could not feel.
+    { id: 'static_discharge', name: "Static Discharge", description: "Damage taken charges a capacitor that blows the crowd off you", type: "discharge", value: 1, stackGrowth: 1, emoji: "⚡" },
+    { id: 'kill_echo', name: "Kill Echo", description: "The dead sometimes detonate", type: "killEcho", value: 0.06, stackGrowth: 1, emoji: "☠️" },
+    { id: 'adrenal_surge', name: "Adrenal Surge", description: "Hit harder and move faster while nearly dead", type: "adrenaline", value: 0.1, stackGrowth: 1, emoji: "🩸" },
+    { id: 'vital_siphon', name: "Vital Siphon", description: "Kills sometimes leave a repair cell behind", type: "siphon", value: 0.025, stackGrowth: 1, emoji: "💗" },
 ];
 
 export const WEAPONS = [

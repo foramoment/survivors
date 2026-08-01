@@ -23,6 +23,11 @@ import { juice } from './core/JuiceSystem';
 import { drawPixelText } from './core/PixelFont';
 import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { contactDamagePerSecond } from './core/ContactDamage';
+import { RepairCell } from './entities/RepairCell';
+import {
+    dischargeThreshold, DISCHARGE_RADIUS, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
+    KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE,
+} from './core/Tactics';
 import { screenManager } from './ui/ScreenManager';
 
 /** Seconds between hurt beats (sound + shake) while enemies are on the player */
@@ -77,6 +82,9 @@ export class GameManager {
     private finalBossSpawned: boolean = false;
     /** Countdown to the next hurt beat while standing in contact */
     private contactFxTimer: number = 0;
+    /** Absorbed damage banked toward the next Static Discharge */
+    private capacitorCharge: number = 0;
+    repairCells: RepairCell[] = [];
     private pauseOverlay: HTMLElement | null = null;
     /** Survives a pause-overlay rebuild so a language switch keeps the panel open */
     private pauseSettingsOpen: boolean = false;
@@ -134,6 +142,8 @@ export class GameManager {
         this.enemies = [];
         this.projectiles = [];
         this.xpCrystals = [];
+        this.repairCells = [];
+        this.capacitorCharge = 0;
         this.damageNumbers = [];
         this.killCount = 0;
         this.gameTime = 0;
@@ -412,6 +422,69 @@ export class GameManager {
         // paints the arena solid red and stutters the frame. The vignette only
         // darkens the edges, so the fight stays visible while the danger reads.
         juice.pulseVignette(0.4 + (1 - this.player.hp / this.player.maxHp) * 0.6);
+    }
+
+    /**
+     * Static Discharge: the capacitor is charged by the damage you absorb, so
+     * the perk is strongest exactly when being surrounded is about to kill you.
+     */
+    private chargeCapacitor(dps: number, dt: number) {
+        if (!this.player || this.player.stats.discharge <= 0) return;
+
+        this.capacitorCharge += dps * dt;
+        const threshold = dischargeThreshold(this.player.stats.discharge);
+        if (this.capacitorCharge < threshold) return;
+
+        this.capacitorCharge = 0;
+        const radius = DISCHARGE_RADIUS * this.player.stats.area;
+        const damage = DISCHARGE_DAMAGE * this.player.stats.discharge;
+
+        audio.play('explosion');
+        juice.addTrauma(0.35);
+        juice.shockwave(this.player.pos.x, this.player.pos.y, radius * 1.4, '#8ce8ff', 0.45, 6);
+        particles.emitLightning(this.player.pos.x, this.player.pos.y);
+
+        for (const enemy of levelSpatialHash.getWithinRadius(this.player.pos, radius)) {
+            if (distance(this.player.pos, enemy.pos) > radius) continue;
+            damageSystem.dealDamage({
+                baseDamage: damage,
+                source: { owner: this.player },
+                target: enemy,
+                position: enemy.pos,
+            });
+            const dx = enemy.pos.x - this.player.pos.x;
+            const dy = enemy.pos.y - this.player.pos.y;
+            const len = Math.hypot(dx, dy) || 1;
+            enemy.applyKnockback(dx / len, dy / len, DISCHARGE_KNOCKBACK);
+        }
+    }
+
+    /**
+     * Kill Echo: a dead enemy sometimes takes its neighbours with it. Scaled
+     * off the corpse's max HP so it stays relevant as enemies get tougher, and
+     * dealt with `skipModifiers` so an echo can never chain into another echo.
+     */
+    private killEcho(enemy: Enemy) {
+        if (!this.player) return;
+        if (Math.random() >= this.player.stats.killEcho) return;
+
+        const radius = KILL_ECHO_RADIUS * this.player.stats.area;
+        const damage = enemy.maxHp * KILL_ECHO_DAMAGE_SHARE;
+
+        particles.emitExplosion(enemy.pos.x, enemy.pos.y, radius, ['#ffd166', '#ff6b35', '#ffffff']);
+        juice.shockwave(enemy.pos.x, enemy.pos.y, radius * 1.5, '#ffb03c', 0.3, 4);
+
+        for (const other of levelSpatialHash.getWithinRadius(enemy.pos, radius)) {
+            if (other === enemy || other.isDead) continue;
+            if (distance(enemy.pos, other.pos) > radius) continue;
+            damageSystem.dealDamage({
+                baseDamage: damage,
+                source: null,
+                target: other,
+                position: other.pos,
+                skipModifiers: true,
+            });
+        }
     }
 
     /** Same look and blips as the menu buttons, without the screen base class */
@@ -905,6 +978,7 @@ export class GameManager {
             const dps = contactDamagePerSecond(contactDamages, this.player.stats.armor);
             this.player.takeContactDamage(dps, dt);
             this.emitContactFeedback(dps, dt);
+            this.chargeCapacitor(dps, dt);
         } else {
             this.contactFxTimer = 0;
         }
@@ -934,11 +1008,32 @@ export class GameManager {
                     juice.addTrauma(0.12);
                     juice.shockwave(enemy.pos.x, enemy.pos.y, enemy.radius * 5, sprites.getEnemyAccentColor(enemy.name), 0.3, 4);
                 }
+                // Tactics that trigger on death (see core/Tactics)
+                this.killEcho(enemy);
+                if (Math.random() < this.player.stats.siphon) {
+                    this.repairCells.push(new RepairCell(enemy.pos.x, enemy.pos.y));
+                }
+
                 // Drop XP crystals instead of giving XP directly
                 const crystalValue = enemy.xpValue;
                 this.spawnXPCrystal(enemy.pos.x, enemy.pos.y, crystalValue);
                 this.enemies.splice(i, 1);
                 this.killCount++;
+            }
+        }
+
+        // Repair cells: healing you have to walk to
+        for (let i = this.repairCells.length - 1; i >= 0; i--) {
+            const cell = this.repairCells[i];
+            cell.update(dt, this.player.pos);
+
+            if (checkCollision(cell, this.player)) {
+                this.player.hp = Math.min(this.player.maxHp, this.player.hp + cell.heal);
+                audio.play('pickup');
+                particles.emitHit(cell.pos.x, cell.pos.y, '#ff6b8a');
+                this.repairCells.splice(i, 1);
+            } else if (cell.isDead) {
+                this.repairCells.splice(i, 1);
             }
         }
 
@@ -1236,6 +1331,7 @@ export class GameManager {
 
         // Draw XP crystals
         this.xpCrystals.forEach(c => c.draw(ctx, camera));
+        this.repairCells.forEach(c => c.draw(ctx, camera));
 
         this.enemies.forEach(e => e.draw(ctx, camera));
 

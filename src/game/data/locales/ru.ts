@@ -70,6 +70,7 @@ export const RU: Record<string, string> = {
     'bonus.armor': 'к броне',
     'bonus.regen': 'HP/с',
     'bonus.tick': 'с к тику зон',
+    'bonus.discharge': 'заряд',
 
     'arena.meteors': 'МЕТЕОРИТНЫЙ ДОЖДЬ',
     'arena.blackout': 'ОТКАЗ ПИТАНИЯ',
@@ -197,14 +198,21 @@ export const RU: Record<string, string> = {
     'powerup.berserker_rage.desc': 'Криты бьют как товарный поезд',
     'powerup.barrier_field.name': 'Барьерное Поле',
     'powerup.barrier_field.desc': 'Усиленная обшивка корпуса',
-    'powerup.overclock.name': 'Разгон',
-    'powerup.overclock.desc': 'Снаряды летят быстрее',
     'powerup.phase_shift.name': 'Фазовый Сдвиг',
     'powerup.phase_shift.desc': 'Двигаешься быстрее',
     'powerup.rapid_tick.name': 'Частый Тик',
     'powerup.rapid_tick.desc': 'Зоны наносят урон чаще',
     'powerup.void_shield.name': 'Щит Пустоты',
     'powerup.void_shield.desc': 'Плоское снижение получаемого урона',
+
+    'powerup.static_discharge.name': 'Статический Разряд',
+    'powerup.static_discharge.desc': 'Полученный урон копит заряд, который сдувает толпу с тебя',
+    'powerup.kill_echo.name': 'Эхо Смерти',
+    'powerup.kill_echo.desc': 'Убитые иногда детонируют',
+    'powerup.adrenal_surge.name': 'Выброс Адреналина',
+    'powerup.adrenal_surge.desc': 'На последнем издыхании бьёшь сильнее и бежишь быстрее',
+    'powerup.vital_siphon.name': 'Сифон Жизни',
+    'powerup.vital_siphon.desc': 'С убитых иногда падает ремкомплект',
 
     // ----------------------------------------------------------------- stages
     'stage.asteroid_fields.name': 'Пояс Астероидов',

@@ -67,8 +67,10 @@ class DamageSystemClass {
         const isCrit = Math.random() < player.stats.critChance;
         const critMultiplier = isCrit ? player.stats.critDamage : 1;
 
-        // Calculate final damage
-        const finalDamage = baseDamage * player.stats.might * GLOBAL_DAMAGE * critMultiplier;
+        // `effectiveMight` folds in conditional bonuses (Adrenal Surge); plain
+        // `stats.might` is the fallback for the mock owners used in tests
+        const might = player.effectiveMight ?? player.stats.might;
+        const finalDamage = baseDamage * might * GLOBAL_DAMAGE * critMultiplier;
 
         return this.applyDamage(finalDamage, target, position, isCrit);
     }
