@@ -16,6 +16,9 @@
 
 import { CHARACTER_SPRITES, FALLBACK_SPRITE_ID } from '../data/CharacterSprites';
 
+/** Whole-silhouette recolour applied to an enemy sprite */
+export type EnemyTint = 'none' | 'hit' | 'corroded';
+
 type Palette = {
     dark: string;
     mid: string;
@@ -79,11 +82,18 @@ export class SpriteFactory {
     // Enemies
     // =========================================================
 
-    getEnemySprite(name: string, frame: number, flash: boolean = false): HTMLCanvasElement {
-        const key = `enemy:${name}:${frame % 2}:${flash ? 'f' : 'n'}`;
+    /**
+     * `tint` recolours the whole silhouette: white for a hit, acid green while
+     * corroded. Every variant is baked and cached, so a screen full of corroded
+     * enemies costs the same as a screen full of plain ones — which is the
+     * point, since the alternative (a stroked ring per enemy) is a per-frame
+     * path for every body in the crowd.
+     */
+    getEnemySprite(name: string, frame: number, tint: EnemyTint = 'none'): HTMLCanvasElement {
+        const key = `enemy:${name}:${frame % 2}:${tint}`;
         let sprite = this.cache.get(key);
         if (!sprite) {
-            sprite = this.generateEnemySprite(name, frame % 2, flash);
+            sprite = this.generateEnemySprite(name, frame % 2, tint);
             this.cache.set(key, sprite);
         }
         return sprite;
@@ -97,7 +107,7 @@ export class SpriteFactory {
         return (ENEMY_PALETTES[name] ?? fallbackPalette(name)).light;
     }
 
-    private generateEnemySprite(name: string, frame: number, flash: boolean): HTMLCanvasElement {
+    private generateEnemySprite(name: string, frame: number, tint: EnemyTint): HTMLCanvasElement {
         const palette = ENEMY_PALETTES[name] ?? fallbackPalette(name);
         const rng = mulberry32(hashString(name));
 
@@ -154,7 +164,7 @@ export class SpriteFactory {
             2: palette.mid,
             3: palette.light,
             4: palette.accent,
-        }, palette.dark, flash);
+        }, palette.dark, tint);
     }
 
     // =========================================================
@@ -588,8 +598,12 @@ export class SpriteFactory {
         grid: number[][],
         colors: Record<number, string>,
         outlineBase: string,
-        flash: boolean
+        tint: EnemyTint | boolean = 'none'
     ): HTMLCanvasElement {
+        const flat = tint === true ? '#ffffff'
+            : tint === 'hit' ? '#ffffff'
+                : tint === 'corroded' ? '#b4ff3c'
+                    : null;
         const h = grid.length;
         const w = grid[0].length;
         const canvas = document.createElement('canvas');
@@ -597,7 +611,7 @@ export class SpriteFactory {
         canvas.height = h * SCALE;
         const ctx = canvas.getContext('2d')!;
 
-        const outline = flash ? '#ffffff' : this.shade(outlineBase, 0.5);
+        const outline = flat ?? this.shade(outlineBase, 0.5);
 
         for (let y = 0; y < h; y++) {
             for (let x = 0; x < w; x++) {
@@ -615,7 +629,7 @@ export class SpriteFactory {
                     }
                     continue;
                 }
-                ctx.fillStyle = flash ? '#ffffff' : (colors[cell] ?? '#ff00ff');
+                ctx.fillStyle = flat ?? (colors[cell] ?? '#ff00ff');
                 ctx.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
             }
         }

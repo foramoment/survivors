@@ -298,3 +298,45 @@ describe('Nanobot Swarm', () => {
         expect(spawned[0].constructor.name).toBe('NaniteHiveCloud');
     });
 });
+
+describe('Phantom Slash cone', () => {
+    it('only cuts inside the arc facing the nearest enemy', () => {
+        const player = new Player(0, 0);
+        const weapon = new PhantomSlashWeapon(player);
+        weapon.onSpawn = () => { };
+
+        // One enemy to the right (the blade will face it), one directly behind
+        const front = makeEnemy(60, 0);
+        const behind = makeEnemy(-70, 0);
+        placeEnemies([front, behind]);
+
+        const behindBefore = behind.hp;
+        weapon.update(2);
+
+        expect(front.hp).toBeLessThan(front.maxHp);
+        // Cutting something 180° away made the weapon read as an aura, not a blade
+        expect(behind.hp).toBe(behindBefore);
+    });
+
+    it('the evolved blade sweeps wider', () => {
+        function hitsAtAngle(evolved: boolean): boolean {
+            const player = new Player(0, 0);
+            const weapon = new PhantomSlashWeapon(player);
+            weapon.evolved = evolved;
+            weapon.onSpawn = () => { };
+
+            const front = makeEnemy(60, 0);
+            // ~60° off the facing direction: outside the 45° base cone,
+            // inside the evolved one
+            const wide = makeEnemy(Math.cos(1.05) * 90, Math.sin(1.05) * 90);
+            placeEnemies([front, wide]);
+
+            const before = wide.hp;
+            weapon.update(2);
+            return wide.hp < before;
+        }
+
+        expect(hitsAtAngle(false)).toBe(false);
+        expect(hitsAtAngle(true)).toBe(true);
+    });
+});

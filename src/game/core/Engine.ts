@@ -18,6 +18,7 @@ import { GameOverScreen } from '../ui/screens/GameOverScreen';
 import { ParticleDebugScreen } from '../ui/screens/ParticleDebugScreen';
 import { StageSelectionScreen } from '../ui/screens/StageSelectionScreen';
 import { RecordsScreen } from '../ui/screens/RecordsScreen';
+import { AchievementsScreen } from '../ui/screens/AchievementsScreen';
 import { menuBackdrop } from '../ui/MenuBackdrop';
 import { juice } from './JuiceSystem';
 import { i18n } from './I18n';
@@ -83,6 +84,9 @@ export class Engine {
 
         // Local leaderboard
         screenManager.register('records', new RecordsScreen(this.canvas, this.ctx));
+
+        // Achievements
+        screenManager.register('achievements', new AchievementsScreen(this.canvas, this.ctx));
 
         // Game Over
         screenManager.register('game_over', new GameOverScreen(this.canvas, this.ctx));

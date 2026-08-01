@@ -16,8 +16,9 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import { type Vector2 } from '../../core/Utils';
+import { type Vector2, angleDelta } from '../../core/Utils';
 import { Zone, Projectile } from '../base';
+import type { Entity } from '../../Entity';
 import { damageSystem } from '../../core/DamageSystem';
 import { particles } from '../../core/ParticleSystem';
 
@@ -199,6 +200,21 @@ export class DimensionalRiftZone extends Zone {
     }
 }
 
+/**
+ * Half-angle of the sweep, in radians: 90° total, 140° once evolved.
+ *
+ * The blade used to cut whatever was nearest in any direction, so a volley
+ * stacked into a ring around the player and read as an aura rather than swings.
+ * The cone is aimed at the *nearest enemy*, not at where the player is walking:
+ * tying it to movement would mean turning away from a pack to face it, which is
+ * the opposite of what a defensive melee weapon should ask of you. Aiming is
+ * automatic; the cone only decides how wide the cuts spread from there.
+ */
+const HALF_ARC = Math.PI / 4;
+const HALF_ARC_EVOLVED = Math.PI * 0.39;
+/** Random rotation added to each cut so a volley fans out instead of stacking */
+const CUT_JITTER = 0.4;
+
 /** Radius counted as "pressed against the player" for the crowd bonus */
 const PRESSURE_RADIUS = 110;
 /** Extra damage per enemy inside that radius, past the first */
@@ -243,6 +259,11 @@ export class PhantomSlashWeapon extends Weapon {
         return 1 + Math.min(PRESSURE_CAP, Math.max(0, packed - 1) * PRESSURE_PER_ENEMY);
     }
 
+    /** The blade always faces the nearest threat; the cone spreads from there */
+    private aimAngle(nearest: Entity): number {
+        return Math.atan2(nearest.pos.y - this.owner.pos.y, nearest.pos.x - this.owner.pos.x);
+    }
+
     update(dt: number) {
         this.cooldown -= dt;
         if (this.cooldown > 0) return;
@@ -251,8 +272,18 @@ export class PhantomSlashWeapon extends Weapon {
         const baseCount = this.stats.count + Math.floor((this.level - 1) * this.stats.countScaling);
         const count = isEvolved ? baseCount + 3 : baseCount;
 
-        // Closest-first: the blade defends you, it doesn't pick at random
-        const targets = this.findEnemies({ mode: 'closest', count });
+        // Closest-first, then narrowed to the cone around the nearest of them
+        const inRange = this.findEnemies({ mode: 'closest', count: count * 4 });
+        if (inRange.length === 0) return;
+
+        const facing = this.aimAngle(inRange[0]);
+        const halfArc = isEvolved ? HALF_ARC_EVOLVED : HALF_ARC;
+        const targets = inRange
+            .filter(e => {
+                const angle = Math.atan2(e.pos.y - this.owner.pos.y, e.pos.x - this.owner.pos.x);
+                return Math.abs(angleDelta(angle, facing)) <= halfArc;
+            })
+            .slice(0, count);
         if (targets.length === 0) return;
 
         const pressure = this.pressureMultiplier();
@@ -276,8 +307,10 @@ export class PhantomSlashWeapon extends Weapon {
             const len = Math.hypot(dx, dy) || 1;
             (target as any).applyKnockback?.(dx / len, dy / len, push);
 
-            // The cut faces the direction the blade travelled in
-            const angle = Math.atan2(target.pos.y - previous.y, target.pos.x - previous.x);
+            // The cut faces the direction the blade travelled in, plus a little
+            // scatter so a volley reads as several swings rather than one line
+            const angle = Math.atan2(target.pos.y - previous.y, target.pos.x - previous.x)
+                + (Math.random() - 0.5) * 2 * CUT_JITTER;
             const arc = new SlashArc(
                 target.pos.x,
                 target.pos.y,

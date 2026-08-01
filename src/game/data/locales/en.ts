@@ -16,6 +16,7 @@ export const EN: Record<string, string> = {
     'menu.start': '▶ START',
     'menu.options': '⚙ OPTIONS',
     'menu.records': '🏅 RECORDS',
+    'menu.achievements': '🎖 ACHIEVEMENTS',
     'menu.particleLab': '🔬 PARTICLE LAB',
     'menu.tagline': 'SURVIVE THE COSMIC CHAOS',
     'menu.hint': 'WASD / DRAG TO MOVE · WEAPONS FIRE THEMSELVES',
@@ -61,6 +62,11 @@ export const EN: Record<string, string> = {
     'result.level': '📊 LEVEL',
     'result.score': 'SCORE',
     'result.newRecord': 'NEW RECORD · #{rank}',
+    'result.bestHit': 'BIGGEST HIT',
+    'result.bestCrit': 'BIGGEST CRIT',
+    'result.untouched': 'UNTOUCHED FOR',
+    'result.multikill': 'BEST MULTIKILL',
+    'result.build': 'YOUR BUILD',
     'result.again': '↻ PLAY AGAIN',
     'result.menu': '⌂ MAIN MENU',
 
@@ -71,6 +77,10 @@ export const EN: Record<string, string> = {
     'records.clear': '🗑 CLEAR',
     'records.kills': '{n} kills',
     'records.won': 'CLEARED',
+
+    'achievements.title': '🎖 ACHIEVEMENTS',
+    'achievements.progress': '{done} of {total} unlocked',
+    'achievements.clear': '🗑 RESET',
 
     // Suffixes for flat powerup bonuses (see UpgradePool.formatPowerupBonus)
     'bonus.magnet': 'pull range',

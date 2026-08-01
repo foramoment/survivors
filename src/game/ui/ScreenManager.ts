@@ -23,7 +23,8 @@ export type ScreenId =
     | 'options'
     | 'particle_debug'
     | 'level_select'
-    | 'records';
+    | 'records'
+    | 'achievements';
 
 class ScreenManagerClass {
     private screens: Map<ScreenId, BaseScreen> = new Map();

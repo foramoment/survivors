@@ -1,6 +1,6 @@
 import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
-import { sprites } from '../core/SpriteFactory';
+import { sprites, type EnemyTint } from '../core/SpriteFactory';
 import type { Infection, Corrosion, InfectionKind } from '../core/StatusEffects';
 
 /** Mote colour per DoT flavour: [plain, contagious] */
@@ -191,7 +191,14 @@ export class Enemy extends Entity {
 
         // Procedural pixel sprite with walk animation and hit flash
         const frame = Math.floor(this.animTimer * 6) % 2;
-        const sprite = sprites.getEnemySprite(this.name, frame, this.hitFlash > 0);
+        // A hit reads as a white flash; corrosion as a slow acid-green pulse of
+        // the same silhouette. Both are baked sprite variants, so this costs a
+        // drawImage no matter how many enemies are affected — the ring this
+        // replaced was a stroked path per body, per frame.
+        const tint: EnemyTint = this.hitFlash > 0
+            ? 'hit'
+            : (this.corrosion && Math.sin(this.animTimer * 7) > 0.25 ? 'corroded' : 'none');
+        const sprite = sprites.getEnemySprite(this.name, frame, tint);
         const size = this.radius * 2.4;
         const bob = Math.sin(this.animTimer * 8) * this.radius * 0.08;
 
@@ -213,16 +220,6 @@ export class Enemy extends Entity {
                     3, 3
                 );
             }
-        }
-
-        // Corrosion does no damage of its own, so it has to be visible for the
-        // player to know this target is the one worth hitting hard.
-        if (this.corrosion) {
-            ctx.strokeStyle = `rgba(180, 255, 60, ${0.35 + 0.25 * Math.sin(this.animTimer * 9)})`;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(0, 0, this.radius * 1.05, 0, Math.PI * 2);
-            ctx.stroke();
         }
 
         if (this.stunTimer > 0) {

@@ -24,6 +24,8 @@ import { drawPixelText } from './core/PixelFont';
 import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, formatStatPreview, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { contactDamagePerSecond } from './core/ContactDamage';
 import { computeScore, submitScore, formatScore } from './core/Score';
+import { RunStatsTracker } from './core/RunStats';
+import { achievements, type RunSnapshot } from './core/Achievements';
 import { RepairCell } from './entities/RepairCell';
 import {
     dischargeThreshold, DISCHARGE_RADIUS, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
@@ -92,6 +94,8 @@ export class GameManager {
     killScore: number = 0;
     /** Which class this run was started with, recorded on the leaderboard */
     classId: string = CLASSES[0].id;
+    /** Best crit, longest untouched streak, biggest multikill (see core/RunStats) */
+    runStats: RunStatsTracker = new RunStatsTracker();
 
     currentStage: StageConfig = STAGES[0];
     private finalBoss: Enemy | null = null;
@@ -107,6 +111,10 @@ export class GameManager {
     /** Survives a pause-overlay rebuild so a language switch keeps the panel open */
     private pauseSettingsOpen: boolean = false;
     private pauseI18nUnsub: (() => void) | null = null;
+    /** Level-up keyboard cursor */
+    private upgradeCards: HTMLElement[] = [];
+    private focusedCard: number = 0;
+    private upgradeKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
 
 
@@ -116,8 +124,12 @@ export class GameManager {
         this.uiLayer = document.getElementById('ui-layer')!;
 
         // Connect DamageSystem to damage number display
-        damageSystem.setDamageNumberCallback((pos, amount, isCrit) => {
+        damageSystem.setDamageNumberCallback((pos, amount, isCrit, source) => {
             this.spawnDamageNumber(pos, amount, isCrit);
+            // The weapon id lives on the weapon, but the hit may come from a
+            // projectile or a zone it spawned — hence the two hops
+            const weaponId = source?.weaponId ?? source?.source?.weaponId ?? null;
+            this.runStats.recordHit(amount, isCrit, weaponId);
         });
 
         // Note: class selection is owned by ui/screens/ClassSelectionScreen
@@ -133,6 +145,7 @@ export class GameManager {
         stageBackdrop.blackout = 0;
         this.pauseOverlay?.remove();
         this.pauseOverlay = null;
+        this.detachUpgradeKeys();
         this.finalBoss = null;
         this.finalBossSpawned = false;
         // Reset progression tracking BEFORE adding the starting weapon
@@ -169,6 +182,7 @@ export class GameManager {
         this.damageNumbers = [];
         this.killCount = 0;
         this.killScore = 0;
+        this.runStats.reset();
         this.gameTime = 0;
         difficultyDirector.reset();
         this.camera.x = this.player.pos.x - this.canvas.width / 2;
@@ -633,6 +647,8 @@ export class GameManager {
         renderReroll();
 
         this.fillUpgradeGrid(grid, screen, upgradeCount);
+        // Six cards wrap into two rows of three, so vertical steps move by 3
+        this.attachUpgradeKeys(isLucky ? 3 : upgradeCount);
         screen.appendChild(reroll);
         this.uiLayer.appendChild(screen);
     }
@@ -640,6 +656,7 @@ export class GameManager {
     /** (Re)draw the level-up offers into `grid` */
     private fillUpgradeGrid(grid: HTMLElement, screen: HTMLElement, count: number) {
         grid.innerHTML = '';
+        const cards: HTMLElement[] = [];
 
         const options = buildUpgradeOptions({
             weaponLevels: this.weaponLevels,
@@ -680,11 +697,7 @@ export class GameManager {
                 ${this.weaponPreview(weaponData, currentLevel, canEvolve)}
               `;
 
-                card.onclick = () => {
-                    this.addWeapon(weaponData.id);
-                    screen.remove();
-                    this.state = 'PLAYING';
-                };
+                this.bindPick(card, screen, () => this.addWeapon(weaponData.id));
             } else {
                 const powerup = opt.data;
                 const stack = this.powerupLevels.get(powerup.name) ?? 0;
@@ -700,15 +713,98 @@ export class GameManager {
                 <p>${powerupDesc(powerup)}</p>
                 ${this.powerupPreview(powerup, value)}
               `;
-                card.onclick = () => {
-                    this.applyPowerup(powerup);
-                    screen.remove();
-                    this.state = 'PLAYING';
-                };
+                this.bindPick(card, screen, () => this.applyPowerup(powerup));
             }
 
+            card.addEventListener('pointerenter', () => this.focusCard(cards.indexOf(card)));
+            cards.push(card);
             grid.appendChild(card);
         });
+
+        // Start on the middle card: the reroll button is directly below it, and
+        // a centred cursor is one keypress from either edge
+        this.upgradeCards = cards;
+        this.focusCard(Math.floor(cards.length / 2));
+    }
+
+    /**
+     * Committing a pick.
+     *
+     * The upgrade used to apply on the same frame as the click, so a level-up
+     * was a card vanishing — nothing confirmed that *this* one was the one you
+     * took. A brief flash on the chosen card plus a chime gives the choice a
+     * moment of weight, and the world is frozen during LEVEL_UP so the delay
+     * costs nothing.
+     */
+    private bindPick(card: HTMLElement, screen: HTMLElement, apply: () => void) {
+        let taken = false;
+        card.onclick = () => {
+            if (taken) return;
+            taken = true;
+            card.classList.add('upgrade-card--picked');
+            audio.play('evolve');
+            juice.flash('#ffffff', 0.18, 0.16);
+
+            setTimeout(() => {
+                this.detachUpgradeKeys();
+                apply();
+                screen.remove();
+                this.state = 'PLAYING';
+            }, 160);
+        };
+    }
+
+    /** Move the keyboard cursor; clamped, never wraps */
+    private focusCard(index: number) {
+        if (this.upgradeCards.length === 0) return;
+        const clamped = Math.max(0, Math.min(this.upgradeCards.length - 1, index));
+        if (clamped === this.focusedCard && this.upgradeCards[clamped].classList.contains('upgrade-card--focused')) return;
+
+        this.upgradeCards.forEach(c => c.classList.remove('upgrade-card--focused'));
+        this.upgradeCards[clamped].classList.add('upgrade-card--focused');
+        this.focusedCard = clamped;
+    }
+
+    /**
+     * WASD / arrows to move, space or enter to take it.
+     *
+     * Three cards is one row, six is two rows of three — so W/S step by the row
+     * width rather than by one, which is what "up" means on a grid.
+     */
+    private attachUpgradeKeys(columns: number) {
+        this.detachUpgradeKeys();
+
+        const onKey = (e: KeyboardEvent) => {
+            if (this.state !== 'LEVEL_UP' || this.upgradeCards.length === 0) return;
+
+            let moved = true;
+            switch (e.code) {
+                case 'KeyA': case 'ArrowLeft': this.focusCard(this.focusedCard - 1); break;
+                case 'KeyD': case 'ArrowRight': this.focusCard(this.focusedCard + 1); break;
+                case 'KeyW': case 'ArrowUp': this.focusCard(this.focusedCard - columns); break;
+                case 'KeyS': case 'ArrowDown': this.focusCard(this.focusedCard + columns); break;
+                case 'Space': case 'Enter':
+                    e.preventDefault();
+                    this.upgradeCards[this.focusedCard]?.click();
+                    return;
+                default: moved = false;
+            }
+
+            if (moved) {
+                e.preventDefault();
+                audio.play('uiHover');
+            }
+        };
+
+        window.addEventListener('keydown', onKey);
+        this.upgradeKeyHandler = onKey;
+    }
+
+    private detachUpgradeKeys() {
+        if (!this.upgradeKeyHandler) return;
+        window.removeEventListener('keydown', this.upgradeKeyHandler);
+        this.upgradeKeyHandler = null;
+        this.upgradeCards = [];
     }
 
     /**
@@ -922,6 +1018,7 @@ export class GameManager {
         });
 
         this.gameTime += dt;
+        this.runStats.update(dt);
         this.waveTimer += dt;
 
         // Parallax layers drift with the camera (frozen while paused)
@@ -1075,6 +1172,7 @@ export class GameManager {
         if (contactDamages.length > 0) {
             const dps = contactDamagePerSecond(contactDamages, this.player.stats.armor);
             this.player.takeContactDamage(dps, dt);
+            this.runStats.onPlayerHurt();
             this.emitContactFeedback(dps, dt);
             this.chargeCapacitor(dps, dt);
         } else {
@@ -1119,6 +1217,7 @@ export class GameManager {
                 this.enemies.splice(i, 1);
                 this.killCount++;
                 this.killScore += enemy.xpValue;
+                this.runStats.recordKill();
             }
         }
 
@@ -1173,6 +1272,30 @@ export class GameManager {
         this.updateHUD();
     }
 
+    /** Everything the achievement conditions are allowed to see */
+    runSnapshot(): RunSnapshot {
+        const stats = this.runStats.stats;
+        let evolved = 0;
+        for (const level of this.weaponLevels.values()) if (level >= 6) evolved++;
+        let maxStack = 0;
+        for (const stacks of this.powerupLevels.values()) maxStack = Math.max(maxStack, stacks);
+
+        return {
+            seconds: this.gameTime,
+            kills: this.killCount,
+            level: this.player?.level ?? 1,
+            evolvedWeapons: evolved,
+            weapons: this.weaponLevels.size,
+            maxPowerupStack: maxStack,
+            longestUntouched: stats.longestUntouched,
+            bestHit: stats.bestHit,
+            bestMultikill: stats.bestMultikill,
+            hpRatio: this.player ? this.player.hp / this.player.maxHp : 1,
+            victory: this.finalBoss?.isDead === true,
+            threat: this.stageThreat,
+        };
+    }
+
     /** Arena threat used as the score multiplier — see core/Score */
     private get stageThreat(): number {
         return (this.currentStage.hpScale + this.currentStage.damageScale) / 2;
@@ -1213,6 +1336,85 @@ export class GameManager {
         return { score, rank };
     }
 
+    /**
+     * The three "what happened" numbers, as opposed to the "how far did you
+     * get" ones above them. These are the parts of a run people retell.
+     */
+    private createHighlights(): HTMLElement {
+        const stats = this.runStats.stats;
+        const box = document.createElement('div');
+        box.className = 'result-highlights';
+
+        const rows: string[] = [];
+
+        if (stats.bestHit > 0) {
+            const weapon = WEAPONS.find(w => w.id === stats.bestHitWeaponId);
+            const evolved = weapon && (this.weaponLevels.get(weapon.id) ?? 0) >= 6;
+            const via = weapon
+                ? `${evolved ? weapon.evolution.emoji : weapon.emoji} ${evolved ? weaponEvoName(weapon) : weaponName(weapon)}`
+                : '';
+            rows.push(`
+                <div class="highlight">
+                    <span>${stats.bestHitCrit ? t('result.bestCrit') : t('result.bestHit')}</span>
+                    <strong>${formatScore(Math.round(stats.bestHit))}</strong>
+                    <em>${via}</em>
+                </div>`);
+        }
+
+        rows.push(`
+            <div class="highlight">
+                <span>${t('result.untouched')}</span>
+                <strong>${this.formatTime(stats.longestUntouched)}</strong>
+            </div>`);
+
+        if (stats.bestMultikill > 1) {
+            rows.push(`
+                <div class="highlight">
+                    <span>${t('result.multikill')}</span>
+                    <strong>×${stats.bestMultikill}</strong>
+                </div>`);
+        }
+
+        box.innerHTML = rows.join('');
+        return box;
+    }
+
+    /**
+     * What you actually built, spelled out — the same icons the in-run panel
+     * shows, so the end screen answers "what was that run" rather than making
+     * you remember. Deliberately no per-weapon damage: ranking your own weapons
+     * would turn build variety into a solved problem.
+     */
+    private createBuildSummary(): HTMLElement {
+        const box = document.createElement('div');
+        box.className = 'result-build';
+
+        const slots: string[] = [];
+        for (const [id, level] of this.weaponLevels) {
+            const weapon = WEAPONS.find(w => w.id === id);
+            if (!weapon) continue;
+            const evolved = level >= 6;
+            slots.push(`
+                <div class="build-slot${evolved ? ' build-slot--evolved' : ''}" title="${evolved ? weaponEvoName(weapon) : weaponName(weapon)}">
+                    <span class="build-icon">${evolved ? weapon.evolution.emoji : weapon.emoji}</span>
+                    <span class="build-badge">${evolved ? '★' : level}</span>
+                </div>`);
+        }
+        for (const [name, stacks] of this.powerupLevels) {
+            const powerup = POWERUPS.find(p => p.name === name);
+            if (!powerup) continue;
+            slots.push(`
+                <div class="build-slot" title="${powerupName(powerup)}">
+                    <span class="build-icon">${powerup.emoji}</span>
+                    <span class="build-badge">${stacks}</span>
+                </div>`);
+        }
+
+        box.innerHTML = `<span class="result-build-label">${t('result.build')}</span>
+            <div class="result-build-row">${slots.join('')}</div>`;
+        return box;
+    }
+
     /** Shared end-of-run panel for both defeat and victory */
     private showRunSummary(opts: { title: string; subtitle: string; variant: 'defeat' | 'victory' }) {
         const mins = Math.floor(this.gameTime / 60).toString().padStart(2, '0');
@@ -1232,6 +1434,7 @@ export class GameManager {
 
         // Score is the headline: it is the only number that makes two runs
         // comparable, so it gets its own panel above the breakdown
+        achievements.check(this.runSnapshot());
         const { score, rank } = this.submitRunScore(opts.variant === 'victory');
         const scoreBox = document.createElement('div');
         scoreBox.className = 'result-score';
@@ -1250,6 +1453,8 @@ export class GameManager {
             <div class="result-stat"><span>${t('result.level')}</span><strong>${this.player?.level ?? 1}</strong></div>
         `;
         screen.appendChild(stats);
+        screen.appendChild(this.createHighlights());
+        screen.appendChild(this.createBuildSummary());
 
         const buttons = document.createElement('div');
         buttons.className = 'menu-buttons menu-buttons--row';
@@ -1377,7 +1582,10 @@ export class GameManager {
      */
     private hazardDamage(fraction: number) {
         if (!this.player) return;
+        const before = this.player.hp;
         this.player.takeDamage(this.player.maxHp * fraction);
+        // i-frames can swallow the hit entirely — only a real one breaks the streak
+        if (this.player.hp < before) this.runStats.onPlayerHurt();
         audio.play('hurt');
         juice.addTrauma(0.35);
         juice.flash('#ff5a1e', 0.2, 0.25);

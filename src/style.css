@@ -950,6 +950,67 @@ h2.lucky {
   color: var(--c-yellow, #ffd23f);
 }
 
+/* End-of-run highlights: the "what happened" numbers */
+.result-highlights {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.highlight {
+  min-width: 130px;
+  padding: 9px 14px;
+  background: rgba(13, 10, 28, 0.7);
+  box-shadow: 0 0 0 2px #2f3a63;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+}
+
+.highlight span {
+  font-size: 0.58em;
+  letter-spacing: 0.14em;
+  color: var(--c-dim);
+}
+
+.highlight strong {
+  font-size: 1.15em;
+  color: var(--c-cyan);
+  text-shadow: 2px 2px 0 #000;
+}
+
+.highlight em {
+  font-style: normal;
+  font-size: 0.58em;
+  letter-spacing: 0.06em;
+  color: var(--c-dim);
+}
+
+.result-build {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.result-build-label {
+  font-size: 0.6em;
+  letter-spacing: 0.18em;
+  color: var(--c-dim);
+}
+
+.result-build-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  max-width: min(560px, 88vw);
+}
+
 /* =========================================================================
    Build panel — the run's weapons and perks, always on screen
    ========================================================================= */
@@ -1108,6 +1169,30 @@ h2.lucky {
   letter-spacing: 0.1em;
 }
 
+/* Keyboard / hover cursor on the level-up cards */
+.upgrade-card--focused {
+  box-shadow:
+    0 0 0 var(--px) var(--c-cyan),
+    0 0 24px rgba(56, 242, 255, 0.35);
+  transform: translateY(-4px);
+  animation: card-focus 1.1s steps(2) infinite alternate;
+}
+
+@keyframes card-focus {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.18); }
+}
+
+/* The moment a pick lands — brief, physical, then the panel goes */
+.upgrade-card--picked {
+  animation: card-pick 160ms steps(2) both;
+}
+
+@keyframes card-pick {
+  0% { filter: brightness(2.6); transform: scale(1.06); }
+  100% { filter: brightness(1); transform: scale(0.96); }
+}
+
 /* Before → after, under the flavour text on an upgrade card */
 .stat-preview {
   margin-top: 6px;
@@ -1115,6 +1200,136 @@ h2.lucky {
   font-size: 0.72em;
   letter-spacing: 0.08em;
   color: var(--c-yellow, #ffd23f);
+}
+
+/* =========================================================================
+   Achievements — toast + list
+   ========================================================================= */
+
+.toast-host {
+  position: absolute;
+  right: 12px;
+  bottom: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 22;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  max-width: min(300px, 62vw);
+  background: rgba(13, 10, 28, 0.94);
+  box-shadow:
+    0 0 0 2px var(--c-yellow, #ffd23f),
+    4px 4px 0 rgba(0, 0, 0, 0.7);
+  animation: toast-in 260ms steps(4) both;
+}
+
+.toast--leaving {
+  animation: toast-out 240ms steps(4) both;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(24px); }
+}
+
+.toast-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.toast-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.toast-text strong {
+  font-size: 0.72em;
+  letter-spacing: 0.1em;
+  color: var(--c-yellow, #ffd23f);
+}
+
+.toast-text em {
+  font-style: normal;
+  font-size: 0.6em;
+  letter-spacing: 0.05em;
+  color: var(--c-dim);
+}
+
+.achievement-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 6px;
+  width: min(760px, 94vw);
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+  margin-bottom: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-cyan) rgba(0, 0, 0, 0.4);
+}
+
+.achievement {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--c-panel);
+  box-shadow: 0 0 0 2px #2f3a63;
+  text-align: left;
+  animation: card-rise 200ms steps(4) both;
+  opacity: 0.55;
+}
+
+.achievement--done {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--c-yellow, #ffd23f);
+}
+
+.achievement-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.achievement-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.achievement-text strong {
+  font-size: 0.7em;
+  letter-spacing: 0.08em;
+  color: var(--c-ink);
+}
+
+.achievement--done .achievement-text strong {
+  color: var(--c-yellow, #ffd23f);
+}
+
+.achievement-text em {
+  font-style: normal;
+  font-size: 0.58em;
+  letter-spacing: 0.04em;
+  color: var(--c-dim);
+}
+
+/* The end-of-run panel already lists the build — no need for both */
+#ui-layer:has(.result-screen) .build-panel {
+  display: none;
 }
 
 /* =========================================================================

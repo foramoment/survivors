@@ -17,3 +17,15 @@ export const checkCollision = (
 
 export const randomRange = (min: number, max: number): number =>
     Math.random() * (max - min) + min;
+
+/**
+ * Shortest signed angle from `b` to `a`, in (-PI, PI].
+ * Plain subtraction wraps wrong across the ±PI seam, which is exactly where a
+ * cone facing left lives.
+ */
+export const angleDelta = (a: number, b: number): number => {
+    let d = (a - b) % (Math.PI * 2);
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    return d;
+};

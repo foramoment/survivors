@@ -53,14 +53,14 @@ class DamageSystemClass {
 
         // If skipModifiers, just deal raw damage (for zones with pre-calculated damage)
         if (skipModifiers) {
-            return this.applyDamage(baseDamage, target, position, false);
+            return this.applyDamage(baseDamage, target, position, false, source);
         }
 
         // Get player stats (owner of weapon)
         const player = this.getPlayer(source);
         if (!player) {
             // Fallback: just deal raw damage
-            return this.applyDamage(baseDamage, target, position, false);
+            return this.applyDamage(baseDamage, target, position, false, source);
         }
 
         // Calculate crit
@@ -72,7 +72,7 @@ class DamageSystemClass {
         const might = player.effectiveMight ?? player.stats.might;
         const finalDamage = baseDamage * might * GLOBAL_DAMAGE * critMultiplier;
 
-        return this.applyDamage(finalDamage, target, position, isCrit);
+        return this.applyDamage(finalDamage, target, position, isCrit, source);
     }
 
 
@@ -80,7 +80,7 @@ class DamageSystemClass {
     /**
      * Internal method to apply damage and emit events
      */
-    private applyDamage(damage: number, target: any, position: Vector2, isCrit: boolean): DamageResult {
+    private applyDamage(damage: number, target: any, position: Vector2, isCrit: boolean, source: any = null): DamageResult {
         const wasAlive = !target.isDead;
 
         // Corrosion amplifies EVERY source, including infection ticks and
@@ -101,7 +101,7 @@ class DamageSystemClass {
         });
 
         // Emit damage number
-        this.emitDamageNumber(position, finalDamage, isCrit);
+        this.emitDamageNumber(position, finalDamage, isCrit, source);
 
         return { finalDamage, isCrit, killed };
     }
@@ -119,14 +119,18 @@ class DamageSystemClass {
     /**
      * Emit damage number event
      */
-    private emitDamageNumber(pos: Vector2, amount: number, isCrit: boolean) {
-        (this as any)._onDamageNumber?.(pos, amount, isCrit);
+    private emitDamageNumber(pos: Vector2, amount: number, isCrit: boolean, source: any) {
+        (this as any)._onDamageNumber?.(pos, amount, isCrit, source);
     }
 
     /**
-     * Set the callback for damage number display
+     * Set the callback for damage number display.
+     * `source` rides along so the run's best-hit record can name the weapon —
+     * this is the only place that knows which one landed the blow.
      */
-    setDamageNumberCallback(callback: (pos: Vector2, amount: number, isCrit: boolean) => void) {
+    setDamageNumberCallback(
+        callback: (pos: Vector2, amount: number, isCrit: boolean, source: any) => void
+    ) {
         (this as any)._onDamageNumber = callback;
     }
 
