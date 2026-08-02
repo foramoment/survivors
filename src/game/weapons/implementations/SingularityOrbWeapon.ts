@@ -18,7 +18,7 @@
 import { ProjectileWeapon, SingularityProjectile, Zone } from '../base';
 import type { Player } from '../../entities/Player';
 import { Entity } from '../../Entity';
-import { distance, type Vector2 } from '../../core/Utils';
+import { distance, normalize, type Vector2 } from '../../core/Utils';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { damageSystem } from '../../core/DamageSystem';
 import { particles } from '../../core/ParticleSystem';
@@ -206,6 +206,13 @@ export class BlackHoleProjectile extends SingularityProjectile {
 // ============================================
 
 export class BlackHoleZone extends Zone {
+    /**
+     * How much gravity bends an enemy's speed outside the horizon, at the
+     * centre of the field. Falls off to nothing at the rim, and flips sign for
+     * anything walking away — so the worst case is an enemy at 40% speed and
+     * the best is one arriving 40% early.
+     */
+    static readonly GRAVITY_ASSIST = 0.4;
     /** Pull at the start; it tightens as the hole collapses */
     pullStrength: number = 340;
     /** Damage per second to anything past the horizon */
@@ -247,6 +254,8 @@ export class BlackHoleZone extends Zone {
         const pullRadius = this.radius * 2;
         const pull = this.pullStrength * (1 + this.collapse * 1.4);
 
+        const playerPos = (this.source as any)?.owner?.pos as Vector2 | undefined;
+
         for (const enemy of levelSpatialHash.getWithinRadius(this.pos, pullRadius)) {
             const dx = this.pos.x - enemy.pos.x;
             const dy = this.pos.y - enemy.pos.y;
@@ -256,16 +265,36 @@ export class BlackHoleZone extends Zone {
             enemy.pos.x += (dx / dist) * (pull / dist) * dt;
             enemy.pos.y += (dy / dist) * (pull / dist) * dt;
 
-            // Past the horizon it stops being a pull and starts being a grave.
-            // Continuous, so a target held in the middle melts while one
-            // skimming the edge only gets dragged.
-            if (dist < this.horizon && this.horizonDps > 0) {
-                damageSystem.dealDamage({
-                    baseDamage: this.horizonDps * dt,
-                    source: this.source,
-                    target: enemy,
-                    position: enemy.pos,
-                });
+            if (dist < this.horizon) {
+                // Past the horizon nothing leaves. It is not a stun — no
+                // recovery, no immunity, no diminishing returns — it is the
+                // hole holding what fell in until it closes. Watching enemies
+                // stroll straight through the black part of a black hole was
+                // the thing that broke the illusion.
+                enemy.speedMultiplier = 0;
+
+                // ...and a grave, continuously, so a body held in the middle
+                // melts while one skimming the edge only gets dragged
+                if (this.horizonDps > 0) {
+                    damageSystem.dealDamage({
+                        baseDamage: this.horizonDps * dt,
+                        source: this.source,
+                        target: enemy,
+                        position: enemy.pos,
+                    });
+                }
+            } else if (playerPos) {
+                // Outside the horizon, gravity bends how fast they travel
+                // rather than where they are: an enemy whose path toward the
+                // player runs *with* the hole gets slingshotted along, one
+                // climbing away from it drags. Same physics that makes the
+                // whole thing feel massive, and it means the hole can hand the
+                // crowd to you faster than they came — which is the trade for
+                // parking it between you and them.
+                const heading = normalize({ x: playerPos.x - enemy.pos.x, y: playerPos.y - enemy.pos.y });
+                const alignment = heading.x * (dx / dist) + heading.y * (dy / dist);
+                const falloff = 1 - dist / pullRadius;
+                enemy.speedMultiplier *= 1 + alignment * BlackHoleZone.GRAVITY_ASSIST * falloff;
             }
         }
 
@@ -285,13 +314,23 @@ export class BlackHoleZone extends Zone {
         }
     }
 
+    /**
+     * Discharges thrown outward from the core in random directions.
+     *
+     * They used to be drawn from the hole to nearby enemies, which promised a
+     * connection that does not exist — the zone's arcs deal no damage, the
+     * horizon does. Lines reaching for specific bodies read as "this is hitting
+     * that one", and it isn't. Radial crackle says "something violent is
+     * happening in there", which is true.
+     */
     private discharge(reach: number) {
-        let struck = 0;
-        for (const enemy of levelSpatialHash.getWithinRadius(this.pos, reach)) {
-            if (struck >= 3 || enemy.isDead) continue;
-            if (distance(this.pos, enemy.pos) > reach) continue;
-            struck++;
-            this.arcs.push(bakeArc(this.pos, enemy.pos));
+        for (let i = 0; i < 3; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const len = this.horizon + Math.random() * (reach - this.horizon) * 0.7;
+            this.arcs.push(bakeArc(this.pos, {
+                x: this.pos.x + Math.cos(angle) * len,
+                y: this.pos.y + Math.sin(angle) * len,
+            }));
         }
     }
 
@@ -486,8 +525,12 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
         const duration = 3.2 * this.owner.stats.duration;
 
         const zone = new BlackHoleZone(x, y, radius, duration, this.damage * 0.18);
-        zone.horizonDps = this.damage * 1.6;
-        zone.implosionDamage = this.damage * 2.4;
+        // Both trimmed now that the horizon actually HOLDS what it catches:
+        // a body that crosses it takes every tick of the field's remaining
+        // life, where before it was dragged through and wandered back out. The
+        // implosion is the punctuation, not a second detonation on top.
+        zone.horizonDps = this.damage * 1.1;
+        zone.implosionDamage = this.damage * 1.4;
         zone.source = this;
 
         particles.emitSingularityDistortion(x, y, radius);

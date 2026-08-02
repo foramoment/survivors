@@ -25,9 +25,24 @@ export const DISCHARGE_RADIUS = 190;
 export const DISCHARGE_DAMAGE = 34;
 export const DISCHARGE_KNOCKBACK = 420;
 
-/** Fraction of a dead enemy's max HP the echo blast deals */
-export const KILL_ECHO_DAMAGE_SHARE = 0.55;
+/**
+ * Kill Echo's blast, as a fraction of the dead enemy's max HP.
+ *
+ * It was 0.55 and it chained. On a hard stage a late-tier corpse carries five
+ * figures of HP, so one echo deleted everything near it, every one of those
+ * deaths rolled its own echo, and a single detonation could clear the screen.
+ * A player who had never built the perk before won a run on it by accident and
+ * was — correctly — annoyed.
+ *
+ * Two things hold it now: this share is less than half what it was, and
+ * `Enemy.echoed` stops an echo kill from echoing again (see
+ * GameManager.killEcho). The chain was the real bug; the share is what makes a
+ * single blast a hit rather than a wipe.
+ */
+export const KILL_ECHO_DAMAGE_SHARE = 0.22;
 export const KILL_ECHO_RADIUS = 84;
+/** Burn left on whatever survives the blast, as a share of the same HP */
+export const KILL_ECHO_BURN_SHARE = 0.06;
 
 /** Below this share of max HP the adrenal bonus is live */
 export const ADRENALINE_THRESHOLD = 0.35;

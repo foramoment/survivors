@@ -29,7 +29,7 @@ import { achievements, type RunSnapshot } from './core/Achievements';
 import { RepairCell } from './entities/RepairCell';
 import {
     dischargeThreshold, DISCHARGE_RADIUS, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
-    KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE,
+    KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE,
 } from './core/Tactics';
 import { screenManager } from './ui/ScreenManager';
 
@@ -160,6 +160,9 @@ export class GameManager {
         this.detachUpgradeKeys();
         this.finalBoss = null;
         this.finalBossSpawned = false;
+        // Nothing from the last run may survive into this one, least of all in
+        // the structure every weapon uses to find targets
+        levelSpatialHash.clear();
         // Reset progression tracking BEFORE adding the starting weapon
         this.powerupLevels.clear();
         this.weaponLevels.clear();
@@ -517,12 +520,23 @@ export class GameManager {
     }
 
     /**
-     * Kill Echo: a dead enemy sometimes takes its neighbours with it. Scaled
-     * off the corpse's max HP so it stays relevant as enemies get tougher, and
-     * dealt with `skipModifiers` so an echo can never chain into another echo.
+     * Kill Echo: a dead enemy sometimes takes its neighbours with it.
+     *
+     * Scaled off the corpse's max HP so it stays relevant as enemies get
+     * tougher, and dealt with `skipModifiers` so the player's damage stats do
+     * not multiply it.
+     *
+     * **An echo kill cannot echo.** The old comment here claimed
+     * `skipModifiers` prevented chaining; it does not — it only stops the
+     * damage being amplified. Anything the blast killed still went through the
+     * death loop and rolled its own echo, one generation per frame, with no
+     * limit. On a hard stage, where a corpse carries five figures of HP, a
+     * single detonation in a dense pack cleared the screen. That is the bug the
+     * `echoed` flag closes.
      */
     private killEcho(enemy: Enemy) {
         if (!this.player) return;
+        if (enemy.echoed) return;
         if (Math.random() >= this.player.stats.killEcho) return;
 
         const radius = KILL_ECHO_RADIUS * this.player.stats.area;
@@ -541,6 +555,19 @@ export class GameManager {
                 position: other.pos,
                 skipModifiers: true,
             });
+            if (other.isDead) {
+                other.echoed = true;
+            } else {
+                // What survives walks away on fire. A burn cannot cascade —
+                // it resolves over seconds, not inside this frame — so the
+                // perk keeps a presence without being able to run away again.
+                status.infect(other, {
+                    dps: enemy.maxHp * KILL_ECHO_BURN_SHARE,
+                    duration: 2.5,
+                    source: undefined,
+                    kind: 'burn',
+                });
+            }
         }
     }
 
@@ -1101,6 +1128,15 @@ export class GameManager {
         // from walking through cover
         propField.update(this.player.pos);
         propField.resolve(this.player);
+        // Rebuild the spatial hash BEFORE anything queries it. Weapons target
+        // through it, so when this ran after them they were aiming at last
+        // frame's snapshot — and on the first frame of a new run that snapshot
+        // was the *previous run's* enemies, still sitting where they died. That
+        // is the "I press start and a weapon immediately fires and damage
+        // numbers appear" bug: it was shooting ghosts.
+        levelSpatialHash.clear();
+        levelSpatialHash.insertAll(this.enemies);
+
         this.player.weapons.forEach(w => w.update(dt));
 
         // Reset enemy stats and forces before updates/collisions
@@ -1111,12 +1147,7 @@ export class GameManager {
             e.resetForces();
         });
 
-        // === ENEMY SEPARATION USING SPATIAL HASH ===
-        // 1. Build spatial hash grid
-        levelSpatialHash.clear();
-        levelSpatialHash.insertAll(this.enemies);
-
-        // 2. Calculate separation forces for each enemy
+        // Separation forces for each enemy
         for (const enemy of this.enemies) {
             // Get nearby enemies from spatial grid (O(1) average case)
             const nearby = levelSpatialHash.getNearby(enemy.pos, enemy.radius * 3);

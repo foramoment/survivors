@@ -21,6 +21,7 @@ import { SpinningEmberWeapon, EmberOrb } from '../weapons/implementations/Spinni
 import { PhantomSlashWeapon } from '../weapons/implementations/PhantomSlashWeapon';
 import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWeapon';
 import { SporeCloudWeapon } from '../weapons/implementations/SporeCloudWeapon';
+import { BlackHoleZone } from '../weapons/implementations/SingularityOrbWeapon';
 import { NanobotSwarmWeapon } from '../weapons/implementations/NanobotSwarmWeapon';
 import type { Entity } from '../Entity';
 
@@ -33,6 +34,50 @@ function placeEnemies(enemies: Enemy[]) {
     levelSpatialHash.clear();
     levelSpatialHash.insertAll(enemies);
 }
+
+describe('Black Hole gravity', () => {
+    /** A hole with a player standing off to the right, as the weapon wires it */
+    function makeHole(playerX: number) {
+        const zone = new BlackHoleZone(0, 0, 200, 3, 5);
+        zone.source = { owner: { pos: { x: playerX, y: 0 } } } as any;
+        return zone;
+    }
+
+    it('holds anything past the horizon completely still', () => {
+        const zone = makeHole(600);
+        const caught = makeEnemy(10, 0);
+        caught.speedMultiplier = 1;
+        placeEnemies([caught]);
+
+        zone.update(1 / 60);
+        expect(caught.speedMultiplier).toBe(0);
+    });
+
+    it('slingshots enemies whose path runs with it, and drags those climbing out', () => {
+        const zone = makeHole(600);
+        // Both outside the horizon. `behind` walks toward the player *through*
+        // the hole; `ahead` has already passed it and is climbing away.
+        const behind = makeEnemy(-150, 0);
+        const ahead = makeEnemy(150, 0);
+        behind.speedMultiplier = 1;
+        ahead.speedMultiplier = 1;
+        placeEnemies([behind, ahead]);
+
+        zone.update(1 / 60);
+        expect(behind.speedMultiplier).toBeGreaterThan(1);
+        expect(ahead.speedMultiplier).toBeLessThan(1);
+    });
+
+    it('leaves anything outside its reach alone', () => {
+        const zone = makeHole(600);
+        const far = makeEnemy(900, 0);
+        far.speedMultiplier = 1;
+        placeEnemies([far]);
+
+        zone.update(1 / 60);
+        expect(far.speedMultiplier).toBe(1);
+    });
+});
 
 describe('Corrosion', () => {
     let enemy: Enemy;

@@ -41,6 +41,12 @@ export class Enemy extends Entity {
     stunTimer: number = 0;
     /** Seconds before this enemy can be stunned again (see StatusEffects.stun) */
     stunImmunity: number = 0;
+    /**
+     * Killed by a Kill Echo blast, so it may not detonate one of its own.
+     * Without this, one echo on a dense pack cascades until the screen is
+     * empty — see core/Tactics.
+     */
+    echoed: boolean = false;
 
     constructor(x: number, y: number, type: EnemyType, isElite: boolean = false) {
         super(x, y, 12);

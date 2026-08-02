@@ -204,7 +204,9 @@ export const POWERUPS: PowerupData[] = [
     // removed because it was the one powerup whose effect you could not feel;
     // Rapid Tick (+zone tick rate) followed it into Cooling System.
     { id: 'static_discharge', name: "Static Discharge", description: "Damage taken charges a capacitor that blows the crowd off you", type: "discharge", value: 1, maxStacks: 8, emoji: "🔌" },
-    { id: 'kill_echo', name: "Kill Echo", description: "The dead sometimes detonate", type: "killEcho", value: 0.06, maxStacks: 8, emoji: "☠️" },
+    // Capped at six: at eight, half of everything you killed was detonating,
+    // which is visual noise on top of a perk that already had to be defused
+    { id: 'kill_echo', name: "Kill Echo", description: "The dead sometimes detonate and set the survivors alight", type: "killEcho", value: 0.06, maxStacks: 6, emoji: "☠️" },
     { id: 'adrenal_surge', name: "Adrenal Surge", description: "Hit harder and move faster while nearly dead", type: "adrenaline", value: 0.1, maxStacks: 8, emoji: "🩸" },
     { id: 'vital_siphon', name: "Vital Siphon", description: "Kills sometimes leave a repair cell behind", type: "siphon", value: 0.025, maxStacks: 8, emoji: "💗" },
     // Hard-capped at two: every level-up already comes with one free reroll, and

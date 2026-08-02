@@ -230,7 +230,11 @@ export class PhantomSlashWeapon extends Weapon {
     readonly stats = {
         damage: 15,
         cooldown: 1.5,
-        area: 250,
+        // Halved from 250. At that reach the "melee" weapon was cutting things
+        // most of a screen away, so there was never a reason to let anything
+        // get close — which is the exact opposite of what a blade that scales
+        // with crowd pressure is asking you to do.
+        area: 125,
         speed: 0,
         duration: 0.2,
         count: 3,

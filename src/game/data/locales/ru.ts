@@ -238,7 +238,7 @@ export const RU: Record<string, string> = {
     'powerup.static_discharge.name': 'Статический Разряд',
     'powerup.static_discharge.desc': 'Полученный урон копит заряд, который сдувает толпу с тебя',
     'powerup.kill_echo.name': 'Эхо Смерти',
-    'powerup.kill_echo.desc': 'Убитые иногда детонируют',
+    'powerup.kill_echo.desc': 'Убитые иногда детонируют и поджигают уцелевших',
     'powerup.adrenal_surge.name': 'Выброс Адреналина',
     'powerup.adrenal_surge.desc': 'На последнем издыхании бьёшь сильнее и бежишь быстрее',
     'powerup.vital_siphon.name': 'Сифон Жизни',

@@ -25,7 +25,9 @@ const EXPECTED_STATS: Record<string, any> = {
     phantom_slash: {
         damage: 15,
         cooldown: 1.5,
-        area: 250,
+        // Halved: a melee weapon reaching most of a screen gave you no reason
+        // to ever let anything close, which is what it scales on
+        area: 125,
         speed: 0,
         duration: 0.2,
         count: 3,
