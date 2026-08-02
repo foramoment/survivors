@@ -21,6 +21,14 @@ export interface RunStats {
     longestUntouched: number;
     /** Most enemies killed inside one MULTIKILL_WINDOW */
     bestMultikill: number;
+    /** Every point of damage the player dealt this run */
+    totalDamage: number;
+    /**
+     * Every point of HP the player got back — regen, repair cells, anything.
+     * Often zero, which is itself worth showing: it says out loud that this
+     * run had no sustain in it, and sustain is a thing you can go build.
+     */
+    totalHealed: number;
 }
 
 /** Kills this far apart still count as one multikill */
@@ -33,6 +41,8 @@ export function createRunStats(): RunStats {
         bestHitWeaponId: null,
         longestUntouched: 0,
         bestMultikill: 0,
+        totalDamage: 0,
+        totalHealed: 0,
     };
 }
 
@@ -71,7 +81,13 @@ export class RunStatsTracker {
         this.untouchedFor = 0;
     }
 
+    /** HP the player got back, from any source */
+    recordHeal(amount: number): void {
+        if (amount > 0) this.stats.totalHealed += amount;
+    }
+
     recordHit(damage: number, isCrit: boolean, weaponId: string | null): void {
+        this.stats.totalDamage += damage;
         if (damage <= this.stats.bestHit) return;
         this.stats.bestHit = damage;
         this.stats.bestHitCrit = isCrit;

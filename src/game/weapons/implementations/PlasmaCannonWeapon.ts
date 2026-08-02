@@ -110,8 +110,18 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         duration: 1.5,
     };
 
-    /** Shards thrown by a second-generation burst */
-    private static readonly SPLINTER_COUNT = 4;
+    /**
+     * Shards thrown by a second-generation burst.
+     *
+     * Generous on purpose. The evolution's whole payoff is conditional — it
+     * only happens where a shard actually connected — so on paper it looked
+     * fine and in a real fight it read as barely different from the base gun.
+     * A conditional payoff has to be worth *more* than an unconditional one,
+     * not the same.
+     */
+    private static readonly SPLINTER_COUNT = 6;
+    /** Size of a second-generation shard relative to its parent */
+    private static readonly SPLINTER_SCALE = 0.72;
 
     constructor(owner: Player) {
         super(owner);
@@ -132,7 +142,10 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
 
             if (target) {
                 this.fire(target);
-                const cdMultiplier = this.evolved ? 1.4 : 1.0;
+                // Trimmed from 1.4: the evolution pays for itself in a
+                // condition (a shard has to connect), so it should not also
+                // pay in rate
+                const cdMultiplier = this.evolved ? 1.2 : 1.0;
                 this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
             }
         }
@@ -207,7 +220,9 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
      */
     private splinter(x: number, y: number) {
         particles.emitPlasmaBurst(x, y, this.area * 0.35 * this.owner.stats.area, false);
-        this.throwShards(x, y, PlasmaCannonWeapon.SPLINTER_COUNT, 0.6, 0);
+        particles.emitShrapnel(x, y, this.area * 0.3 * this.owner.stats.area,
+            ['#e8ffe8', '#3dff86', '#0f7a3a'], 5);
+        this.throwShards(x, y, PlasmaCannonWeapon.SPLINTER_COUNT, PlasmaCannonWeapon.SPLINTER_SCALE, 0);
     }
 }
 

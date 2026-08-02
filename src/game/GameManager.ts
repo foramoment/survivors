@@ -185,6 +185,7 @@ export class GameManager {
 
         this.player.baseMaxHp = cls.hp;
         this.player.onLevelUp = () => this.showLevelUp();
+        this.player.onHeal = amount => this.runStats.recordHeal(amount);
 
         // Add starting weapon
         this.addWeapon(cls.weaponId);
@@ -540,7 +541,6 @@ export class GameManager {
         if (Math.random() >= this.player.stats.killEcho) return;
 
         const radius = KILL_ECHO_RADIUS * this.player.stats.area;
-        const damage = enemy.maxHp * KILL_ECHO_DAMAGE_SHARE;
 
         particles.emitExplosion(enemy.pos.x, enemy.pos.y, radius, ['#ffd166', '#ff6b35', '#ffffff']);
         juice.shockwave(enemy.pos.x, enemy.pos.y, radius * 1.5, '#ffb03c', 0.3, 4);
@@ -548,8 +548,10 @@ export class GameManager {
         for (const other of levelSpatialHash.getWithinRadius(enemy.pos, radius)) {
             if (other === enemy || other.isDead) continue;
             if (distance(enemy.pos, other.pos) > radius) continue;
+            // A share of what IT can take, not of what the corpse could — see
+            // KILL_ECHO_DAMAGE_SHARE
             damageSystem.dealDamage({
-                baseDamage: damage,
+                baseDamage: other.maxHp * KILL_ECHO_DAMAGE_SHARE,
                 source: null,
                 target: other,
                 position: other.pos,
@@ -562,7 +564,7 @@ export class GameManager {
                 // it resolves over seconds, not inside this frame — so the
                 // perk keeps a presence without being able to run away again.
                 status.infect(other, {
-                    dps: enemy.maxHp * KILL_ECHO_BURN_SHARE,
+                    dps: other.maxHp * KILL_ECHO_BURN_SHARE,
                     duration: 2.5,
                     source: undefined,
                     kind: 'burn',
@@ -1274,7 +1276,7 @@ export class GameManager {
             cell.update(dt, this.player.pos);
 
             if (checkCollision(cell, this.player)) {
-                this.player.hp = Math.min(this.player.maxHp, this.player.hp + cell.heal);
+                this.player.heal(cell.heal);
                 audio.play('pickup');
                 particles.emitHit(cell.pos.x, cell.pos.y, '#ff6b8a');
                 this.repairCells.splice(i, 1);
@@ -1482,6 +1484,20 @@ export class GameManager {
                     <strong>×${stats.bestMultikill}</strong>
                 </div>`);
         }
+
+        rows.push(`
+            <div class="highlight">
+                <span>${t('result.totalDamage')}</span>
+                <strong>${formatScore(Math.round(stats.totalDamage))}</strong>
+            </div>`);
+
+        // Shown even at zero, on purpose: "you healed nothing all run" is a
+        // fact about the build, and one the player can act on next time
+        rows.push(`
+            <div class="highlight">
+                <span>${t('result.healed')}</span>
+                <strong>${formatScore(Math.round(stats.totalHealed))}</strong>
+            </div>`);
 
         box.innerHTML = rows.join('');
         return box;

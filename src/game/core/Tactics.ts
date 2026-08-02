@@ -26,23 +26,30 @@ export const DISCHARGE_DAMAGE = 34;
 export const DISCHARGE_KNOCKBACK = 420;
 
 /**
- * Kill Echo's blast, as a fraction of the dead enemy's max HP.
+ * Kill Echo's blast, as a fraction of **the max HP of each enemy it hits** —
+ * not of the corpse that produced it.
  *
- * It was 0.55 and it chained. On a hard stage a late-tier corpse carries five
- * figures of HP, so one echo deleted everything near it, every one of those
- * deaths rolled its own echo, and a single detonation could clear the screen.
- * A player who had never built the perk before won a run on it by accident and
- * was — correctly — annoyed.
+ * This is the third attempt and the first one that is bounded by construction.
+ * Scaling off the *corpse* meant a fat body was a bomb: kill one late-tier
+ * elite in the middle of a pack and it deleted the pack, because its HP had
+ * nothing to do with theirs. Scaling off the corpse's *current* HP does not
+ * work either — at the moment of death that is zero.
  *
- * Two things hold it now: this share is less than half what it was, and
- * `Enemy.echoed` stops an echo kill from echoing again (see
- * GameManager.killEcho). The chain was the real bug; the share is what makes a
- * single blast a hit rather than a wipe.
+ * Off the victim's own maximum, the blast is a fixed fraction of whatever it
+ * touches. It cannot one-shot anything, it cannot spike on a big corpse, it
+ * stays exactly as relevant at minute twenty as at minute one, and five and a
+ * half echoes are needed to kill anything outright — which, combined with the
+ * no-chaining rule in GameManager.killEcho, makes a screen wipe arithmetically
+ * impossible.
  */
-export const KILL_ECHO_DAMAGE_SHARE = 0.22;
-export const KILL_ECHO_RADIUS = 84;
-/** Burn left on whatever survives the blast, as a share of the same HP */
-export const KILL_ECHO_BURN_SHARE = 0.06;
+export const KILL_ECHO_DAMAGE_SHARE = 0.18;
+/**
+ * Tightened from 84. Enemies travel packed together, so a generous radius here
+ * is not "a blast" — it is "everything on top of the corpse", every time.
+ */
+export const KILL_ECHO_RADIUS = 62;
+/** Burn left on survivors, as a share of their own max HP per second */
+export const KILL_ECHO_BURN_SHARE = 0.05;
 
 /** Below this share of max HP the adrenal bonus is live */
 export const ADRENALINE_THRESHOLD = 0.35;

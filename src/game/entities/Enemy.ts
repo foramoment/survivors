@@ -199,13 +199,17 @@ export class Enemy extends Entity {
 
         // Procedural pixel sprite with walk animation and hit flash
         const frame = Math.floor(this.animTimer * 6) % 2;
-        // A hit reads as a white flash; corrosion as a slow acid-green pulse of
-        // the same silhouette. Both are baked sprite variants, so this costs a
-        // drawImage no matter how many enemies are affected — the ring this
-        // replaced was a stroked path per body, per frame.
+        // A hit reads as a white flash; corrosion as a steady acid-green cast
+        // of the same silhouette. Both are baked sprite variants, so this costs
+        // one drawImage no matter how many enemies are affected.
+        //
+        // The corroded tint used to blink on a sine, which made a corroded pack
+        // the loudest thing on the arena — dozens of bodies strobing in and out
+        // of green while you are trying to read where the gaps are. Corrosion
+        // is a state, and a state should be a colour, not an animation.
         const tint: EnemyTint = this.hitFlash > 0
             ? 'hit'
-            : (this.corrosion && Math.sin(this.animTimer * 7) > 0.25 ? 'corroded' : 'none');
+            : (this.corrosion ? 'corroded' : 'none');
         const sprite = sprites.getEnemySprite(this.name, frame, tint);
         const size = this.radius * 2.4;
         const bob = Math.sin(this.animTimer * 8) * this.radius * 0.08;

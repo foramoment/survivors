@@ -75,6 +75,20 @@ export class Player extends Entity {
     facingLeft: boolean = false;
 
     onLevelUp: () => void = () => { };
+    /** Every source of healing reports through here, so the run can total it */
+    onHeal: (amount: number) => void = () => { };
+
+    /**
+     * Restore HP, capped at the maximum, and report what actually landed.
+     * Overheal is not healing — a full-HP player picking up a repair cell got
+     * nothing, and the run summary should say so.
+     */
+    heal(amount: number): void {
+        if (amount <= 0 || this.hp >= this.maxHp) return;
+        const restored = Math.min(amount, this.maxHp - this.hp);
+        this.hp += restored;
+        this.onHeal(restored);
+    }
 
     constructor(x: number, y: number) {
         super(x, y, 15);
@@ -153,8 +167,7 @@ export class Player extends Entity {
 
         // Regen
         if (this.stats.regen > 0 && this.hp < this.maxHp) {
-            this.hp += this.stats.regen * dt;
-            if (this.hp > this.maxHp) this.hp = this.maxHp;
+            this.heal(this.stats.regen * dt);
         }
 
         // Update invulnerability timer

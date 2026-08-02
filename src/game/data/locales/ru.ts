@@ -70,6 +70,8 @@ export const RU: Record<string, string> = {
     'result.bestCrit': 'ЛУЧШИЙ КРИТ',
     'result.untouched': 'БЕЗ УРОНА',
     'result.multikill': 'ЛУЧШАЯ СЕРИЯ',
+    'result.totalDamage': 'УРОНА НАНЕСЕНО',
+    'result.healed': 'HP ВОССТАНОВЛЕНО',
     'result.build': 'ТВОЙ БИЛД',
     'result.again': '↻ ЕЩЁ РАЗ',
     'result.menu': '⌂ ГЛАВНОЕ МЕНЮ',

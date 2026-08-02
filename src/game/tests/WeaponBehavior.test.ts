@@ -28,6 +28,7 @@ vi.mock('../core/ParticleSystem', () => ({
         emitAcidBubble: vi.fn(),
         emitBeamCharge: vi.fn(),
         emitZoneEdge: vi.fn(),
+        emitShrapnel: vi.fn(),
         emitColdMist: vi.fn(),
         emitSporeCloud: vi.fn(),
         emitFrost: vi.fn(),
@@ -246,7 +247,7 @@ describe('PlasmaCannonWeapon', () => {
         first[0].handleHit({ pos: { x: 300, y: 300 }, isDead: false } as any);
 
         const second = [...spawnedEntities] as any[];
-        expect(second.length).toBe(4);
+        expect(second.length).toBe(6);
         expect(second[0].pos).toEqual({ x: 300, y: 300 });
         // ...and the children cannot cascade
         expect(second.every(s => s.splinters === 0)).toBe(true);
@@ -262,8 +263,9 @@ describe('PlasmaCannonWeapon', () => {
         weapon.cooldown = 0;
         weapon.update(0.1);
 
-        // Evolved cooldown multiplier is 1.4
-        expect(weapon.cooldown).toBeCloseTo(weapon.baseCooldown * mockOwner.stats.cooldown * 1.4);
+        // Evolved cooldown multiplier is 1.2 — the evolution already pays in a
+        // condition (a shard has to connect), so it should not also pay in rate
+        expect(weapon.cooldown).toBeCloseTo(weapon.baseCooldown * mockOwner.stats.cooldown * 1.2);
     });
 });
 

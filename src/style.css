@@ -898,10 +898,13 @@ h2.lucky {
 /* The two rows of end-of-run tiles share one grid so their columns line up
    exactly. They used to be flex rows with a min-width, which meant each row
    sized itself to its own content and the two sat slightly out of step. */
+/* auto-fit rather than a fixed three, so adding a stat does not require
+   re-planning the layout — the rows re-flow and stay column-aligned with each
+   other because both grids use the same track size. */
 .result-stats,
 .result-highlights {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
   gap: 12px;
   width: min(560px, 92vw);
   margin-left: auto;

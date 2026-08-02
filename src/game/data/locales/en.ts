@@ -66,6 +66,8 @@ export const EN: Record<string, string> = {
     'result.bestCrit': 'BIGGEST CRIT',
     'result.untouched': 'UNTOUCHED FOR',
     'result.multikill': 'BEST MULTIKILL',
+    'result.totalDamage': 'DAMAGE DEALT',
+    'result.healed': 'HP RESTORED',
     'result.build': 'YOUR BUILD',
     'result.again': '↻ PLAY AGAIN',
     'result.menu': '⌂ MAIN MENU',
