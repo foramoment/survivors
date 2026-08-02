@@ -6,8 +6,28 @@
  * 2. Все типы существуют в VALID_PLAYER_STATS
  */
 import { describe, it, expect } from 'vitest';
-import { POWERUPS } from '../data/GameData';
+import { POWERUPS, WEAPONS } from '../data/GameData';
 import { VALID_PLAYER_STATS } from '../core/PlayerStats';
+
+describe('Icons', () => {
+    it('no two things you can own share an icon', () => {
+        // The build panel is a row of icons and nothing else, so two entries
+        // with the same emoji are indistinguishable there. Plasma Grenade and
+        // Chain Reaction were both 💣, Frost Nova and Cooling System both ❄️,
+        // Lightning Chain and Static Discharge both ⚡.
+        const seen = new Map<string, string>();
+        const claim = (emoji: string, owner: string) => {
+            expect(seen.get(emoji), `${emoji}: ${seen.get(emoji)} and ${owner}`).toBeUndefined();
+            seen.set(emoji, owner);
+        };
+
+        for (const weapon of WEAPONS) {
+            claim(weapon.emoji, weapon.name);
+            claim(weapon.evolution.emoji, weapon.evolution.name);
+        }
+        for (const powerup of POWERUPS) claim(powerup.emoji, powerup.name);
+    });
+});
 
 describe('POWERUPS Validation', () => {
     it('should not have duplicate stat types', () => {

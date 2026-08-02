@@ -30,9 +30,19 @@ const SEARCH_RANGE = 460;
 // ============================================
 // ABSOLUTE ZERO - freezes solid, then shatters
 // ============================================
+/**
+ * ABSOLUTE ZERO — the evolved field.
+ *
+ * It does **not** stun. The freeze is the *impact* (see
+ * FrostNovaWeapon.impactBurst); what the slab does afterwards is hold the pack
+ * in a deep slow until it cracks and shatters.
+ *
+ * It used to re-apply a stun every frame to everything standing in it, which is
+ * exactly the shape `StatusEffects` had to grow a diminishing-returns rule to
+ * survive. Stun-on-landing then slow is the same fantasy without needing the
+ * rule to save it, and it is legible: you see the pack snap still, then crawl.
+ */
 export class AbsoluteZeroZone extends Zone {
-    /** Seconds of stun refreshed on anything inside */
-    freezeDuration: number = 0.6;
     /** Damage of the burst when the field collapses */
     shatterDamage: number = 0;
 
@@ -44,8 +54,8 @@ export class AbsoluteZeroZone extends Zone {
     private rim: Vector2[] = [];
     private cracks: Vector2[][] = [];
 
-    constructor(x: number, y: number, radius: number, damage: number, duration: number) {
-        super(x, y, radius, duration, damage, 0.5, '');
+    constructor(x: number, y: number, radius: number, damage: number, duration: number, slow: number) {
+        super(x, y, radius, duration, damage, 0.5, '', slow);
         this.maxDuration = duration;
         // The slab keeps freezing outward for as long as it holds
         this.growOver(0.35, 1);
@@ -90,9 +100,10 @@ export class AbsoluteZeroZone extends Zone {
                 ['#e2f8ff', '#7ecdfc', '#ffffff'], 2);
         }
 
+        // A puff of frost the first time each body enters the slab — the slow
+        // itself is applied by Zone.onOverlap
         for (const enemy of levelSpatialHash.getWithinRadius(this.pos, this.radius)) {
             if (distance(this.pos, enemy.pos) > this.radius) continue;
-            status.stun(enemy, this.freezeDuration);
             if (!this.frozen.has(enemy)) {
                 this.frozen.add(enemy);
                 particles.emitFrost(enemy.pos.x, enemy.pos.y);
@@ -196,8 +207,15 @@ export class FrostNovaWeapon extends Weapon {
         duration: 3.0,
     };
 
-    /** Seconds of stun the impact itself lands, before the field takes over */
-    private static readonly IMPACT_STUN = 0.7;
+    /**
+     * Seconds of stun the impact lands — **evolved only**.
+     *
+     * The base weapon does not freeze anybody. Slow is its whole job: it buys
+     * distance, which is the resource contact damage takes away, and handing it
+     * a stun as well left the evolution with nothing to be. Absolute Zero is
+     * the one that snaps a pack still on landing and *then* holds it.
+     */
+    private static readonly IMPACT_STUN = 1.1;
 
     /** The field currently on the ground, if any */
     private activeField: Zone | null = null;
@@ -253,22 +271,22 @@ export class FrostNovaWeapon extends Weapon {
     }
 
     /**
-     * The charge landing is the loud part: everything caught is stunned for a
-     * moment, and only then does the field settle in to slow whatever walks
-     * through it. Freeze-then-slow is the shape the weapon always implied and
-     * never delivered — it used to be a puddle that quietly dragged people.
+     * The charge landing is the loud part. Both tiers deal a burst; only the
+     * evolved one freezes the pack in place before the field takes over.
      */
     private impactBurst(x: number, y: number, radius: number) {
-        juice.shockwave(x, y, radius * 1.5, '#bfe9ff', 0.35, 5);
-        juice.addTrauma(0.18);
+        juice.shockwave(x, y, radius * 1.5, '#bfe9ff', 0.35, this.evolved ? 6 : 4);
+        juice.addTrauma(this.evolved ? 0.24 : 0.14);
 
         const stun = FrostNovaWeapon.IMPACT_STUN * this.owner.stats.duration;
         for (const enemy of levelSpatialHash.getWithinRadius({ x, y }, radius)) {
             if (distance({ x, y }, enemy.pos) > radius) continue;
-            // Bosses shrug most of it off, same rule as every other stun source
-            status.stun(enemy, enemy.isBoss ? stun * 0.25 : stun);
+            if (this.evolved) {
+                // Bosses shrug most of it off, same as every other stun source
+                status.stun(enemy, enemy.isBoss ? stun * 0.25 : stun);
+            }
             damageSystem.dealDamage({
-                baseDamage: this.damage * 2,
+                baseDamage: this.damage * (this.evolved ? 3 : 2),
                 source: this,
                 target: enemy,
                 position: enemy.pos,
@@ -276,29 +294,28 @@ export class FrostNovaWeapon extends Weapon {
         }
     }
 
+    /** Slow deepens with level: 42% at level 1 up to 62% at level 5 */
+    private slowStrength(): number {
+        return Math.min(0.62, 0.42 + (this.level - 1) * 0.05);
+    }
+
     private detonate(x: number, y: number, radius: number) {
         particles.emitFrost(x, y);
         this.impactBurst(x, y, radius);
         const duration = this.duration * this.owner.stats.duration;
 
-        if (this.evolved) {
-            const zone = new AbsoluteZeroZone(x, y, radius, this.damage, duration);
-            zone.freezeDuration = 0.6;
-            zone.shatterDamage = this.damage * 4;
-            zone.source = this;
-            this.activeField = zone;
-            this.onSpawn(zone);
-        } else {
-            // Slow deepens with level: 42% at level 1 up to 62% at level 5.
-            // It used to reach 80%, and with duration and cooldown stacked the
-            // field covered the ground permanently — enemies crawling at a
-            // fifth of their speed forever is a stun without the stun's
-            // downtime rule. Zone.SLOW_FLOOR backstops this at 65%.
-            const slow = Math.min(0.62, 0.42 + (this.level - 1) * 0.05);
-            const zone = new FrostZone(x, y, radius, duration, this.damage, 0.5, slow);
-            zone.source = this;
-            this.activeField = zone;
-            this.onSpawn(zone);
-        }
+        // The slow used to reach 80%, and with duration and cooldown stacked the
+        // field covered the ground permanently — enemies crawling at a fifth of
+        // their speed forever is a stun without the stun's downtime rule.
+        // Zone.SLOW_FLOOR backstops this at 65%.
+        const slow = this.slowStrength();
+        const zone = this.evolved
+            ? new AbsoluteZeroZone(x, y, radius, this.damage, duration, Math.min(0.62, slow + 0.1))
+            : new FrostZone(x, y, radius, duration, this.damage, 0.5, slow);
+
+        if (zone instanceof AbsoluteZeroZone) zone.shatterDamage = this.damage * 4;
+        zone.source = this;
+        this.activeField = zone;
+        this.onSpawn(zone);
     }
 }

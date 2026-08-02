@@ -105,6 +105,10 @@ export class BlackHoleProjectile extends SingularityProjectile {
         super(x, y, velocity, duration, damage, pierce);
         this.radius = 32;
         this.pullStrength = 260;
+        // The evolved orb's payoff is the collapse it leaves behind, so its
+        // travelling field only grinds lightly on the way in
+        this.pullRadiusScale = 3.2;
+        this.fieldDamageShare = 0.1;
     }
 
     update(dt: number) {
@@ -446,7 +450,14 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
                 this.damage,
                 this.pierce
             );
+            // Two regions, matching the two things it draws: a heavy core that
+            // tears through whatever it passes over, and a wide field that
+            // drags the pack onto it and grinds them meanwhile. Steering the
+            // core through a crowd you already gathered is the play.
+            proj.radius = (16 + this.level * 2) * this.owner.stats.area;
             proj.pullStrength = 200;
+            proj.pullRadiusScale = 4;
+            proj.fieldDamageShare = 0.18;
             proj.source = this;
             this.onSpawn(proj);
         }

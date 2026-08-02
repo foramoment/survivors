@@ -1205,15 +1205,18 @@ export class PlasmaExplosionZone extends Zone {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        // Shockwave ring
+        // Shockwave ring. Plasma burns violet and the evolved cluster burns
+        // orange — it used to come out acid green, which belonged to a
+        // different weapon entirely and clashed with the violet canister that
+        // had just been thrown.
         if (this.shockwaveAlpha > 0) {
             ctx.beginPath();
             ctx.arc(0, 0, this.shockwaveRadius, 0, Math.PI * 2);
             ctx.strokeStyle = this.isEvolved
                 ? `rgba(255, 150, 50, ${this.shockwaveAlpha})`
-                : `rgba(100, 255, 100, ${this.shockwaveAlpha})`;
+                : `rgba(214, 140, 255, ${this.shockwaveAlpha})`;
             ctx.lineWidth = this.isEvolved ? 8 : 5;
-            ctx.shadowColor = this.isEvolved ? '#ff6600' : '#00ff00';
+            ctx.shadowColor = this.isEvolved ? '#ff6600' : '#b06cff';
             ctx.shadowBlur = 15;
             ctx.stroke();
         }
@@ -1227,10 +1230,10 @@ export class PlasmaExplosionZone extends Zone {
                 gradient.addColorStop(0.6, `rgba(255, 80, 0, ${this.flashAlpha * 0.5})`);
                 gradient.addColorStop(1, `rgba(200, 50, 0, 0)`);
             } else {
-                gradient.addColorStop(0, `rgba(200, 255, 200, ${this.flashAlpha})`);
-                gradient.addColorStop(0.3, `rgba(100, 255, 100, ${this.flashAlpha * 0.8})`);
-                gradient.addColorStop(0.6, `rgba(50, 200, 50, ${this.flashAlpha * 0.5})`);
-                gradient.addColorStop(1, `rgba(0, 150, 0, 0)`);
+                gradient.addColorStop(0, `rgba(255, 246, 255, ${this.flashAlpha})`);
+                gradient.addColorStop(0.3, `rgba(214, 140, 255, ${this.flashAlpha * 0.85})`);
+                gradient.addColorStop(0.6, `rgba(150, 70, 230, ${this.flashAlpha * 0.5})`);
+                gradient.addColorStop(1, `rgba(90, 30, 160, 0)`);
             }
 
             ctx.beginPath();
@@ -1246,13 +1249,14 @@ export class PlasmaExplosionZone extends Zone {
                 ctx.fill();
             }
 
-            // Emoji at center during flash
+            // A hard white core at the heart of the blast. This used to be
+            // `fillText('💣')` — the most expensive way to draw anything, and
+            // against the no-emoji-in-the-arena rule in CLAUDE.md.
             if (this.flashAlpha > 0.7) {
-                ctx.font = `${this.radius * 0.5}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
+                const core = this.radius * 0.18 * this.flashAlpha;
                 ctx.globalAlpha = this.flashAlpha;
-                ctx.fillText(this.isEvolved ? '💥' : '💣', 0, 0);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(-core, -core, core * 2, core * 2);
             }
         }
 

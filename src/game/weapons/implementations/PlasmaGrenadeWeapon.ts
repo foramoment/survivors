@@ -32,9 +32,19 @@ import { distance } from '../../core/Utils';
 /** Chain explosions allowed per detonation (evolved only) */
 const MAX_CHAINS = 3;
 
-/** Seconds of stun on a direct blast. Bosses get a quarter of it. */
-const STUN_BASE = 0.55;
-const STUN_EVOLVED = 0.9;
+/**
+ * Seconds of stun on a direct blast. Bosses get a quarter of it.
+ *
+ * Deliberately NOT divided by the canister count. It used to be scaled by the
+ * same `power` share as the damage, which meant the evolution — advertised as a
+ * *longer* concussion — actually stunned for less than the base weapon: 0.9
+ * nominal times a 0.447 share is 0.40s, against 0.55s from a single canister.
+ * The concussion is a property of being caught in a blast, not a pool split
+ * between canisters, and `StatusEffects.stun` already caps how much of the time
+ * any enemy can be frozen, so nothing here can turn into a lockdown.
+ */
+const STUN_BASE = 0.7;
+const STUN_EVOLVED = 1.3;
 
 export class PlasmaGrenadeWeapon extends Weapon {
     name = "Plasma Grenade";
@@ -151,11 +161,12 @@ export class PlasmaGrenadeWeapon extends Weapon {
 
         particles.emitPlasmaBurst(x, y, explosionRadius, this.evolved);
         juice.addTrauma(0.1 * power);
-        juice.shockwave(x, y, explosionRadius * 1.5, this.evolved ? '#ffb03c' : '#66ff88', 0.3, 4);
+        // Violet plasma, matching the canister that was thrown; the evolved
+        // cluster burns orange
+        juice.shockwave(x, y, explosionRadius * 1.5, this.evolved ? '#ffb03c' : '#c98cff', 0.3, 4);
 
-        // Concussion. Scaled by `power` so a cluster's smaller canisters stun
-        // for less than a single well-placed grenade.
-        const stun = (this.evolved ? STUN_EVOLVED : STUN_BASE) * power * this.owner.stats.duration;
+        // Concussion — full length per blast, see STUN_BASE
+        const stun = (this.evolved ? STUN_EVOLVED : STUN_BASE) * this.owner.stats.duration;
         for (const enemy of levelSpatialHash.getWithinRadius({ x, y }, explosionRadius)) {
             if (distance({ x, y }, enemy.pos) > explosionRadius) continue;
             // A boss that can be perma-stunned by a 2.5s cooldown is not a boss

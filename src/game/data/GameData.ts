@@ -173,18 +173,18 @@ export const POWERUPS: PowerupData[] = [
     // Also speeds up how often damage zones tick — that used to be its own
     // powerup (Rapid Tick) which hit an internal floor after three picks and
     // then did nothing at all.
-    { id: 'cooling_system', name: "Cooling System", description: "Weapons fire and zones tick more often", type: "cooldown", value: -0.05, maxStacks: 8, emoji: "❄️" },
+    { id: 'cooling_system', name: "Cooling System", description: "Weapons fire and zones tick more often", type: "cooldown", value: -0.05, maxStacks: 8, emoji: "🌬️" },
 
     // Creative
     // 250px at the cap. A 695px magnet (the old ceiling) collects the whole
     // screen and deletes the reason to walk anywhere.
     { id: 'gravity_well', name: "Gravity Well", description: "Crystals fly to you from farther away", type: "magnet", value: 25, maxStacks: 6, emoji: "🧲" },
-    { id: 'chain_reaction', name: "Chain Reaction", description: "Bigger blasts, wider zones", type: "area", value: 0.08, maxStacks: 8, emoji: "💣" },
+    { id: 'chain_reaction', name: "Chain Reaction", description: "Bigger blasts, wider zones", type: "area", value: 0.08, maxStacks: 8, emoji: "🎆" },
     { id: 'vampiric_link', name: "Vampiric Link", description: "Drain more XP from every kill", type: "growth", value: 0.1, maxStacks: 6, emoji: "🧛" },
     // Duration times cooldown reduction is what lets a zone weapon cover the
     // ground permanently. +80% at the cap keeps a puddle worth stacking without
     // turning the arena into a carpet you never have to re-lay.
-    { id: 'temporal_flux', name: "Temporal Flux", description: "Effects linger longer", type: "duration", value: 0.1, maxStacks: 8, emoji: "⏰" },
+    { id: 'temporal_flux', name: "Temporal Flux", description: "Effects linger longer", type: "duration", value: 0.1, maxStacks: 8, emoji: "⌛" },
     // Crit damage starts at 2x, so the cap is a clean 4x. It used to reach
     // 7.95x, which — multiplied by a guaranteed crit — was most of the reason
     // late-game enemies evaporated.
@@ -203,7 +203,7 @@ export const POWERUPS: PowerupData[] = [
     // and numbers live in core/Tactics.ts. Overclock (+projectile speed) was
     // removed because it was the one powerup whose effect you could not feel;
     // Rapid Tick (+zone tick rate) followed it into Cooling System.
-    { id: 'static_discharge', name: "Static Discharge", description: "Damage taken charges a capacitor that blows the crowd off you", type: "discharge", value: 1, maxStacks: 8, emoji: "⚡" },
+    { id: 'static_discharge', name: "Static Discharge", description: "Damage taken charges a capacitor that blows the crowd off you", type: "discharge", value: 1, maxStacks: 8, emoji: "🔌" },
     { id: 'kill_echo', name: "Kill Echo", description: "The dead sometimes detonate", type: "killEcho", value: 0.06, maxStacks: 8, emoji: "☠️" },
     { id: 'adrenal_surge', name: "Adrenal Surge", description: "Hit harder and move faster while nearly dead", type: "adrenaline", value: 0.1, maxStacks: 8, emoji: "🩸" },
     { id: 'vital_siphon', name: "Vital Siphon", description: "Kills sometimes leave a repair cell behind", type: "siphon", value: 0.025, maxStacks: 8, emoji: "💗" },
@@ -361,12 +361,12 @@ export const WEAPONS = [
         id: 'frost_nova',
         name: "Frost Nova",
         emoji: "❄️",
-        description: "Freezing field dropped on the thickest part of the crowd",
+        description: "Chilling field dropped on the thickest part of the crowd",
         class: FrostNovaWeapon,
         evolution: {
             name: "Absolute Zero",
             emoji: "🧊",
-            description: "Freezes enemies in place, then shatters them"
+            description: "Freezes the pack solid on impact, holds it, then shatters"
         }
     },
     {

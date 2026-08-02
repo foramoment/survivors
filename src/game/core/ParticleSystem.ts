@@ -244,7 +244,10 @@ export class ParticleSystem {
         this.emit({
             x, y,
             count: 6,
-            color: evolved ? ['#ffffff', '#ffe9b0'] : ['#ffffff', '#ccffdd'],
+            // Plasma burns violet; the evolved cluster burns orange. The base
+            // tier used to come out acid green, which read as somebody else's
+            // weapon going off next to the violet canister you just threw.
+            color: evolved ? ['#ffffff', '#ffe9b0'] : ['#ffffff', '#f0d6ff'],
             speed: radius * 2.2,
             size: 8,
             sizeEnd: 0,
@@ -258,7 +261,7 @@ export class ParticleSystem {
         this.emit({
             x, y,
             count: 14,
-            color: evolved ? ['#ff9a2a', '#ffd24d', '#ff5a1e'] : ['#66ff88', '#aaffbb', '#22cc55'],
+            color: evolved ? ['#ff9a2a', '#ffd24d', '#ff5a1e'] : ['#c98cff', '#e2b8ff', '#7a3ccc'],
             speed: radius * 1.7,
             speedVariation: 0.7,
             size: 6,
@@ -272,7 +275,7 @@ export class ParticleSystem {
         this.emit({
             x, y,
             count: 8,
-            color: ['#2a3a2a', '#4a5a4a'],
+            color: evolved ? ['#3a2a1a', '#5a4434'] : ['#2a2038', '#453a5a'],
             speed: radius * 0.9,
             size: 10,
             sizeEnd: 16,

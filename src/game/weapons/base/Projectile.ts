@@ -7,6 +7,7 @@ import type { Weapon } from '../../Weapon';
 import { type Vector2, normalize, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
+import { damageSystem } from '../../core/DamageSystem';
 import { sprites, type ThrownKind } from '../../core/SpriteFactory';
 
 // ============================================
@@ -170,14 +171,48 @@ export class BouncingProjectile extends Projectile {
 // ============================================
 // SINGULARITY PROJECTILE - Pulls enemies in
 // ============================================
+/**
+ * The travelling singularity: a hard core inside a wide field of gravity.
+ *
+ * It is drawn as two things — a black disc and a halo around it — so it should
+ * *behave* as two things, and it did not: the whole 200px pull radius was inert
+ * and only the tiny collision circle mattered, so the orb read as a slow bullet
+ * with a decorative glow. Now:
+ *
+ *   - the **core** is the event horizon. Passing it through a body is the big
+ *     hit, and it lands once per enemy — the orb crawls, so a per-frame check
+ *     would tick the same enemy a dozen times on the way through.
+ *   - the **halo** drags everything toward the core and grinds it for a small
+ *     amount on a slow tick, so steering the core into a pack you have already
+ *     gathered is worth doing on purpose.
+ */
 export class SingularityProjectile extends Projectile {
     private particleTimer: number = 0;
     private rotation: number = 0;
     pullStrength: number = 80;
+    /** Reach of the gravity field, as a multiple of the core radius */
+    pullRadiusScale: number = 4;
+    /** Share of `damage` the field deals on each grind tick */
+    fieldDamageShare: number = 0.18;
+    /** Seconds between grind ticks */
+    fieldInterval: number = 0.4;
+
+    private fieldTimer: number = 0;
+    /** Bodies the core has already torn through */
+    private cored: Set<any> = new Set();
 
     constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number) {
         super(x, y, velocity, duration, damage, pierce, '');
         this.radius = 20;
+        // All of this weapon's damage is resolved in update(), by region. The
+        // collision system would otherwise land a third hit of its own on
+        // whatever touched the core.
+        this.canCollide = false;
+    }
+
+    /** How far the gravity field reaches */
+    get pullRadius(): number {
+        return this.radius * this.pullRadiusScale;
     }
 
     update(dt: number) {
@@ -190,17 +225,46 @@ export class SingularityProjectile extends Projectile {
             particles.emitSingularityDistortion(this.pos.x, this.pos.y, this.radius);
         }
 
-        const enemiesInPullRange = levelSpatialHash.getWithinRadius(this.pos, 200);
+        this.fieldTimer -= dt;
+        const grinds = this.fieldTimer <= 0;
+        if (grinds) this.fieldTimer = this.fieldInterval;
 
-        for (const enemy of enemiesInPullRange) {
+        const reach = this.pullRadius;
+        for (const enemy of levelSpatialHash.getWithinRadius(this.pos, reach)) {
+            if (enemy.isDead) continue;
             const dx = this.pos.x - enemy.pos.x;
             const dy = this.pos.y - enemy.pos.y;
             const dist = distance(this.pos, enemy.pos);
+            if (dist > reach) continue;
 
-            if (dist < 200 && dist > 5) {
+            // Pull: stronger the closer you already are
+            if (dist > 5) {
                 const pullForce = this.pullStrength / dist;
                 enemy.pos.x += (dx / dist) * pullForce * dt;
                 enemy.pos.y += (dy / dist) * pullForce * dt;
+            }
+
+            // Core: the payoff hit, once per body
+            if (dist <= this.radius + enemy.radius && !this.cored.has(enemy)) {
+                this.cored.add(enemy);
+                damageSystem.dealDamage({
+                    baseDamage: this.damage,
+                    source: this.source,
+                    target: enemy,
+                    position: enemy.pos,
+                });
+                particles.emitHit(enemy.pos.x, enemy.pos.y, '#c07bff');
+                continue;
+            }
+
+            // Halo: a slow grind on everything the gravity has hold of
+            if (grinds) {
+                damageSystem.dealDamage({
+                    baseDamage: this.damage * this.fieldDamageShare,
+                    source: this.source,
+                    target: enemy,
+                    position: enemy.pos,
+                });
             }
         }
     }
@@ -209,11 +273,17 @@ export class SingularityProjectile extends Projectile {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        ctx.strokeStyle = 'rgba(100, 0, 200, 0.5)';
-        ctx.lineWidth = 3;
+        // The gravity field, drawn as a haze that reaches exactly as far as it
+        // pulls — the ring it replaced stopped at half the real reach, so half
+        // the field was invisible
+        const halo = ctx.createRadialGradient(0, 0, this.radius * 0.8, 0, 0, this.pullRadius);
+        halo.addColorStop(0, 'rgba(120, 40, 220, 0.28)');
+        halo.addColorStop(0.55, 'rgba(90, 20, 180, 0.14)');
+        halo.addColorStop(1, 'rgba(60, 0, 140, 0)');
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 2, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.arc(0, 0, this.pullRadius, 0, Math.PI * 2);
+        ctx.fillStyle = halo;
+        ctx.fill();
 
         ctx.rotate(this.rotation);
         for (let i = 0; i < 4; i++) {

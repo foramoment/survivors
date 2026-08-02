@@ -129,17 +129,45 @@ describe('Frost Nova', () => {
         expect(spawned.length).toBe(1);
     });
 
-    it('Absolute Zero actually freezes — the old version wrote to a dead field', () => {
-        const zone = new AbsoluteZeroZone(0, 0, 80, 10, 1);
+    it('only the evolved tier freezes, and it freezes on impact', () => {
+        const player = new Player(0, 0);
+        const weapon = new FrostNovaWeapon(player);
+        const spawned: Entity[] = [];
+        weapon.onSpawn = e => spawned.push(e);
+        const enemy = makeEnemy(20, 0);
+        placeEnemies([enemy]);
+
+        // Base tier: the charge lands, nobody is frozen — slow is its whole job
+        weapon.update(0.1);
+        (spawned[0] as any).onLand(0, 0);
+        expect(enemy.stunTimer).toBe(0);
+
+        // Evolved: the same landing snaps the pack still
+        const evolved = new FrostNovaWeapon(player);
+        evolved.evolved = true;
+        const evolvedSpawned: Entity[] = [];
+        evolved.onSpawn = e => evolvedSpawned.push(e);
+        evolved.update(0.1);
+        (evolvedSpawned[0] as any).onLand(0, 0);
+        expect(enemy.stunTimer).toBeGreaterThan(0);
+    });
+
+    it('the slab holds the pack in a slow rather than a rolling stun', () => {
+        // Re-applying a stun every frame is the exact shape StatusEffects had
+        // to grow a diminishing-returns rule to survive
+        const zone = new AbsoluteZeroZone(0, 0, 80, 10, 1, 0.6);
         const enemy = makeEnemy(20, 0);
         placeEnemies([enemy]);
 
         zone.update(0.1);
-        expect(enemy.stunTimer).toBeGreaterThan(0);
+        expect(enemy.stunTimer).toBe(0);
+
+        zone.onOverlap(enemy);
+        expect(enemy.speedMultiplier).toBeLessThan(1);
     });
 
     it('shatters everything still inside when the field collapses', () => {
-        const zone = new AbsoluteZeroZone(0, 0, 80, 10, 0.05);
+        const zone = new AbsoluteZeroZone(0, 0, 80, 10, 0.05, 0.6);
         zone.shatterDamage = 40;
         const enemy = makeEnemy(10, 0);
         placeEnemies([enemy]);
