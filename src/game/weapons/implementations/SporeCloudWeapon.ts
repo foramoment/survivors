@@ -31,7 +31,9 @@ export class FungalBloomZone extends SporeZone {
     constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number) {
         super(x, y, radius, duration, damage, interval);
         this.contagious = true;
-        this.creepRate = 0.14;
+        // The bloom does not just infect harder, it takes more ground: it
+        // doubles across its life where a plain patch grows by half
+        this.growOver(1, 2);
     }
 }
 

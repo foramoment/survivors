@@ -142,7 +142,28 @@ describe('Void Ray', () => {
         expect(hits).not.toContain(offAxis);
     });
 
-    it('hits each enemy once however long the sweep takes', () => {
+    it('cuts a body on the line exactly once, however long the sweep takes', () => {
+        const weapon = new VoidRayWeapon(mockOwner());
+        const spawned = collect(weapon);
+
+        const target = enemyAt(300, 0);
+        // On the beam's path but far from the impact point, so it is only ever
+        // touched by the line — the target itself also takes the impact burst
+        const bystander = enemyAt(150, 4);
+        levelSpatialHash.insertAll([target, bystander]);
+        (weapon as any).findClosestEnemy = () => target as any;
+        (weapon as any).pickSweepTarget = () => null;
+
+        const spy = vi.spyOn(damageSystem, 'dealDamage')
+            .mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
+
+        weapon.update(0.1);
+        runLance(spawned[0]);
+
+        expect(spy.mock.calls.filter(c => (c[0] as any).target === bystander)).toHaveLength(1);
+    });
+
+    it('detonates a small burst on the body it settles on', () => {
         const weapon = new VoidRayWeapon(mockOwner());
         const spawned = collect(weapon);
 
@@ -157,7 +178,9 @@ describe('Void Ray', () => {
         weapon.update(0.1);
         runLance(spawned[0]);
 
-        expect(spy.mock.calls.filter(c => (c[0] as any).target === target)).toHaveLength(1);
+        // Line cut plus the impact burst, and the burst sets it alight
+        expect(spy.mock.calls.filter(c => (c[0] as any).target === target)).toHaveLength(2);
+        expect(target.infection?.kind).toBe('burn');
     });
 
     it('leaves burning ground along the path it swept', () => {

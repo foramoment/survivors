@@ -27,6 +27,10 @@ vi.mock('../core/ParticleSystem', () => ({
         emitPlasmaBurst: vi.fn(),
         emitAcidBubble: vi.fn(),
         emitBeamCharge: vi.fn(),
+        emitZoneEdge: vi.fn(),
+        emitColdMist: vi.fn(),
+        emitSporeCloud: vi.fn(),
+        emitFrost: vi.fn(),
         emitTrail: vi.fn()
     }
 }));
@@ -311,13 +315,13 @@ describe('AcidPoolWeapon', () => {
         lobbed.onLand(250, 150);
 
         const zone = spawnedEntities[1] as AcidZone;
-        // `radius` starts at the seed and eases outward, so the settled size
-        // is the one to assert (see Zone.spreadIn)
-        expect(zone.fullRadius).toBeCloseTo(weapon.area * 1.5);
-        expect(zone.radius).toBeLessThan(zone.fullRadius);
+        // `radius` starts small and creeps outward, so the configured size is
+        // the one to assert (see Zone.growOver)
+        expect(zone.baseRadius).toBeCloseTo(weapon.area * 1.5);
+        expect(zone.radius).toBeLessThan(zone.baseRadius);
     });
 
-    it('the puddle spreads out from where the flask broke', () => {
+    it('the puddle keeps creeping for its whole life, not for a moment', () => {
         const enemy = createMockEnemy(200, 100);
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
 
@@ -327,9 +331,16 @@ describe('AcidPoolWeapon', () => {
 
         const zone = spawnedEntities[1] as AcidZone;
         const seeded = zone.radius;
+
+        // Half a second in it has barely moved — the growth is not a 0.3s pop
         for (let i = 0; i < 30; i++) zone.update(1 / 60);
-        expect(zone.radius).toBeGreaterThan(seeded);
-        expect(zone.radius).toBeCloseTo(zone.fullRadius);
+        const early = zone.radius;
+        expect(early).toBeGreaterThan(seeded);
+        expect(early).toBeLessThan(zone.baseRadius * 0.65);
+
+        // It only reaches full size as it dies
+        while (!zone.isDead) zone.update(1 / 60);
+        expect(zone.radius).toBeCloseTo(zone.baseRadius, 0);
     });
 });
 

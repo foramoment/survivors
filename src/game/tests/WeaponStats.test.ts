@@ -64,7 +64,7 @@ const EXPECTED_STATS: Record<string, any> = {
         damage: 48,
         // A strike that aims itself needs a real wait between shots
         cooldown: 3.0,
-        area: 100,
+        area: 74,
         speed: 0,
         duration: 1.0,
     },

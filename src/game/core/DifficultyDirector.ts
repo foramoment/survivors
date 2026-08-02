@@ -35,6 +35,18 @@ export type DifficultyEvent =
     | { type: 'miniboss'; waveIndex: number }
     | { type: 'arena' };
 
+/**
+ * What one player level is worth on the difficulty clock, in seconds.
+ *
+ * Calibrated against the XP curve (`Player.levelUp`): normal play lands around
+ * six levels a minute early on, i.e. roughly ten seconds a level. This is
+ * deliberately **below** that, so an ordinary run is always governed by the
+ * clock and the level term only takes over for a player who is genuinely
+ * running ahead of it — at eight, you have to be about 25% over the expected
+ * level before the arena starts answering.
+ */
+const LEVEL_AS_SECONDS = 8;
+
 /** Cadence of the stage hazard, in seconds */
 export const ArenaSchedule = {
     /** First hazard lands well after the opening minute is under control */
@@ -147,24 +159,48 @@ export class DifficultyDirector {
     }
 
     /**
-     * Enemy HP multiplier. Time growth is uncapped (the old 3x cap is what made
+     * How far into the run the arena thinks you are — **the later of the clock
+     * and your level**, expressed as an equivalent number of seconds.
+     *
+     * The clock alone had a hole in it big enough to walk a build through. On
+     * the hardest stage the opening enemies are too tough to kill, so you kite
+     * instead — and because crystals no longer expire, a pile of XP just sits
+     * there accumulating at no risk. Clear it in one sweep and you cash five or
+     * six levels at once, at minute three, against minute-three enemies. The
+     * hardest stage was the easiest place to snowball.
+     *
+     * This does not take the play pattern away — banking a crowd and detonating
+     * it is a good, deliberate thing to do, and the user liked it. It stops it
+     * being *free*: out-level the clock and the arena immediately levels with
+     * you. Under normal pacing the two terms track each other (roughly six
+     * levels a minute against 240s-per-doubling), so nothing changes for a run
+     * that is not running ahead of itself.
+     */
+    private effectiveTime(gameTime: number, playerLevel: number): number {
+        return Math.max(gameTime, playerLevel * LEVEL_AS_SECONDS);
+    }
+
+    /**
+     * Enemy HP multiplier. Growth is uncapped (the old 3x cap is what made
      * late game trivial against exponentially-scaling player damage).
      */
-    getHpMultiplier(gameTime: number): number {
-        return (1 + gameTime / 240) * (0.75 + 0.25 * this.intensity);
+    getHpMultiplier(gameTime: number, playerLevel: number = 0): number {
+        return (1 + this.effectiveTime(gameTime, playerLevel) / 240)
+            * (0.75 + 0.25 * this.intensity);
     }
 
     /**
      * Enemy contact damage-per-second multiplier — milder than HP in both time
      * and intensity.
      *
-     * Time growth is /600 rather than /300 because contact damage is now
-     * actually applied (see core/ContactDamage) and stacks across a crowd:
-     * doubling by minute 10 already turns a late-game pile into a 3-second
-     * death sentence. Enemy *count* is what escalates late, not per-enemy bite.
+     * Growth is /600 rather than /300 because contact damage is now actually
+     * applied (see core/ContactDamage) and stacks across a crowd: doubling by
+     * minute 10 already turns a late-game pile into a 3-second death sentence.
+     * Enemy *count* is what escalates late, not per-enemy bite.
      */
-    getDamageMultiplier(gameTime: number): number {
-        return (1 + gameTime / 600) * (0.85 + 0.15 * this.intensity);
+    getDamageMultiplier(gameTime: number, playerLevel: number = 0): number {
+        return (1 + this.effectiveTime(gameTime, playerLevel) / 600)
+            * (0.85 + 0.15 * this.intensity);
     }
 
     /** Elite spawn chance grows with time and with player overperformance */

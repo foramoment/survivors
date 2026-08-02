@@ -1626,10 +1626,14 @@ export class GameManager {
 
         const enemy = new Enemy(x, y, type, isElite);
 
-        // Time + adaptive + stage scaling (HP cap removed — see DifficultyDirector)
-        enemy.maxHp = enemy.maxHp * difficultyDirector.getHpMultiplier(this.gameTime) * this.currentStage.hpScale;
+        // Time + player level + adaptive + stage scaling. Level matters because
+        // banking a crowd of un-killed enemies and cashing the whole XP pile at
+        // once used to buy five levels against minute-three enemies — see
+        // DifficultyDirector.effectiveTime.
+        const level = this.player?.level ?? 0;
+        enemy.maxHp = enemy.maxHp * difficultyDirector.getHpMultiplier(this.gameTime, level) * this.currentStage.hpScale;
         enemy.hp = enemy.maxHp;
-        enemy.damage *= difficultyDirector.getDamageMultiplier(this.gameTime) * this.currentStage.damageScale;
+        enemy.damage *= difficultyDirector.getDamageMultiplier(this.gameTime, level) * this.currentStage.damageScale;
 
         if (options.boss) {
             enemy.makeBoss();

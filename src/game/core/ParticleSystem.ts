@@ -561,6 +561,37 @@ export class ParticleSystem {
         });
     }
 
+    /**
+     * A few motes seeded ON the rim of a zone, drifting outward.
+     *
+     * This is how a ground zone gets a readable edge without a stroked outline.
+     * A crisp line around a puddle looks like a selection marker; a haze of
+     * particles that thins out reads as the stuff itself spreading. Budgeted at
+     * `count` per call and called on a timer, not per frame — see the VFX rules
+     * in CLAUDE.md.
+     */
+    emitZoneEdge(x: number, y: number, radius: number, colors: string[], count: number = 2) {
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            this.emit({
+                x: x + Math.cos(angle) * radius * 0.95,
+                y: y + Math.sin(angle) * radius * 0.8,
+                count: 1,
+                color: colors,
+                speed: 12,
+                speedVariation: 0.8,
+                angle,
+                spread: 0.9,
+                size: 5,
+                sizeVariation: 0.6,
+                sizeEnd: 0,
+                life: 0.9,
+                lifeVariation: 0.4,
+                shape: 'circle',
+            });
+        }
+    }
+
     emitColdMist(x: number, y: number, radius: number) {
         // Rising cold vapor
         this.emit({

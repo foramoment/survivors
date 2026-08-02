@@ -188,7 +188,10 @@ export class OrbitalStrikeWeapon extends Weapon {
         // strike an event you watch land.
         damage: 48,
         cooldown: 3.0,
-        area: 100,
+        // 100 plus 10% a level plus area powerups put the crater at most of the
+        // screen, which stops being a strike and starts being weather — you
+        // could not see which enemies it was about to catch
+        area: 74,
         speed: 0,
         duration: 1.0,
     };
@@ -227,7 +230,7 @@ export class OrbitalStrikeWeapon extends Weapon {
     }
 
     private blastRadius(): number {
-        return this.area * this.owner.stats.area * (1 + this.level * 0.1);
+        return this.area * this.owner.stats.area * (1 + this.level * 0.07);
     }
 
     /**

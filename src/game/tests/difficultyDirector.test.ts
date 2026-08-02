@@ -125,6 +125,26 @@ describe('DifficultyDirector', () => {
             expect(director.getHpMultiplier(300)).toBeGreaterThan(base);
         });
 
+        it('a player who out-levels the clock meets the arena they earned', () => {
+            // Kiting a crowd you cannot kill, then detonating the whole pile,
+            // used to buy five levels against minute-three enemies
+            const onPace = director.getHpMultiplier(180, 15);
+            const snowballed = director.getHpMultiplier(180, 40);
+            expect(snowballed).toBeGreaterThan(onPace);
+            expect(director.getDamageMultiplier(180, 40))
+                .toBeGreaterThan(director.getDamageMultiplier(180, 15));
+        });
+
+        it('leaves an ordinary run governed by the clock', () => {
+            // Normal pacing is roughly a level every ten seconds, and the level
+            // term is deliberately slower than that, so it must not bite
+            for (const seconds of [60, 180, 420]) {
+                const level = Math.round(seconds / 10);
+                expect(director.getHpMultiplier(seconds, level))
+                    .toBeCloseTo(director.getHpMultiplier(seconds, 0));
+            }
+        });
+
         it('elite chance grows over time and stays capped', () => {
             expect(director.getEliteChance(0)).toBeCloseTo(0.01);
             expect(director.getEliteChance(600)).toBeGreaterThan(0.01);

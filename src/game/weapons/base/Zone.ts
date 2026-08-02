@@ -24,27 +24,32 @@ export class Zone extends Entity {
     source?: Weapon;
 
     /**
-     * The radius this zone settles at. `radius` is the live one and eases up to
-     * it while the zone spreads; subclasses that keep creeping (spores) raise
-     * `fullRadius` and let the ramp follow.
+     * The radius the weapon asked for — `area * stats.area`. The live `radius`
+     * is this multiplied by the growth ramp below, so area powerups scale what
+     * the zone *starts* at and the growth rides on top.
      */
-    fullRadius: number;
+    baseRadius: number;
     /**
-     * Seconds to creep out from the impact point to full size. 0 means "appear
-     * at full size", which is correct for a telegraphed blast — you already
-     * watched a reticle close on it — and wrong for anything poured onto the
-     * ground. Acid, frost and spores turn it on: a puddle that pops into
-     * existence at full width reads as a decal, one that spreads reads as
-     * something landing.
+     * Radius multipliers at the moment it lands and at the moment it dies.
+     *
+     * A ground zone grows across its **whole life**, not in a quarter of a
+     * second. The first cut of this ramped over 0.3s, which is not "acid
+     * spreading" — it is a sprite scaling up. Frost opens at a quarter of its
+     * final size and takes the full field duration to reach it; the spore mat
+     * opens at its configured size and swells to 1.5x as the fungus grows.
+     *
+     * 1/1 (the default) means "appear at full size and stay there", which is
+     * right for a telegraphed blast — you already watched a reticle close on it.
      */
-    spreadTime: number = 0;
-    /** Share of the full radius the zone starts at when it spreads */
-    protected static readonly SPREAD_SEED = 0.28;
-    private spreadAge: number = 0;
+    growFrom: number = 1;
+    growTo: number = 1;
+    /** Duration the zone was born with, so the ramp knows how far along it is */
+    readonly lifetime: number;
 
     constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number, emoji: string, slowEffect: number = 0) {
         super(x, y, radius);
-        this.fullRadius = radius;
+        this.baseRadius = radius;
+        this.lifetime = Math.max(0.0001, duration);
         this.duration = duration;
         this.damage = damage;
         this.interval = interval;
@@ -53,21 +58,28 @@ export class Zone extends Entity {
     }
 
     /**
-     * Turn the spread ramp on. Call from a subclass constructor so the zone is
-     * already small before anything draws it.
+     * Turn the growth ramp on. Call from a subclass constructor so the zone is
+     * already the right size before anything draws it.
      */
-    protected spreadIn(time: number) {
-        this.spreadTime = time;
-        this.radius = this.fullRadius * Zone.SPREAD_SEED;
+    protected growOver(from: number, to: number) {
+        this.growFrom = from;
+        this.growTo = to;
+        this.radius = this.baseRadius * from;
+    }
+
+    /** 0 the instant it lands, 1 the instant it dies */
+    protected get lifeProgress(): number {
+        return Math.max(0, Math.min(1, 1 - this.duration / this.lifetime));
     }
 
     /**
-     * How far along the spread is, 0.28..1. Zones that bake their decoration
-     * against `fullRadius` multiply the baked offsets by this so the whole
-     * pattern grows together instead of appearing over a growing circle.
+     * Current size as a multiple of `baseRadius`. Zones that bake their
+     * decoration against `baseRadius` multiply the baked offsets by this, so
+     * the whole pattern grows together instead of appearing over a growing
+     * circle.
      */
-    protected get spreadScale(): number {
-        return this.fullRadius > 0 ? this.radius / this.fullRadius : 1;
+    protected get growScale(): number {
+        return this.baseRadius > 0 ? this.radius / this.baseRadius : 1;
     }
 
     update(dt: number) {
@@ -76,13 +88,9 @@ export class Zone extends Entity {
 
         this.timer += dt;
 
-        if (this.spreadTime > 0) {
-            this.spreadAge = Math.min(this.spreadTime, this.spreadAge + dt);
-            const t = this.spreadAge / this.spreadTime;
-            // Ease-out: the edge lunges outward and settles, like liquid finding
-            // its level. Linear growth looks like a scaling sprite.
-            const eased = 1 - (1 - t) * (1 - t);
-            this.radius = this.fullRadius * (Zone.SPREAD_SEED + (1 - Zone.SPREAD_SEED) * eased);
+        if (this.growFrom !== this.growTo) {
+            this.radius = this.baseRadius
+                * (this.growFrom + (this.growTo - this.growFrom) * this.lifeProgress);
         }
     }
 
@@ -130,20 +138,25 @@ export class Zone extends Entity {
 // FROST ZONE - Slows enemies
 // ============================================
 /**
- * A patch of frozen ground, not a blue disc with triangles on it.
+ * A patch of frozen ground that creeps outward for the whole time it exists.
  *
- * The old look was a perfect circle, a dashed ring and eight loose triangles
- * scattered at random — the oldest art in the game and the only zone that still
- * read as programmer placeholder. What replaced it is built from the way ice
- * actually forms: an uneven rimed edge, frost fingers crawling outward from the
- * impact point, and chunky pixel chips frozen into the surface.
+ * Two things this went through. The original was a perfect circle, a dashed
+ * ring and eight loose triangles — programmer placeholder. The second pass gave
+ * it an uneven rimed outline, and the outline was the problem: a hard stroked
+ * edge on the floor reads as a UI shape, not as ice. So the body is a soft
+ * gradient inside an irregular silhouette with **no stroke at all**, and the
+ * edge is told by particles drifting off the rim (`emitZoneEdge`) — a haze that
+ * thins out instead of a line that stops.
  *
- * Everything is baked once against `fullRadius` and multiplied by the spread
+ * Everything is baked once against `baseRadius` and multiplied by the growth
  * ramp at draw time, so the whole pattern creeps outward together and nothing
  * is recomputed per frame (see the VFX rules in CLAUDE.md).
  */
 export class FrostZone extends Zone {
+    /** Share of its final size the field opens at */
+    static readonly SEED = 0.265;
     private particleTimer: number = 0;
+    private edgeTimer: number = 0;
     /** Uneven rim, as unit-length offsets from the centre */
     private rim: Vector2[] = [];
     /** Frost creeping out of the middle: [angle, length, branch offset] */
@@ -153,12 +166,14 @@ export class FrostZone extends Zone {
 
     constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number, slowEffect: number = 0.5) {
         super(x, y, radius, duration, damage, interval, '', slowEffect);
-        this.spreadIn(0.32);
+        // Opens as a small patch under the impact and takes the whole field
+        // duration to reach the size the weapon was configured for
+        this.growOver(FrostZone.SEED, 1);
         this.bakeGeometry();
     }
 
     private bakeGeometry() {
-        const r = this.fullRadius;
+        const r = this.baseRadius;
 
         const points = 18;
         for (let i = 0; i < points; i++) {
@@ -193,15 +208,24 @@ export class FrostZone extends Zone {
 
     update(dt: number) {
         super.update(dt);
+
         this.particleTimer += dt;
-        if (this.particleTimer > 0.1) {
+        if (this.particleTimer > 0.12) {
             this.particleTimer = 0;
             particles.emitColdMist(this.pos.x, this.pos.y, this.radius);
+        }
+
+        // The edge is told by particles, not by a line
+        this.edgeTimer += dt;
+        if (this.edgeTimer > 0.09) {
+            this.edgeTimer = 0;
+            particles.emitZoneEdge(this.pos.x, this.pos.y, this.radius,
+                ['#cfeeff', '#8fd4ff', '#ffffff'], 2);
         }
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        const g = this.spreadScale;
+        const g = this.growScale;
         // Fade out over the last half second instead of vanishing mid-frame
         const fade = Math.max(0, Math.min(1, this.duration / 0.5));
 
@@ -209,29 +233,27 @@ export class FrostZone extends Zone {
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
         ctx.scale(g, g);
 
-        // Rimed floor: an uneven patch, filled and outlined in one path
+        // Uneven silhouette, filled only — no stroke.
         ctx.beginPath();
         ctx.moveTo(this.rim[0].x, this.rim[0].y);
         for (let i = 1; i < this.rim.length; i++) ctx.lineTo(this.rim[i].x, this.rim[i].y);
         ctx.closePath();
 
-        // Saturated blue, not pale grey: at 0.4 alpha a near-white fill over a
-        // near-black arena just reads as a grey polygon, which is what the
-        // first pass of this looked like
-        const floor = ctx.createRadialGradient(0, 0, 0, 0, 0, this.fullRadius);
-        floor.addColorStop(0, `rgba(140, 222, 255, ${0.5 * fade})`);
-        floor.addColorStop(0.6, `rgba(58, 158, 240, ${0.4 * fade})`);
-        floor.addColorStop(1, `rgba(24, 96, 190, ${0.16 * fade})`);
+        // The gradient reaches zero alpha before the silhouette ends, so the
+        // rim is already transparent where the shape stops. That is the whole
+        // trick: a hard stroked outline on the floor reads as a selection
+        // marker, and this reads as frost.
+        const floor = ctx.createRadialGradient(0, 0, 0, 0, 0, this.baseRadius);
+        floor.addColorStop(0, `rgba(150, 226, 255, ${0.46 * fade})`);
+        floor.addColorStop(0.45, `rgba(70, 170, 244, ${0.34 * fade})`);
+        floor.addColorStop(0.8, `rgba(34, 118, 206, ${0.15 * fade})`);
+        floor.addColorStop(1, 'rgba(24, 96, 190, 0)');
         ctx.fillStyle = floor;
         ctx.fill();
 
-        ctx.strokeStyle = `rgba(176, 230, 255, ${0.6 * fade})`;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
         // Frost fingers crawling out of the centre. Their reach follows the
-        // spread, so the ice visibly grows into the ground.
-        ctx.strokeStyle = `rgba(224, 246, 255, ${0.7 * fade})`;
+        // growth, so the ice visibly grows into the ground.
+        ctx.strokeStyle = `rgba(224, 246, 255, ${0.5 * fade})`;
         ctx.lineWidth = 1.5;
         ctx.lineCap = 'round';
         ctx.beginPath();
@@ -254,12 +276,13 @@ export class FrostZone extends Zone {
         }
         ctx.stroke();
 
-        // Chunky chips, aligned to the pixel grid rather than rotated
-        ctx.fillStyle = `rgba(240, 252, 255, ${0.85 * fade})`;
+        // Chunky chips, aligned to the pixel grid rather than rotated. They sit
+        // well inside the rim so nothing hard-edged touches the boundary.
+        ctx.fillStyle = `rgba(240, 252, 255, ${0.7 * fade})`;
         for (const chip of this.chips) {
             ctx.fillRect(chip.x, chip.y, chip.w, chip.h);
         }
-        ctx.fillStyle = `rgba(120, 190, 240, ${0.7 * fade})`;
+        ctx.fillStyle = `rgba(120, 190, 240, ${0.55 * fade})`;
         for (const chip of this.chips) {
             ctx.fillRect(chip.x, chip.y + chip.h, chip.w, Math.max(1, chip.h * 0.4));
         }
@@ -273,13 +296,14 @@ export class FrostZone extends Zone {
 // ============================================
 export class AcidZone extends Zone {
     private particleTimer: number = 0;
+    private edgeTimer: number = 0;
     private bubbles: { x: number; y: number; size: number; speed: number; offset: number }[] = [];
 
     constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number) {
         super(x, y, radius, duration, damage, interval, '', 0);
-        // Acid is poured, not stamped: the puddle spreads out from where the
-        // flask broke (see Zone.spreadIn)
-        this.spreadIn(0.28);
+        // Acid is poured, not stamped: the puddle keeps creeping outward the
+        // whole time it is eating the floor
+        this.growOver(0.4, 1);
         for (let i = 0; i < 12; i++) {
             this.bubbles.push({
                 x: (Math.random() - 0.5) * radius * 1.6,
@@ -296,9 +320,9 @@ export class AcidZone extends Zone {
 
         for (const bubble of this.bubbles) {
             bubble.y -= bubble.speed * dt;
-            if (bubble.y < -this.fullRadius) {
-                bubble.y = this.fullRadius * 0.8;
-                bubble.x = (Math.random() - 0.5) * this.fullRadius * 1.6;
+            if (bubble.y < -this.baseRadius) {
+                bubble.y = this.baseRadius * 0.8;
+                bubble.x = (Math.random() - 0.5) * this.baseRadius * 1.6;
             }
         }
 
@@ -307,30 +331,38 @@ export class AcidZone extends Zone {
             this.particleTimer = 0;
             particles.emitAcidBubble(this.pos.x, this.pos.y, this.radius);
         }
+
+        // Acid mist creeping off the edge, in place of the outline this used
+        // to stroke around itself
+        this.edgeTimer += dt;
+        if (this.edgeTimer > 0.1) {
+            this.edgeTimer = 0;
+            particles.emitZoneEdge(this.pos.x, this.pos.y, this.radius,
+                ['#b4ff3c', '#5fe08a', '#d6ff8a'], 2);
+        }
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-        ctx.scale(this.spreadScale, this.spreadScale);
+        ctx.scale(this.growScale, this.growScale);
 
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.fullRadius);
-        gradient.addColorStop(0, 'rgba(0, 255, 0, 0.5)');
-        gradient.addColorStop(0.5, 'rgba(50, 200, 0, 0.35)');
-        gradient.addColorStop(1, 'rgba(100, 150, 0, 0.1)');
+        // Fades to nothing at the rim and is never stroked — the puddle has no
+        // drawn boundary, only the mist coming off it
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.baseRadius);
+        gradient.addColorStop(0, 'rgba(0, 255, 0, 0.46)');
+        gradient.addColorStop(0.5, 'rgba(50, 200, 0, 0.32)');
+        gradient.addColorStop(0.85, 'rgba(90, 160, 0, 0.12)');
+        gradient.addColorStop(1, 'rgba(100, 150, 0, 0)');
 
         ctx.beginPath();
-        ctx.arc(0, 0, this.fullRadius, 0, Math.PI * 2);
+        ctx.arc(0, 0, this.baseRadius, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
 
-        ctx.strokeStyle = 'rgba(100, 255, 50, 0.6)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
         for (const bubble of this.bubbles) {
             const dist = Math.hypot(bubble.x, bubble.y);
-            if (dist < this.fullRadius) {
+            if (dist < this.baseRadius) {
                 ctx.beginPath();
                 ctx.arc(bubble.x, bubble.y, bubble.size, 0, Math.PI * 2);
                 ctx.fillStyle = `rgba(150, 255, 100, ${0.3 + Math.sin(Date.now() / 200 + bubble.offset) * 0.2})`;
@@ -365,7 +397,8 @@ export class BurningTrailZone extends Zone {
     constructor(x: number, y: number, radius: number, duration: number, damage: number) {
         super(x, y, radius, duration, damage, 0.3, '');
         this.maxDuration = duration;
-        this.spreadIn(0.18);
+        // Fire spreads while it burns
+        this.growOver(0.55, 1);
 
         for (let i = 0; i < 4; i++) {
             const angle = Math.random() * Math.PI * 2;
@@ -401,16 +434,16 @@ export class BurningTrailZone extends Zone {
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-        ctx.scale(this.spreadScale, this.spreadScale);
+        ctx.scale(this.growScale, this.growScale);
 
         const fade = Math.max(0, Math.min(1, this.duration / (this.maxDuration * 0.5)));
 
-        const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, this.fullRadius);
+        const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, this.baseRadius);
         glow.addColorStop(0, `rgba(255, 150, 50, ${0.45 * fade})`);
         glow.addColorStop(0.5, `rgba(255, 80, 20, ${0.26 * fade})`);
         glow.addColorStop(1, 'rgba(200, 50, 0, 0)');
         ctx.beginPath();
-        ctx.arc(0, 0, this.fullRadius, 0, Math.PI * 2);
+        ctx.arc(0, 0, this.baseRadius, 0, Math.PI * 2);
         ctx.fillStyle = glow;
         ctx.fill();
 
@@ -438,50 +471,43 @@ export class BurningTrailZone extends Zone {
 
 /**
  * A patch of fungus rather than a coloured circle: mycelium threads crawl
- * across the ground and a cloud of spores breathes above them. Anything
- * standing in it gets *infected* — the damage keeps ticking after the enemy
- * walks out (see core/StatusEffects).
+ * across the ground, pixel mushrooms sprout out of them one at a time, and a
+ * cloud of spores breathes above. Anything standing in it gets *infected* —
+ * the damage keeps ticking after the enemy walks out (core/StatusEffects).
  *
- * Two things this deliberately does NOT draw:
- *   - **pixel mushrooms.** They were the loudest thing in the zone and they
- *     said nothing: caps sprouting one after another read as a decoration you
- *     had to look at, in the middle of a fight where you are reading damage
- *     numbers.
- *   - **a dashed boundary ring.** In a menu that would mark the edge; in
- *     combat it is a UI element painted onto the arena. The mat's own edge
- *     already tells you where it stops.
+ * The mushrooms went away for one iteration and came back: they are the thing
+ * that makes the patch read as alive rather than as a stain, and sprouting them
+ * on a stagger is the point — the mat *grows*, over its whole life, rather than
+ * being stamped down at full size. What did not come back is the dashed
+ * boundary ring, which was a UI element painted onto the arena.
  *
- * The patch keeps creeping outward for its whole life, not just when evolved —
- * mould grows. All geometry is baked against `fullRadius` and scaled at draw
- * time, and re-baked only when the mat has grown enough to look thin.
+ * All geometry is baked against `baseRadius` and scaled at draw time.
  */
 export class SporeZone extends Zone {
     /** Damage per second applied as an infection to anything inside */
     infectDps: number = 0;
     infectDuration: number = 3;
     contagious: boolean = false;
-    /** Share of the starting radius the mat gains every second */
-    creepRate: number = 0.07;
 
     protected puffs: { x: number; y: number; r: number; phase: number; drift: number }[] = [];
     /** Mycelium: short baked polylines crawling out of the centre */
     protected threads: Vector2[][] = [];
+    /** Caps sprouting on a stagger; `grow` runs 0..1 */
+    protected caps: { x: number; y: number; scale: number; variant: number; grow: number; at: number }[] = [];
     protected age: number = 0;
-    private baseRadius: number;
-    private lastGeometryRadius: number;
     private particleTimer: number = 0;
 
     constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number) {
         super(x, y, radius, duration, damage, interval, '', 0);
-        this.baseRadius = radius;
-        this.lastGeometryRadius = radius;
-        this.spreadIn(0.35);
+        // Opens at the size the weapon configured and swells by half again as
+        // the fungus takes hold — mould grows, it does not land
+        this.growOver(1, 1.5);
         this.rebuildGeometry();
     }
 
-    /** Baked once, and again once the mat has outgrown the pattern */
+    /** Baked once against the final size the mat will reach */
     protected rebuildGeometry() {
-        const r = this.fullRadius;
+        const r = this.baseRadius;
 
         this.puffs.length = 0;
         const puffCount = Math.min(16, 7 + Math.round(r / 20));
@@ -514,17 +540,34 @@ export class SporeZone extends Zone {
             }
             this.threads.push(path);
         }
+
+        // Caps are spread across the FIRST HALF of the patch's life, so they
+        // keep appearing while it spreads instead of all popping at once
+        this.caps.length = 0;
+        const capCount = Math.min(7, 3 + Math.round(r / 40));
+        for (let i = 0; i < capCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = r * (0.12 + Math.random() * 0.72);
+            this.caps.push({
+                x: Math.cos(angle) * dist,
+                y: Math.sin(angle) * dist * 0.7,
+                scale: 0.7 + Math.random() * 0.7,
+                variant: Math.floor(Math.random() * 3),
+                grow: 0,
+                at: (i / capCount) * this.lifetime * 0.5,
+            });
+        }
     }
 
     update(dt: number) {
-        // Creep first, then let the base class ease `radius` toward it
-        this.fullRadius = this.baseRadius * (1 + this.creepRate * this.age);
         super.update(dt);
         this.age += dt;
 
-        if (this.fullRadius > this.lastGeometryRadius * 1.35) {
-            this.lastGeometryRadius = this.fullRadius;
-            this.rebuildGeometry();
+        // One mushroom pushes up after another
+        for (const cap of this.caps) {
+            if (cap.grow < 1 && this.age >= cap.at) {
+                cap.grow = Math.min(1, cap.grow + dt * 2.2);
+            }
         }
 
         this.particleTimer += dt;
@@ -549,15 +592,19 @@ export class SporeZone extends Zone {
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-        ctx.scale(this.spreadScale, this.spreadScale);
+        ctx.scale(this.growScale, this.growScale);
 
         const fade = Math.min(1, this.duration / 0.6);
         const breathe = 1 + Math.sin(this.age * 1.6) * 0.05;
-        const r = this.fullRadius;
+        const r = this.baseRadius;
 
-        // Damp ground patch
-        ctx.globalAlpha = 0.32 * fade;
-        ctx.fillStyle = this.contagious ? '#243d10' : '#2a2c14';
+        // Damp ground patch, fading out at the rim rather than ending on a line
+        const soil = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+        const soilColor = this.contagious ? '36, 61, 16' : '42, 44, 20';
+        soil.addColorStop(0, `rgba(${soilColor}, ${0.36 * fade})`);
+        soil.addColorStop(0.75, `rgba(${soilColor}, ${0.24 * fade})`);
+        soil.addColorStop(1, `rgba(${soilColor}, 0)`);
+        ctx.fillStyle = soil;
         ctx.beginPath();
         ctx.ellipse(0, 0, r, r * 0.78, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -574,6 +621,13 @@ export class SporeZone extends Zone {
         }
         ctx.stroke();
 
+        // Mushrooms pushing up out of the mycelium
+        ctx.globalAlpha = fade;
+        for (const cap of this.caps) {
+            if (cap.grow <= 0) continue;
+            this.drawMushroom(ctx, cap.x, cap.y, cap.scale * cap.grow, cap.variant);
+        }
+
         // Spore puffs drifting above the mat
         for (const puff of this.puffs) {
             const lift = Math.sin(this.age * puff.drift + puff.phase) * 5;
@@ -586,6 +640,24 @@ export class SporeZone extends Zone {
 
         ctx.globalAlpha = 1;
         ctx.restore();
+    }
+
+    /** Chunky pixel mushroom: stalk, cap, one spot */
+    protected drawMushroom(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, variant: number) {
+        const p = Math.max(2, Math.round(3 * scale));
+        const capColor = this.contagious ? '#9ee83c' : ['#b4552e', '#8a6a2e', '#7a4a6a'][variant];
+        const capShade = this.contagious ? '#5f9418' : ['#7a3218', '#5c451c', '#4e2d47'][variant];
+
+        ctx.fillStyle = '#d8d2b8';
+        ctx.fillRect(x - p / 2, y - p, p, p * 2);
+
+        ctx.fillStyle = capColor;
+        ctx.fillRect(x - p * 2, y - p * 2, p * 4, p);
+        ctx.fillRect(x - p * 1.5, y - p * 3, p * 3, p);
+
+        ctx.fillStyle = capShade;
+        ctx.fillRect(x - p * 2, y - p, p * 4, Math.max(1, p * 0.5));
+        ctx.fillRect(x - p * 0.5, y - p * 3, p, p);
     }
 }
 

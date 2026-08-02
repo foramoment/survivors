@@ -8,10 +8,15 @@
  * and played as the dullest weapon in the pool: there was no moment to watch,
  * no decision in it, and levelling it changed a damage number and nothing else.
  *
- * What it does now: it locks the beam onto a target, then **sweeps** — the
- * emitter swings and the burning end of the beam is pulled across to the next
- * enemy, cutting everything the line crosses on the way. The floor it swept
- * over is left on fire.
+ * What it does now: a **thin** lance snaps out at a target, detonates in a
+ * small burst on it, then is dragged on to the next one — cutting whatever the
+ * line crosses and setting fire to what the bursts catch. The whole thing is
+ * over in about a fifth of a second, because the beam is the widest object
+ * this weapon puts on the arena and it has no business lingering there.
+ *
+ * The reach lives in the impact bursts, not in the beam's thickness. An early
+ * pass made the lance fat enough to cover a third of the screen, which hid the
+ * fight behind the weapon that was supposed to be winning it.
  *
  * Evolved — Void Cannon: three sweeps instead of one, and each one reaches for
  * something *further out* rather than the nearest body, so the beam zigzags
@@ -24,18 +29,25 @@ import { type Vector2, distance } from '../../core/Utils';
 import { damageSystem } from '../../core/DamageSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { particles } from '../../core/ParticleSystem';
+import { status } from '../../core/StatusEffects';
 import { juice } from '../../core/JuiceSystem';
 
 /** Closest a sweep will reach for — anything nearer is not worth swinging to */
 const SWEEP_MIN_REACH = 130;
 /** Furthest a sweep will reach */
 const SWEEP_MAX_REACH = 430;
-/** Seconds one sweep takes, however long the path is */
-const SWEEP_TIME = 0.3;
+/**
+ * Seconds one sweep takes, however long the path is.
+ *
+ * Short on purpose. The beam is the widest thing this weapon puts on screen,
+ * and a lance that lingers is a lance sitting on top of the fight you are
+ * trying to read. It snaps across and gets out of the way.
+ */
+const SWEEP_TIME = 0.14;
 /** Distance between the fires dropped along the swept path */
-const TRAIL_SPACING = 110;
+const TRAIL_SPACING = 150;
 /** Ceiling on trail fires per shot, so a long zigzag can't carpet the arena */
-const MAX_TRAILS = 8;
+const MAX_TRAILS = 6;
 
 // ============================================
 // SWEEPING LANCE - the beam itself
@@ -50,8 +62,8 @@ export class SweepingLance extends Projectile {
 
     private stage: 'charge' | 'sweep' | 'fade' = 'charge';
     private timer: number = 0;
-    private chargeTime: number = 0.32;
-    private fadeTime: number = 0.22;
+    private chargeTime: number = 0.16;
+    private fadeTime: number = 0.14;
 
     /** How far along the whole path the burning end currently is */
     private travelled: number = 0;
@@ -67,6 +79,8 @@ export class SweepingLance extends Projectile {
     color: string;
     /** Fires dropped on the floor the beam swept over */
     onTrail?: (x: number, y: number) => void;
+    /** Fired at every point the beam settles on — the small impact burst */
+    onNode?: (x: number, y: number) => void;
 
     constructor(owner: any, nodes: Vector2[], damage: number, width: number, isEvolved: boolean) {
         super(owner.pos.x, owner.pos.y, { x: 0, y: 0 }, 4, damage, 0, '');
@@ -136,6 +150,8 @@ export class SweepingLance extends Projectile {
             if (i <= this.resolved) continue;
             this.resolved = i;
             this.cutSegment(legStart, this.nodes[i], Math.pow(this.falloff, i - 1));
+            // The beam does not just pass over the target, it bites into it
+            this.onNode?.(this.nodes[i].x, this.nodes[i].y);
         }
     }
 
@@ -302,9 +318,21 @@ export class VoidRayWeapon extends Weapon {
         return this.evolved ? 3 : 1;
     }
 
-    /** Beam width, and the only thing a level changes besides damage */
+    /**
+     * Beam width. Deliberately **thin** — a lance is a line, not a corridor.
+     *
+     * The first cut of the swept lance was 26–46px wide, which swallowed a
+     * third of the screen for the length of the sweep and hid the fight behind
+     * its own glow. The reach now comes from the burst at each impact point
+     * (see `impactBurst`), not from the beam being fat.
+     */
     private beamWidth(): number {
-        return (26 + this.level * 4) * this.owner.stats.area;
+        return (9 + this.level * 1.5) * this.owner.stats.area;
+    }
+
+    /** Radius of the little detonation where the beam settles on a target */
+    private burstRadius(): number {
+        return this.area * 0.5 * this.owner.stats.area;
     }
 
     update(dt: number) {
@@ -334,6 +362,7 @@ export class VoidRayWeapon extends Weapon {
         const lance = new SweepingLance(this.owner, nodes, this.damage, this.beamWidth(), this.evolved);
         lance.source = this;
         lance.onTrail = (x, y) => this.layFire(x, y);
+        lance.onNode = (x, y) => this.impactBurst(x, y);
         this.onSpawn(lance);
 
         // Three legs of cutting and a trail of fire is worth a longer wait
@@ -371,15 +400,47 @@ export class VoidRayWeapon extends Weapon {
         return candidates[Math.floor(Math.random() * candidates.length)];
     }
 
+    /**
+     * The small detonation where the beam settles on a target.
+     *
+     * This is what carries the weapon now that the beam itself is a thread: a
+     * tight burst that catches the bodies pressed around the one it locked
+     * onto, and sets them alight. Small on purpose — three of these along a
+     * zigzag should read as three bites, not as three explosions.
+     */
+    private impactBurst(x: number, y: number) {
+        const radius = this.burstRadius();
+        const spot = { x, y };
+
+        particles.emitHit(x, y, this.evolved ? '#ff6cf0' : '#bd6cff');
+        juice.shockwave(x, y, radius * 1.5, this.evolved ? '#ff6cf0' : '#bd6cff', 0.22, 3);
+
+        for (const enemy of levelSpatialHash.getWithinRadius(spot, radius)) {
+            if (enemy.isDead || distance(spot, enemy.pos) > radius) continue;
+            damageSystem.dealDamage({
+                baseDamage: this.damage * 0.45,
+                source: this,
+                target: enemy,
+                position: enemy.pos,
+            });
+            status.infect(enemy, {
+                dps: this.damage * 0.2,
+                duration: 2,
+                source: this,
+                kind: 'burn',
+            });
+        }
+    }
+
     /** Burning floor left where the beam passed */
     private layFire(x: number, y: number) {
         const fire = new BurningTrailZone(
             x, y,
-            this.area * 0.42 * this.owner.stats.area,
-            1.4 * this.owner.stats.duration,
-            this.damage * 0.1,
+            this.area * 0.3 * this.owner.stats.area,
+            1.2 * this.owner.stats.duration,
+            this.damage * 0.08,
         );
-        fire.burnDps = this.damage * 0.18;
+        fire.burnDps = this.damage * 0.15;
         fire.source = this;
         this.onSpawn(fire);
     }
