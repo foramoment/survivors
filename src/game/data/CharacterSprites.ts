@@ -65,6 +65,33 @@ const LEGS_HEAVY: [string[], string[]] = [
 ];
 
 export const CHARACTER_SPRITES: Record<string, CharacterSprite> = {
+    // Near-black silhouette with a broken halo above the head and a collapsing
+    // core in the chest. Deliberately the darkest figure on the roster: the
+    // Void Walker is saturated violet, this one is the absence of colour with a
+    // pale event-horizon rim.
+    null_warden: {
+        body: [
+            '..a......a..',
+            '...hhhhhh...',
+            '..hsvvvvsh..',
+            '..hsvvvvsh..',
+            '...dssssd...',
+            'a.dsSaaSsd.a',
+            '.adsSaaSsda.',
+            '..dsSaaSsd..',
+            '..dssaassd..',
+            '..ds.aa.sd..',
+            '...dssssd...',
+            '...dssssd...',
+            '....dssd....',
+        ],
+        legs: LEGS_HEAVY,
+        palette: {
+            dark: '#0a0814', mid: '#1c1930', light: '#38335a',
+            shell: '#7d76a8', visor: '#9dfcff', accent: '#e8e0ff', boots: '#050409',
+        },
+    },
+
     // Slim, hooded, trailing void wisps off both shoulders
     void_walker: {
         body: [

@@ -25,7 +25,7 @@ export const RU: Record<string, string> = {
     'menu.tagline': 'ВЫЖИВИ В КОСМИЧЕСКОМ ХАОСЕ',
     'menu.hint': 'WASD / ТЯНИ МЫШЬЮ · ОРУЖИЕ СТРЕЛЯЕТ САМО',
 
-    'classes.devMode': '🛠️ Режим разработчика (только оружие, 6 вариантов)',
+    'classes.devMode': '🛠️ Режим разработчика (любое оружие и бонусы)',
     'classes.hp': '{n} HP',
 
     'stages.title': 'ВЫБОР АРЕНЫ',
@@ -204,6 +204,8 @@ export const RU: Record<string, string> = {
     'class.astro_biologist.bonus': 'Реген +0.25/с, Площадь +10% · +1% площади за уровень',
     'class.storm_mage.name': 'Маг Бури',
     'class.storm_mage.bonus': 'Урон +15% · −1% перезарядки за уровень',
+    'class.null_warden.name': 'Страж Пустоты',
+    'class.null_warden.bonus': 'Площадь +15%, Броня +1 · +1% длительности эффектов за уровень',
     'class.berserker.name': 'Берсерк',
     'class.berserker.bonus': 'HP +50%, Урон +10%, Броня −2 · Адреналин: сильнее и быстрее ниже 35% HP · +1% шанса крита за уровень',
 

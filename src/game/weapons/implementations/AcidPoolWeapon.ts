@@ -48,24 +48,18 @@ export class CorrosivePool extends AcidZone {
         }
     }
 
+    /**
+     * A corroding pool draws no boundary of its own.
+     *
+     * This went through two rings — a marching dashed one, then a solid etched
+     * one — and both were the same mistake: a circle stroked onto the floor is
+     * a selection marker, and on a puddle that had already faded out it was the
+     * *only* thing left on screen, a bright green outline sitting on empty
+     * ground. What tells you where the acid reaches is the acid: the gradient
+     * (AcidZone) and the mist coming off its edge.
+     */
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         super.draw(ctx, camera);
-
-        // A bright acid line eaten into the floor, so a corroding pool reads
-        // differently from a plain puddle.
-        //
-        // This used to be a marching dashed ring — which is a selection
-        // indicator, not a puddle. It was the same offence as the dashed edge
-        // we pulled off the spore patch: a UI element painted into the arena.
-        ctx.save();
-        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-        ctx.globalAlpha = 0.45;
-        ctx.strokeStyle = '#c9ff5c';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.9, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
     }
 }
 

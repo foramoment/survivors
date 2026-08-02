@@ -21,7 +21,7 @@ export const EN: Record<string, string> = {
     'menu.tagline': 'SURVIVE THE COSMIC CHAOS',
     'menu.hint': 'WASD / DRAG TO MOVE · WEAPONS FIRE THEMSELVES',
 
-    'classes.devMode': '🛠️ Developer Mode (Weapons Only, 6 Options)',
+    'classes.devMode': '🛠️ Developer Mode (pick any weapon or perk)',
     'classes.hp': '{n} HP',
 
     'stages.title': 'SELECT STAGE',

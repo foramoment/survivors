@@ -94,6 +94,26 @@ export const CLASSES = [
         stats: { armor: -2, might: 1.1, adrenaline: 0.15 },
         perLevel: { stat: 'critChance', value: 0.01 } as ClassPerLevel,
     },
+    {
+        /**
+         * The seventh class exists to give the Singularity Orb an owner.
+         *
+         * It was the strongest weapon left unclaimed, and it is the only one
+         * that plays the game backwards: every other weapon is about surviving
+         * the crowd, and the orb is about *making* one. So the stats support
+         * that and nothing else — a wider event horizon, a longer hold, and
+         * just enough armour to stand next to the pile you just gathered.
+         *
+         * Deliberately NOT given damage or crit: the Warden's payoff is that
+         * everything else you own gets to hit a crowd standing still in one
+         * spot, which is worth more than any number this line could add.
+         */
+        id: 'null_warden', name: "Null Warden", emoji: "🕳️",
+        bonus: "Area +15%, Armor +1 · +1% effect duration per level",
+        weaponId: 'singularity_orb', hp: 105,
+        stats: { area: 1.15, armor: 1 },
+        perLevel: { stat: 'duration', value: 0.01 } as ClassPerLevel,
+    },
 ];
 
 /**
