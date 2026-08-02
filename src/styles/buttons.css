@@ -1,0 +1,130 @@
+/* =========================================================================
+   Pixel buttons
+   ========================================================================= */
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+  min-width: min(360px, 80vw);
+}
+
+.menu-buttons--row {
+  flex-direction: row;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pixel-btn {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: clamp(0.85em, 2.4vw, 1.15em);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 14px 28px;
+  cursor: pointer;
+  border: none;
+  border-radius: 0;
+  color: var(--c-cyan);
+  background: var(--c-panel);
+  box-shadow:
+    0 0 0 var(--px) var(--c-cyan),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7);
+  transition: transform 90ms steps(2), background-color 90ms steps(2), color 90ms steps(2);
+}
+
+.pixel-btn:hover,
+.pixel-btn:focus-visible {
+  outline: none;
+  background: var(--c-cyan);
+  color: #05040d;
+  transform: translate(calc(var(--px) * -1), calc(var(--px) * -1));
+  box-shadow:
+    0 0 0 var(--px) var(--c-cyan),
+    calc(var(--px) * 3) calc(var(--px) * 3) 0 rgba(0, 0, 0, 0.75),
+    0 0 26px rgba(56, 242, 255, 0.45);
+}
+
+.pixel-btn:active {
+  transform: translate(var(--px), var(--px));
+  box-shadow: 0 0 0 var(--px) var(--c-cyan);
+}
+
+.pixel-btn--primary {
+  color: var(--c-yellow);
+  box-shadow:
+    0 0 0 var(--px) var(--c-yellow),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7);
+  animation: btn-idle 1.6s steps(2) infinite alternate;
+}
+
+.pixel-btn--primary:hover,
+.pixel-btn--primary:focus-visible {
+  background: var(--c-yellow);
+  color: #1a1200;
+  box-shadow:
+    0 0 0 var(--px) var(--c-yellow),
+    calc(var(--px) * 3) calc(var(--px) * 3) 0 rgba(0, 0, 0, 0.75),
+    0 0 30px rgba(255, 210, 63, 0.5);
+}
+
+@keyframes btn-idle {
+  from {
+    filter: brightness(1);
+  }
+
+  to {
+    filter: brightness(1.35);
+  }
+}
+
+.pixel-btn--ghost {
+  color: var(--c-dim);
+  font-size: 0.8em;
+  box-shadow:
+    0 0 0 var(--px) #3a3f5c,
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.6);
+}
+
+.pixel-btn--ghost:hover {
+  background: #3a3f5c;
+  color: var(--c-ink);
+}
+
+.pixel-btn--danger {
+  color: var(--c-red);
+  box-shadow:
+    0 0 0 var(--px) var(--c-red),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7);
+}
+
+.pixel-btn--danger:hover {
+  background: var(--c-red);
+  color: #1a0006;
+}
+
+/* Legacy button class still used by a few screens */
+.menu-button {
+  font-family: var(--font-pixel);
+}
+
+.menu-credit {
+  margin-top: 10px;
+  font-size: 0.6em;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--c-dim);
+  opacity: 0.6;
+  text-align: center;
+}
+
+.menu-footer {
+  margin-top: 22px;
+  font-size: 0.7em;
+  letter-spacing: 0.2em;
+  color: var(--c-dim);
+  text-align: center;
+  opacity: 0.8;
+}
+

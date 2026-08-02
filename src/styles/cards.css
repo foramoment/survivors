@@ -1,0 +1,89 @@
+/* =========================================================================
+   Card grids (class select / stage select)
+   ========================================================================= */
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  max-width: 1150px;
+  width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  /* 14 classes overflow a laptop screen — scroll the grid, not the page,
+     so the title and Back button always stay visible */
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-cyan) rgba(0, 0, 0, 0.4);
+}
+
+.class-grid::-webkit-scrollbar {
+  width: 10px;
+}
+
+.class-grid::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.class-grid::-webkit-scrollbar-thumb {
+  background: var(--c-cyan);
+}
+
+.class-card {
+  position: relative;
+  background: var(--c-panel);
+  box-shadow:
+    0 0 0 var(--px) #2f3a63,
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.65);
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: transform 90ms steps(2), background-color 90ms steps(2);
+  animation: card-rise 260ms steps(5) both;
+}
+
+.class-card:hover {
+  background: var(--c-panel-hi);
+  transform: translate(calc(var(--px) * -1), calc(var(--px) * -1));
+  box-shadow:
+    0 0 0 var(--px) var(--c-cyan),
+    calc(var(--px) * 3) calc(var(--px) * 3) 0 rgba(0, 0, 0, 0.7),
+    0 0 22px rgba(56, 242, 255, 0.35);
+}
+
+@keyframes card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.class-icon {
+  font-size: 2.6em;
+  line-height: 1;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6));
+}
+
+.class-name {
+  font-size: 0.95em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-ink);
+}
+
+.class-bonus {
+  font-size: 0.72em;
+  letter-spacing: 0.04em;
+  color: var(--c-dim);
+}
+

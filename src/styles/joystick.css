@@ -1,0 +1,62 @@
+/* =========================================================================
+   Joystick (touch)
+   ========================================================================= */
+
+#joystick-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  z-index: 5;
+}
+
+.joystick-base {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  background: rgba(56, 242, 255, 0.06);
+  box-shadow: 0 0 0 var(--px) rgba(56, 242, 255, 0.4);
+  display: none;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+}
+
+.joystick-stick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 38px;
+  height: 38px;
+  background: rgba(56, 242, 255, 0.6);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 12px rgba(56, 242, 255, 0.7);
+}
+
+/* Disable text selection globally for better touch experience */
+* {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Respect users who don't want motion */
+@media (prefers-reduced-motion: reduce) {
+
+  .crash-in,
+  .upgrade-card,
+  .upgrade-card.evolution-ready,
+  .class-card,
+  .result-screen,
+  .pixel-btn--primary,
+  h2.lucky {
+    animation: none !important;
+  }
+
+  /* Without its fade-out animation the crack would linger — drop it entirely */
+  .crack-overlay {
+    display: none;
+  }
+}
+

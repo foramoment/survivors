@@ -1,0 +1,72 @@
+/* =========================================================================
+   HUD
+   ========================================================================= */
+
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  padding: 16px;
+  box-sizing: border-box;
+  display: none;
+}
+
+.hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+}
+
+.bar-container {
+  width: min(300px, 40vw);
+  height: 18px;
+  background: #12081a;
+  box-shadow: 0 0 0 var(--px) #000, 0 0 0 calc(var(--px) * 2) #3a3f5c;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Segmented fill — reads as discrete pixel chunks, not a smooth gradient */
+.hp-bar-fill {
+  height: 100%;
+  width: 100%;
+  background:
+    repeating-linear-gradient(90deg,
+      var(--c-red) 0 8px,
+      #c01030 8px 10px);
+  transition: width 120ms steps(4);
+}
+
+.xp-bar-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: #0a0616;
+}
+
+.xp-bar-fill {
+  height: 100%;
+  background:
+    repeating-linear-gradient(90deg,
+      var(--c-cyan) 0 10px,
+      #1aa8c8 10px 12px);
+  width: 0%;
+  box-shadow: 0 0 10px rgba(56, 242, 255, 0.6);
+  transition: width 120ms steps(4);
+}
+
+.stats {
+  color: var(--c-ink);
+  font-family: var(--font-pixel);
+  font-size: 0.9em;
+  letter-spacing: 0.1em;
+  text-shadow: 2px 2px 0 #000;
+}
+

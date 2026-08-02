@@ -1,0 +1,149 @@
+/* =========================================================================
+   Achievements — toast + list
+   ========================================================================= */
+
+.toast-host {
+  position: absolute;
+  right: 12px;
+  bottom: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 22;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  max-width: min(300px, 62vw);
+  background: rgba(13, 10, 28, 0.94);
+  box-shadow:
+    0 0 0 2px var(--c-yellow, #ffd23f),
+    4px 4px 0 rgba(0, 0, 0, 0.7);
+  animation: toast-in 260ms steps(4) both;
+}
+
+.toast--leaving {
+  animation: toast-out 240ms steps(4) both;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(24px); }
+}
+
+.toast-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.toast-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.toast-text strong {
+  font-size: 0.72em;
+  letter-spacing: 0.1em;
+  color: var(--c-yellow, #ffd23f);
+}
+
+.toast-text em {
+  font-style: normal;
+  font-size: 0.6em;
+  letter-spacing: 0.05em;
+  color: var(--c-dim);
+}
+
+/* Achievements are square tiles, the shape a player expects a trophy case to
+   be, sized off one knob so the grid stays sane whether there are twelve of
+   them or forty. They used to be full-width rows, which read as a settings
+   list. Deliberately their own class rather than a reuse of .upgrade-card:
+   those cards are built to be clicked and animate on focus, and these are not
+   interactive at all. */
+.achievement-list {
+  --achv-tile: clamp(116px, 12.5vmin, 176px);
+
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--achv-tile), 1fr));
+  gap: calc(var(--achv-tile) * 0.06);
+  width: min(860px, 94vw);
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+  /* Room for the tiles' outset ring: an `overflow` container clips it, which
+     is why the corner tiles used to look like their border was cut off */
+  padding: 4px;
+  margin-bottom: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-cyan) rgba(0, 0, 0, 0.4);
+}
+
+.achievement {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: calc(var(--achv-tile) * 0.05);
+  aspect-ratio: 1;
+  padding: calc(var(--achv-tile) * 0.09);
+  /* A long requirement must not spill past the square */
+  overflow: hidden;
+  background: var(--c-panel);
+  box-shadow: 0 0 0 2px #2f3a63;
+  text-align: center;
+  animation: card-rise 200ms steps(4) both;
+  opacity: 0.5;
+}
+
+.achievement--done {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--c-yellow, #ffd23f);
+}
+
+.achievement-icon {
+  font-size: calc(var(--achv-tile) * 0.3);
+  line-height: 1.1;
+}
+
+.achievement-text {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--achv-tile) * 0.03);
+  min-width: 0;
+}
+
+.achievement-text strong {
+  font-size: calc(var(--achv-tile) * 0.085);
+  letter-spacing: 0.06em;
+  line-height: 1.25;
+  color: var(--c-ink);
+}
+
+.achievement--done .achievement-text strong {
+  color: var(--c-yellow, #ffd23f);
+}
+
+.achievement-text em {
+  font-style: normal;
+  font-size: calc(var(--achv-tile) * 0.072);
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  color: var(--c-dim);
+}
+
+/* The end-of-run panel already lists the build — no need for both */
+#ui-layer:has(.result-screen) .build-panel {
+  display: none;
+}
+

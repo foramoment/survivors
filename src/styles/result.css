@@ -1,0 +1,209 @@
+/* =========================================================================
+   Run result (game over / victory)
+   ========================================================================= */
+
+.result-screen {
+  gap: 6px;
+  animation: crash-zoom 300ms cubic-bezier(0.2, 1.3, 0.35, 1) both;
+}
+
+.result-screen--defeat {
+  background: rgba(30, 2, 10, 0.9);
+}
+
+.result-screen--defeat h1 {
+  color: var(--c-red);
+  text-shadow: var(--px) var(--px) 0 #200, 0 0 22px rgba(255, 59, 82, 0.6);
+}
+
+.result-screen--victory {
+  background: rgba(8, 6, 26, 0.9);
+}
+
+.result-screen--victory h1 {
+  color: var(--c-yellow);
+  text-shadow: var(--px) var(--px) 0 #201400, 0 0 26px rgba(255, 210, 63, 0.7);
+}
+
+.result-subtitle {
+  margin: 0 0 22px;
+  font-size: 0.85em;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-dim);
+}
+
+/* Score is the headline of a run — bigger than the breakdown below it */
+.result-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 16px 32px;
+  background: var(--c-panel);
+  box-shadow: 0 0 0 var(--px) var(--c-yellow, #ffd23f);
+}
+
+.result-score span {
+  font-size: 0.7em;
+  letter-spacing: 0.18em;
+  color: var(--c-dim);
+}
+
+.result-score strong {
+  font-size: 2.4em;
+  color: var(--c-yellow, #ffd23f);
+  text-shadow: 3px 3px 0 #000;
+  letter-spacing: 0.04em;
+}
+
+.result-rank {
+  font-size: 0.68em;
+  font-style: normal;
+  letter-spacing: 0.14em;
+  color: var(--c-cyan);
+  animation: rank-blink 900ms steps(2, jump-none) infinite;
+}
+
+@keyframes rank-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* The two rows of end-of-run tiles share one grid so their columns line up
+   exactly. They used to be flex rows with a min-width, which meant each row
+   sized itself to its own content and the two sat slightly out of step. */
+/* auto-fit rather than a fixed three, so adding a stat does not require
+   re-planning the layout — the rows re-flow and stay column-aligned with each
+   other because both grids use the same track size. */
+.result-stats,
+.result-highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 12px;
+  width: min(560px, 92vw);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.result-stats {
+  margin-bottom: 12px;
+}
+
+.result-stat {
+  padding: 12px 16px;
+  background: var(--c-panel);
+  box-shadow: 0 0 0 var(--px) #2f3a63;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.result-stat span {
+  font-size: 0.65em;
+  letter-spacing: 0.14em;
+  color: var(--c-dim);
+}
+
+.result-stat strong {
+  font-size: 1.5em;
+  color: var(--c-ink);
+  text-shadow: 2px 2px 0 #000;
+}
+
+/* Character cards show the real in-game sprite instead of an emoji */
+.class-card--portrait {
+  padding-top: 18px;
+}
+
+.class-portrait {
+  display: block;
+  width: 72px;
+  height: 96px;
+  margin: 0 auto 10px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, 0.6));
+}
+
+.class-card--portrait:hover .class-portrait {
+  animation: portrait-bob 420ms steps(2) infinite alternate;
+}
+
+@keyframes portrait-bob {
+  from { transform: translateY(0); }
+  to { transform: translateY(-3px); }
+}
+
+/* The per-level growth is the reason to pick one class over another */
+.class-perk {
+  color: var(--c-yellow, #ffd23f);
+}
+
+/* End-of-run highlights: the "what happened" numbers. Grid shared with
+   .result-stats above so the two rows are column-aligned. */
+.result-highlights {
+  margin-bottom: 18px;
+}
+
+.highlight {
+  padding: 9px 14px;
+  background: rgba(13, 10, 28, 0.7);
+  box-shadow: 0 0 0 2px #2f3a63;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+}
+
+.highlight span {
+  font-size: 0.58em;
+  letter-spacing: 0.14em;
+  color: var(--c-dim);
+}
+
+.highlight strong {
+  font-size: 1.15em;
+  color: var(--c-cyan);
+  text-shadow: 2px 2px 0 #000;
+}
+
+.highlight em {
+  font-style: normal;
+  font-size: 0.58em;
+  letter-spacing: 0.06em;
+  color: var(--c-dim);
+}
+
+.result-build {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.result-build-label {
+  font-size: 0.6em;
+  letter-spacing: 0.18em;
+  color: var(--c-dim);
+}
+
+/* Bigger than the in-game panel: this is the one screen where reading the
+   build IS the content, and there is room for it. */
+.result-build {
+  --build-slot: clamp(40px, 4.6vmin, 66px);
+}
+
+.result-build-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--build-slot) * 0.18);
+  row-gap: calc(var(--build-slot) * 0.26);
+  justify-content: center;
+  max-width: min(560px, 88vw);
+}
+

@@ -1,0 +1,98 @@
+/* =========================================================================
+   Level-up reroll
+   ========================================================================= */
+
+.reroll-btn {
+  margin-top: 22px;
+  width: 62px;
+  height: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  font-family: var(--font-pixel);
+  color: var(--c-cyan);
+  background: var(--c-panel);
+  box-shadow:
+    0 0 0 var(--px) var(--c-cyan),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 rgba(0, 0, 0, 0.7);
+  transition: transform 90ms steps(2), background-color 90ms steps(2), color 90ms steps(2);
+}
+
+.reroll-btn:hover:not(:disabled),
+.reroll-btn:focus-visible:not(:disabled) {
+  outline: none;
+  background: var(--c-cyan);
+  color: #05040d;
+  transform: translate(calc(var(--px) * -1), calc(var(--px) * -1));
+}
+
+.reroll-btn:disabled {
+  cursor: default;
+  color: #4a5170;
+  box-shadow: 0 0 0 var(--px) #2f3a63;
+}
+
+.reroll-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.reroll-btn:hover:not(:disabled) .reroll-icon {
+  animation: reroll-spin 400ms steps(4) infinite;
+}
+
+@keyframes reroll-spin {
+  to { transform: rotate(360deg); }
+}
+
+.reroll-count {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+/*
+ * Keyboard / hover cursor on the level-up cards.
+ *
+ * An `outline` on purpose, and nothing else. The card is already running
+ * `card-slam` on entry (and `evo-pulse` when it can evolve), and CSS animations
+ * override the plain `transform` / `box-shadow` / `filter` properties for as
+ * long as they are filling — so an earlier version that set `animation` here
+ * *replaced* the entrance mid-flight and the card visibly snapped whenever the
+ * mouse crossed it. `outline` is not touched by any of those keyframes, costs
+ * no layout, and works the same on an evolution-ready card.
+ *
+ * Hover no longer highlights on its own either: it moves this cursor instead,
+ * so there is exactly one focused card. Before, hovering one card while the
+ * keyboard sat on another lit both, in two different colours.
+ */
+.upgrade-card--focused {
+  outline: var(--px) solid var(--c-cyan);
+  outline-offset: 4px;
+}
+
+/* The moment a pick lands — brief, physical, then the panel goes */
+.upgrade-card--picked {
+  animation: card-pick 160ms steps(2) both;
+}
+
+@keyframes card-pick {
+  0% { filter: brightness(2.6); transform: scale(1.06); }
+  100% { filter: brightness(1); transform: scale(0.96); }
+}
+
+/* Before → after, under the flavour text on an upgrade card */
+.stat-preview {
+  margin-top: 6px;
+  font-family: var(--font-pixel);
+  font-size: 0.72em;
+  letter-spacing: 0.08em;
+  color: var(--c-yellow, #ffd23f);
+}
+

@@ -1,0 +1,148 @@
+/* =========================================================================
+   Responsive
+   ========================================================================= */
+
+@media screen and (max-height: 700px),
+screen and (max-width: 900px) {
+  :root {
+    --px: 2px;
+  }
+
+  .class-grid {
+    grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .class-card {
+    padding: 8px 5px;
+    gap: 5px;
+  }
+
+  .class-icon {
+    font-size: 1.9em;
+  }
+
+  .class-name {
+    font-size: 0.78em;
+  }
+
+  .class-bonus {
+    font-size: 0.62em;
+  }
+
+  .dev-mode-container {
+    padding: 7px 12px;
+    margin-bottom: 12px;
+  }
+
+  .dev-mode-label {
+    font-size: 0.68em;
+  }
+
+  .upgrade-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    max-width: 100%;
+  }
+
+  .upgrade-grid-6 {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px;
+    max-width: 100%;
+  }
+
+  .upgrade-card {
+    padding: 9px 6px;
+  }
+
+  .upgrade-card h3 {
+    font-size: 0.75em;
+  }
+
+  .upgrade-card p {
+    font-size: 0.63em;
+  }
+
+  .upgrade-card>div[style*="font-size: 3em"] {
+    font-size: 1.8em !important;
+  }
+
+  .level-indicator {
+    font-size: 0.63em;
+  }
+
+  .hud {
+    padding: 10px;
+  }
+
+  .bar-container {
+    height: 14px;
+  }
+
+  .stats {
+    font-size: 0.72em;
+  }
+
+  .result-stat {
+    min-width: 90px;
+    padding: 9px 12px;
+  }
+
+  .dev-tabs {
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+
+  .dev-tab {
+    padding: 7px 12px;
+    font-size: 0.7em;
+  }
+
+  .dev-upgrade-grid {
+    gap: 8px;
+    max-height: calc(100vh - 170px);
+    padding: 4px;
+  }
+}
+
+@media screen and (max-height: 500px) {
+  .screen--menu {
+    padding-bottom: 3vh;
+  }
+
+  .menu-buttons {
+    gap: 8px;
+  }
+
+  .pixel-btn {
+    padding: 9px 18px;
+  }
+
+  .menu-footer {
+    margin-top: 12px;
+    font-size: 0.6em;
+  }
+
+  .class-grid {
+    grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .class-icon {
+    font-size: 1.4em;
+  }
+
+  .class-name {
+    font-size: 0.7em;
+  }
+
+  .class-bonus {
+    font-size: 0.58em;
+  }
+
+  .upgrade-card {
+    padding: 7px 5px;
+  }
+}

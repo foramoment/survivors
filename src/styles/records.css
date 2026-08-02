@@ -1,0 +1,81 @@
+/* =========================================================================
+   Records (local leaderboard)
+   ========================================================================= */
+
+.records-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(620px, 92vw);
+  margin: 8px 0 24px;
+}
+
+.records-row {
+  display: grid;
+  grid-template-columns: 34px minmax(96px, auto) 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--c-panel);
+  box-shadow: 0 0 0 var(--px) #2f3a63;
+  font-size: 0.72em;
+  text-align: left;
+  animation: card-rise 220ms steps(4) both;
+}
+
+.records-row--victory {
+  box-shadow: 0 0 0 var(--px) var(--c-yellow, #ffd23f);
+}
+
+.records-rank {
+  color: var(--c-dim);
+  font-size: 1.1em;
+}
+
+.records-score {
+  color: var(--c-yellow, #ffd23f);
+  font-size: 1.25em;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.records-meta {
+  color: var(--c-ink);
+  letter-spacing: 0.06em;
+}
+
+.records-detail {
+  color: var(--c-dim);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.records-badge {
+  color: var(--c-yellow, #ffd23f);
+  letter-spacing: 0.18em;
+  font-size: 0.9em;
+}
+
+.records-empty {
+  margin: 30px 0;
+  color: var(--c-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.8em;
+}
+
+/* Score sits between the kill count and the pause button */
+.hud-score {
+  color: var(--c-yellow, #ffd23f);
+}
+
+@media (max-width: 560px) {
+  .records-row {
+    grid-template-columns: 28px 1fr;
+  }
+
+  .records-detail,
+  .records-meta {
+    grid-column: 2;
+  }
+}
+

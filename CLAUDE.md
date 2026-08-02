@@ -51,6 +51,7 @@ src/game/
 │   └── implementations/  # 14 оружий (каждое в своём файле)
 └── ui/
     ├── ScreenManager.ts  # Менеджер экранов
+    │   # (стили: src/style.css — только @import; главы в src/styles/)
     ├── BaseScreen.ts     # Базовый класс экрана + createPixelButton()
     ├── components/       # HUD, BuildPanel (иконки оружий/перков), SettingsPanel
     ├── MenuBackdrop.ts   # 🌌 Анимированный пиксельный космос под всеми меню
@@ -785,7 +786,19 @@ const dist = Math.sqrt(dx * dx + dy * dy);
 
 ### UI: пиксельная тема
 
-`src/style.css` — единая дизайн-система (токены в `:root`):
+`src/style.css` — **только список `@import`**. Сами правила лежат в
+`src/styles/` по главам (`tokens`, `screens`, `buttons`, `cards`, `dev-mode`,
+`hud`, `pause`, `level-up`, `result`, `build-panel`, `reroll`, `achievements`,
+`records`, `options`, `joystick`, `responsive`).
+
+> **Порядок импортов — это каскад.** Он повторяет порядок исходного файла, и
+> ломать его нельзя: поздние главы намеренно перекрывают ранние, `responsive`
+> идёт последним. Новая глава = решение, **куда** в каскаде она встаёт, а не
+> «дописать в конец». Vite инлайнит импорты на сборке, рантайм не страдает.
+> Проверка после любой перестановки — собрать и сравнить хеш `dist/assets/*.css`
+> (при чистом переносе он не меняется вообще).
+
+Токены — в `styles/tokens.css` (`:root`):
 
 - Никаких скруглений и мягких теней. Рамки — `box-shadow: 0 0 0 var(--px) color`,
   глубина — жёсткие смещённые тени с `blur: 0`.

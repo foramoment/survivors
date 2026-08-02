@@ -1,0 +1,118 @@
+/* =========================================================================
+   Build panel — the run's weapons and perks, always on screen
+   ========================================================================= */
+
+/* The slot scale is a root token so anything that reuses .build-slot gets a
+   working size. The result screen's build row does exactly that, and when the
+   variable lived only on .build-panel those tiles collapsed to nothing while
+   their stars and stack counts kept their own font size — which is how you end
+   up with a row of numbers floating over slots too small to see. */
+:root {
+  --build-slot: clamp(34px, 3.6vmin, 58px);
+}
+
+.build-panel {
+  /* One knob drives every size in the panel.
+     `vmin` tracks the SHORTER viewport axis, so an ultrawide monitor does not
+     inflate the icons and a tall window does not shrink them; clamp() keeps
+     them legible on a laptop and stops them ballooning on a 4K screen.
+       1366x768   3.6vmin = 28px -> clamped up to 34
+       1920x1080  3.6vmin = 39px
+       2560x1440  3.6vmin = 52px
+       3840x2160  3.6vmin = 78px -> clamped down to 58
+     They used to be a flat 30px/24px at every resolution, which meant the
+     panel shrank into nothing the bigger the monitor got. */
+  --build-slot: clamp(34px, 3.6vmin, 58px);
+
+  position: absolute;
+  left: 10px;
+  /* Clears the level readout below it. Scales with the slots, or the badges
+     hanging off the bottom row collide with the text as the panel grows. */
+  bottom: calc(34px + var(--build-slot) * 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--build-slot) * 0.16);
+  pointer-events: none;
+  /* Above the level-up overlay on purpose: "do I already own this?" is the
+     question the panel exists to answer, and that is exactly when you ask it.
+     It sits in the empty bottom-left corner, so it covers nothing. */
+  z-index: 20;
+}
+
+.build-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--build-slot) * 0.13);
+  /* Ten slots before it wraps, whatever a slot currently measures */
+  max-width: min(55vw, calc(var(--build-slot) * 10.5));
+}
+
+.build-slot {
+  position: relative;
+  width: var(--build-slot);
+  height: var(--build-slot);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 24, 0.78);
+  box-shadow: 0 0 0 2px #2f3a63;
+}
+
+.build-row--powerups .build-slot {
+  width: calc(var(--build-slot) * 0.84);
+  height: calc(var(--build-slot) * 0.84);
+}
+
+.build-slot--evolved {
+  box-shadow: 0 0 0 2px var(--c-yellow, #ffd23f);
+}
+
+/* One pick from evolving — worth flagging while you can still act on it */
+.build-slot--ready {
+  box-shadow: 0 0 0 2px var(--c-cyan, #38f2ff);
+  animation: build-ready 900ms steps(2) infinite alternate;
+}
+
+@keyframes build-ready {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.6); }
+}
+
+.build-icon {
+  font-size: calc(var(--build-slot) * 0.54);
+  line-height: 1;
+}
+
+.build-row--powerups .build-icon {
+  font-size: calc(var(--build-slot) * 0.45);
+}
+
+/* Top-right corner. It used to sit bottom-right, where on the end-of-run
+   screen the star of an evolved weapon covered the tile it was pinned to. */
+.build-badge {
+  position: absolute;
+  right: calc(var(--build-slot) * -0.08);
+  top: calc(var(--build-slot) * -0.1);
+  min-width: calc(var(--build-slot) * 0.38);
+  padding: 0 calc(var(--build-slot) * 0.05);
+  font-family: var(--font-pixel);
+  font-size: calc(var(--build-slot) * 0.26);
+  line-height: calc(var(--build-slot) * 0.38);
+  text-align: center;
+  color: #05040d;
+  background: var(--c-cyan, #38f2ff);
+}
+
+.build-slot--evolved .build-badge {
+  background: var(--c-yellow, #ffd23f);
+}
+
+/* Phones: the arena is the scarce thing, so lower the whole scale rather than
+   re-specifying each element */
+@media (max-width: 560px) {
+  .build-panel {
+    --build-slot: clamp(22px, 6.5vmin, 32px);
+    bottom: calc(28px + var(--build-slot) * 0.35);
+  }
+}
+

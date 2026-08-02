@@ -1,0 +1,98 @@
+/* =========================================================================
+   COSMOS SURVIVORS — pixel/CRT UI theme
+   -------------------------------------------------------------------------
+   Design rules:
+     - No rounded corners, no blur-soft shadows. Depth comes from hard
+       offset shadows (box-shadow with 0 blur) like a 16-bit UI.
+     - Borders are drawn with box-shadow steps so they stay crisp at any DPI.
+     - Everything is uppercase monospace with wide letter-spacing.
+     - Motion is snappy: 90-140ms steps, never smooth 300ms fades.
+   ========================================================================= */
+
+:root {
+  --px: 3px;
+
+  --c-bg: #05040d;
+  --c-panel: #0d0a1c;
+  --c-panel-hi: #191233;
+  --c-ink: #e8f6ff;
+  --c-dim: #8792b8;
+
+  --c-cyan: #38f2ff;
+  --c-magenta: #ff3fa4;
+  --c-yellow: #ffd23f;
+  --c-green: #6bff8f;
+  --c-red: #ff3b52;
+  --c-violet: #a06bff;
+
+  --font-pixel: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "SFMono-Regular",
+    "DejaVu Sans Mono", "Courier New", monospace;
+
+  font-family: var(--font-pixel);
+  line-height: 1.5;
+  font-weight: 700;
+  color-scheme: dark;
+  color: var(--c-ink);
+  background-color: var(--c-bg);
+
+  font-synthesis: none;
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: none;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--c-bg);
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* CRT pass: scanlines + corner vignette over the whole app */
+#app::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  background:
+    repeating-linear-gradient(to bottom,
+      rgba(0, 0, 0, 0.20) 0 1px,
+      rgba(255, 255, 255, 0.015) 1px 2px,
+      rgba(0, 0, 0, 0) 2px 4px),
+    radial-gradient(ellipse at center,
+      rgba(0, 0, 0, 0) 55%,
+      rgba(0, 0, 0, 0.55) 100%);
+}
+
+#ui-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.interactive {
+  pointer-events: auto;
+}
+
