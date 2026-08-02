@@ -147,6 +147,18 @@ export class PlasmaGrenadeWeapon extends Weapon {
         this.onSpawn(lob);
     }
 
+    /**
+     * A blast has two rings, and they are different sizes on purpose.
+     *
+     * The **concussion** reaches much further than the damage: what a grenade
+     * is for is stopping a charge, and a stun that only catches what was
+     * standing on the fuse does not do that. The **damage and the burn** stay
+     * in the tight ring where the canister actually went off, so the weapon
+     * does not quietly become an area nuke on the back of its own crowd
+     * control.
+     */
+    private static readonly STUN_RADIUS_SCALE = 1.9;
+
     private createExplosion(x: number, y: number, power: number, allowChains: boolean = true) {
         const explosionRadius = this.area * this.owner.stats.area * power;
 
@@ -160,17 +172,33 @@ export class PlasmaGrenadeWeapon extends Weapon {
         zone.source = this;
 
         particles.emitPlasmaBurst(x, y, explosionRadius, this.evolved);
+        // Splinters flying out of the casing. They do nothing — they are there
+        // because a blast that only expands a circle does not read as a blast.
+        particles.emitShrapnel(x, y, explosionRadius,
+            this.evolved ? ['#ffd24d', '#ff9a2a', '#fff0c0'] : ['#e2b8ff', '#c98cff', '#ffffff']);
         juice.addTrauma(0.1 * power);
         // Violet plasma, matching the canister that was thrown; the evolved
         // cluster burns orange
         juice.shockwave(x, y, explosionRadius * 1.5, this.evolved ? '#ffb03c' : '#c98cff', 0.3, 4);
 
-        // Concussion — full length per blast, see STUN_BASE
+        // Concussion — full length per blast (see STUN_BASE), over a ring
+        // almost twice the size of the damage
+        const stunRadius = explosionRadius * PlasmaGrenadeWeapon.STUN_RADIUS_SCALE;
         const stun = (this.evolved ? STUN_EVOLVED : STUN_BASE) * this.owner.stats.duration;
-        for (const enemy of levelSpatialHash.getWithinRadius({ x, y }, explosionRadius)) {
-            if (distance({ x, y }, enemy.pos) > explosionRadius) continue;
+        for (const enemy of levelSpatialHash.getWithinRadius({ x, y }, stunRadius)) {
+            const d = distance({ x, y }, enemy.pos);
+            if (d > stunRadius) continue;
             // A boss that can be perma-stunned by a 2.5s cooldown is not a boss
             status.stun(enemy, enemy.isBoss ? stun * 0.25 : stun);
+            // Only what was close to the canister catches fire
+            if (d <= explosionRadius) {
+                status.infect(enemy, {
+                    dps: this.damage * power * 0.12,
+                    duration: 2,
+                    source: this,
+                    kind: 'burn',
+                });
+            }
         }
 
         // Evolved: every crater keeps burning. Five small fires laid across the

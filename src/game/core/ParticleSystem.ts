@@ -595,6 +595,30 @@ export class ParticleSystem {
         }
     }
 
+    /**
+     * Hot splinters thrown out of a blast — streaks, not dots.
+     *
+     * Purely cosmetic; the damage is resolved by whatever spawned it. This is
+     * the crackle that makes the Plasma Cannon's burst feel good, factored out
+     * so a grenade can read as an explosion rather than as a circle appearing.
+     */
+    emitShrapnel(x: number, y: number, radius: number, colors: string[], count: number = 7) {
+        this.emit({
+            x, y,
+            count,
+            color: colors,
+            speed: Math.max(180, radius * 4),
+            speedVariation: 0.6,
+            size: 5,
+            sizeVariation: 0.5,
+            sizeEnd: 0,
+            life: 0.34,
+            lifeVariation: 0.5,
+            spread: Math.PI * 2,
+            shape: 'spark',
+        });
+    }
+
     emitColdMist(x: number, y: number, radius: number) {
         // Rising cold vapor
         this.emit({

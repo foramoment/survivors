@@ -59,7 +59,7 @@ import { AcidPoolWeapon } from '../weapons/implementations/AcidPoolWeapon';
 import { ChronoDiscWeapon } from '../weapons/implementations/ChronoDiscWeapon';
 import { LightningChainWeapon } from '../weapons/implementations/LightningChainWeapon';
 import { PlasmaProjectile, BouncingProjectile } from '../weapons/base/Projectile';
-import { AcidZone, PlasmaExplosionZone } from '../weapons/base/Zone';
+import { AcidZone } from '../weapons/base/Zone';
 
 // Mock owner
 const createMockOwner = () => ({
@@ -213,8 +213,8 @@ describe('PlasmaCannonWeapon', () => {
         spawnedEntities.length = 0;
         plasma.onExplosion!(0, 0);
         expect(spawnedEntities.length).toBeGreaterThan(0);
-        // Base tier bursts, but the crater does not keep erupting
-        expect(spawnedEntities.some(e => e instanceof PlasmaExplosionZone)).toBe(false);
+        // Base tier bursts, but its shards do not burst again
+        expect(spawnedEntities.every((s: any) => s.splinters === 0)).toBe(true);
     });
 
     it('bursts on the first body it touches instead of piercing a column', () => {
@@ -223,7 +223,7 @@ describe('PlasmaCannonWeapon', () => {
         expect(weapon.pierce).toBe(0);
     });
 
-    it('rolls three delayed aftershocks out of the crater when evolved', () => {
+    it('evolved shards burst into more shards, exactly two generations deep', () => {
         const enemy = createMockEnemy(200, 100);
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
 
@@ -233,18 +233,24 @@ describe('PlasmaCannonWeapon', () => {
         weapon.update(0.1);
 
         const plasma = spawnedEntities[0] as PlasmaProjectile;
-        expect(plasma.onExplosion).toBeDefined();
-
         spawnedEntities.length = 0;
         plasma.onExplosion!(100, 100);
 
-        const waves = spawnedEntities.filter(
-            e => e instanceof PlasmaExplosionZone && (e as any).detonationDelay > 0
-        );
-        expect(waves).toHaveLength(3);
-        // One per second, each wider than the last
-        expect(waves.map(w => (w as any).detonationDelay)).toEqual([1, 2, 3]);
-        expect(waves[2].radius).toBeGreaterThan(waves[0].radius);
+        // Copy: `spawnedEntities` is cleared below and `first` must survive it
+        const first = [...spawnedEntities] as any[];
+        expect(first.length).toBe(8);
+        expect(first.every(s => s.splinters === 1)).toBe(true);
+
+        // A shard biting into a body seeds the next spray from that body
+        spawnedEntities.length = 0;
+        first[0].handleHit({ pos: { x: 300, y: 300 }, isDead: false } as any);
+
+        const second = [...spawnedEntities] as any[];
+        expect(second.length).toBe(4);
+        expect(second[0].pos).toEqual({ x: 300, y: 300 });
+        // ...and the children cannot cascade
+        expect(second.every(s => s.splinters === 0)).toBe(true);
+        expect(second[0].damage).toBeLessThan(first[0].damage);
     });
 
     it('should have longer cooldown when evolved', () => {

@@ -124,9 +124,9 @@ export const RU: Record<string, string> = {
 
     // ---------------------------------------------------------------- weapons
     'weapon.void_ray.name': 'Луч Пустоты',
-    'weapon.void_ray.desc': 'Заряженное копьё, прожигающее всё на своём пути',
+    'weapon.void_ray.desc': 'Захватывает цель и протаскивает луч сквозь толпу, оставляя огонь',
     'weapon.void_ray.evoName': 'Пушка Пустоты',
-    'weapon.void_ray.evoDesc': 'Простреливает цель насквозь и схлопывает точку удара',
+    'weapon.void_ray.evoDesc': 'Три рывка зигзагом — до дальнего края толпы',
 
     'weapon.phantom_slash.name': 'Фантомный Разрез',
     'weapon.phantom_slash.desc': 'Бьёт тем сильнее, чем плотнее враги вокруг тебя',
@@ -134,9 +134,9 @@ export const RU: Record<string, string> = {
     'weapon.phantom_slash.evoDesc': 'Каждый разрез рвёт разлом, который замедляет и перемалывает',
 
     'weapon.plasma_cannon.name': 'Плазменная Пушка',
-    'weapon.plasma_cannon.desc': 'Тяжёлый заряд прожигает строй насквозь и разлетается осколками',
+    'weapon.plasma_cannon.desc': 'Тяжёлый заряд рвётся о первое тело и осыпает всё вокруг горящими осколками',
     'weapon.plasma_cannon.evoName': 'Термоядерное Ядро',
-    'weapon.plasma_cannon.evoDesc': 'Залп шире, а на месте взрыва остаётся сингулярность',
+    'weapon.plasma_cannon.evoDesc': 'Каждый осколок, попав во врага, рвётся на новые осколки',
 
     'weapon.nanobot_swarm.name': 'Рой Нанитов',
     'weapon.nanobot_swarm.desc': 'Аура нанитов с дронами, что бросаются на всё рядом',
@@ -156,7 +156,7 @@ export const RU: Record<string, string> = {
     'weapon.orbital_strike.name': 'Орбитальный Удар',
     'weapon.orbital_strike.desc': 'Отмечает точку и роняет на неё кинетический снаряд',
     'weapon.orbital_strike.evoName': 'Орбитальный Залп',
-    'weapon.orbital_strike.evoDesc': 'Три снаряда, а потом один тяжёлый — в самую гущу',
+    'weapon.orbital_strike.evoDesc': 'Стена снарядов проходит сквозь толпу, следом один тяжёлый',
 
     'weapon.mind_blast.name': 'Псионный Взрыв',
     'weapon.mind_blast.desc': 'Псионная детонация, оглушающая всех, кого зацепит',
@@ -184,14 +184,14 @@ export const RU: Record<string, string> = {
     'weapon.spinning_ember.evoDesc': 'Кольцо хлещет наружу и выжигает землю',
 
     'weapon.frost_nova.name': 'Ледяная Новая',
-    'weapon.frost_nova.desc': 'Ледяное поле, брошенное в самую гущу толпы',
+    'weapon.frost_nova.desc': 'Стужа, брошенная в самую гущу толпы — всё в ней еле ползёт',
     'weapon.frost_nova.evoName': 'Абсолютный Ноль',
-    'weapon.frost_nova.evoDesc': 'Вмораживает врагов в лёд, а потом разбивает их',
+    'weapon.frost_nova.evoDesc': 'Вмораживает толпу на месте, держит её, а потом раскалывает',
 
     'weapon.plasma_grenade.name': 'Плазменная Граната',
     'weapon.plasma_grenade.desc': 'Гранаты взрываются и оглушают всех, кого зацепят',
     'weapon.plasma_grenade.evoName': 'Кассетная Бомба',
-    'weapon.plasma_grenade.evoDesc': 'Три заряда, оглушение дольше, цепочка вторичных взрывов',
+    'weapon.plasma_grenade.evoDesc': 'Пять зарядов, оглушение дольше, и в каждой воронке остаётся огонь',
 
     // ---------------------------------------------------------------- classes
     'class.void_walker.name': 'Странник Пустоты',

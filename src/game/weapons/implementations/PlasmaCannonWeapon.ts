@@ -14,10 +14,11 @@
  * caught, and throws a ring of short-range shards that set fire to whatever
  * they reach. Everything happens where you were aiming.
  *
- * Evolved — Fusion Core: the same impact, then the fire keeps going off. Three
- * aftershocks roll out of the crater, one per second, each wider than the last.
+ * Evolved — Fusion Core: the shrapnel is contagious. Every shard that bites
+ * into a body bursts into a smaller spray from that body, so a hit in the
+ * middle of a pack turns into a second wave coming off the pack itself.
  */
-import { ProjectileWeapon, PlasmaProjectile, Projectile, PlasmaExplosionZone, type ProjectileParams } from '../base';
+import { ProjectileWeapon, PlasmaProjectile, Projectile, type ProjectileParams } from '../base';
 import type { Player } from '../../entities/Player';
 import type { Entity } from '../../Entity';
 import { type Vector2 } from '../../core/Utils';
@@ -36,6 +37,14 @@ import type { HitResult } from '../../core/CollisionSystem';
  */
 export class PlasmaShard extends Projectile {
     igniteDps: number = 0;
+    /**
+     * How many more times this shard may burst into smaller ones. The evolved
+     * cannon starts its shards at 1 and the children at 0, so shrapnel goes
+     * exactly two generations deep and cannot cascade.
+     */
+    splinters: number = 0;
+    /** Fired where a shard bit into a body, so the weapon can seed the next set */
+    onSplinter?: (x: number, y: number) => void;
     private clock: number = 0;
 
     constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number) {
@@ -57,6 +66,10 @@ export class PlasmaShard extends Projectile {
                 source: this.source,
                 kind: 'burn',
             });
+        }
+        if (this.splinters > 0) {
+            this.splinters--;
+            this.onSplinter?.(enemy.pos.x, enemy.pos.y);
         }
         return result;
     }
@@ -97,9 +110,8 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         duration: 1.5,
     };
 
-    /** Evolved aftershocks: how many, and the seconds between them */
-    private static readonly AFTERSHOCKS = 3;
-    private static readonly AFTERSHOCK_INTERVAL = 1.0;
+    /** Shards thrown by a second-generation burst */
+    private static readonly SPLINTER_COUNT = 4;
 
     constructor(owner: Player) {
         super(owner);
@@ -147,58 +159,55 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
      */
     private detonate(x: number, y: number) {
         const radius = this.area * this.owner.stats.area;
-        const shards = this.evolved ? 8 : 5;
-        // Shards carry further than they used to: with the round no longer
-        // piercing, this ring is how the weapon covers a line of bodies
-        const speed = 460 * this.owner.stats.speed;
-        const life = 0.5 * this.owner.stats.duration;
-        const base = Math.random() * Math.PI * 2;
-
         particles.emitPlasmaBurst(x, y, radius, this.evolved);
         juice.shockwave(x, y, radius * 1.4, '#3dff86', 0.3, 4);
+        this.throwShards(x, y, this.evolved ? 8 : 5, 1, this.evolved ? 1 : 0);
+    }
 
-        for (let i = 0; i < shards; i++) {
-            const angle = base + (i / shards) * Math.PI * 2;
+    /**
+     * A ring of shards. `scale` shrinks the whole burst for a second-generation
+     * spray, and `splinters` says whether those shards may burst again.
+     */
+    private throwShards(x: number, y: number, count: number, scale: number, splinters: number) {
+        const speed = 460 * scale * this.owner.stats.speed;
+        const life = 0.5 * scale * this.owner.stats.duration;
+        const base = Math.random() * Math.PI * 2;
+        const damage = this.damage * (this.evolved ? 0.45 : 0.35) * scale;
+
+        for (let i = 0; i < count; i++) {
+            const angle = base + (i / count) * Math.PI * 2;
             const shard = new PlasmaShard(
                 x, y,
                 { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
                 life,
-                this.damage * (this.evolved ? 0.45 : 0.35),
+                damage,
             );
             shard.source = this;
-            shard.igniteDps = this.damage * 0.22;
+            shard.igniteDps = this.damage * 0.22 * scale;
+            shard.splinters = splinters;
+            if (splinters > 0) shard.onSplinter = (sx, sy) => this.splinter(sx, sy);
             this.onSpawn(shard);
         }
-
-        if (this.evolved) this.rollAftershocks(x, y, radius);
     }
 
     /**
-     * Three waves rolling out of the crater, one per second, each wider and
-     * weaker than the last.
+     * Second-generation shrapnel: a shard that bit into a body bursts, and the
+     * body becomes the source of the next spray.
      *
-     * They are deliberately small: the point is that the ground you just hit
-     * stays dangerous for three seconds, so the crater becomes a place enemies
-     * have to path around — not a second, third and fourth full blast. Each
-     * wave is a delayed detonation on its own timer, so nothing resolves in the
-     * same frame as anything else (see the VFX rules in CLAUDE.md).
+     * This replaced three timed aftershock waves that went off in the crater
+     * on their own, which read as explosions arriving out of nowhere. Shrapnel
+     * begetting shrapnel is the same idea told through the thing that already
+     * feels good about this weapon — the crackle of splinters coming off a hit
+     * — and it points the damage at where the enemies actually are, because
+     * that is where the first shard landed.
+     *
+     * The children are deliberately weak (60% of a shard's already-fractional
+     * damage, and half its reach) and cannot burst again. The cannon should
+     * stay a shrapnel gun, not quietly become an area weapon.
      */
-    private rollAftershocks(x: number, y: number, radius: number) {
-        for (let i = 1; i <= PlasmaCannonWeapon.AFTERSHOCKS; i++) {
-            const wave = new PlasmaExplosionZone(
-                x, y,
-                radius * (0.75 + i * 0.25),
-                this.damage * 0.22,
-                false,
-            );
-            wave.source = this;
-            wave.detonationDelay = i * PlasmaCannonWeapon.AFTERSHOCK_INTERVAL;
-            wave.onDetonate = (cx, cy, r) => {
-                particles.emitPlasmaBurst(cx, cy, r, true);
-                juice.shockwave(cx, cy, r * 1.3, '#ffb03c', 0.28, 3);
-            };
-            this.onSpawn(wave);
-        }
+    private splinter(x: number, y: number) {
+        particles.emitPlasmaBurst(x, y, this.area * 0.35 * this.owner.stats.area, false);
+        this.throwShards(x, y, PlasmaCannonWeapon.SPLINTER_COUNT, 0.6, 0);
     }
 }
 

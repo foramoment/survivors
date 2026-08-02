@@ -149,28 +149,39 @@ export class BlackHoleProjectile extends SingularityProjectile {
         }
     }
 
+    /**
+     * A dashed lensing ring and a stroked accretion ellipse are gone.
+     *
+     * The plain orb reads better than this one did for exactly one reason: it
+     * has no drawn boundary. All it is is a black centre inside a haze that
+     * fades out, and the pull is told by the enemies actually moving. Hard
+     * rings on top of that are clutter — and this weapon already fills the
+     * screen with damage numbers, so it can afford clutter least of all.
+     *
+     * What is left is the part that works: real black in the middle, a wider
+     * violet haze (inherited from SingularityProjectile), and a slow swirl of
+     * infalling motes drawn as points rather than lines.
+     */
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        super.draw(ctx, camera);
+
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        // Lensing ring: light bent around the hole
-        ctx.rotate(this.spin);
-        ctx.strokeStyle = 'rgba(160, 90, 255, 0.45)';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([14, 9]);
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 1.9, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.rotate(-this.spin);
-
-        // Accretion disc — an ellipse edge-on, so it reads as a disc not a ball
+        // Matter caught in the disc: dots on a tilted orbit, not a stroked
+        // ellipse. Same silhouette, no edge.
         ctx.rotate(this.spin * 0.6);
-        ctx.strokeStyle = 'rgba(210, 130, 255, 0.75)';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, this.radius * 1.35, this.radius * 0.42, 0, 0, Math.PI * 2);
-        ctx.stroke();
+        for (let i = 0; i < 10; i++) {
+            const a = (i / 10) * Math.PI * 2 + this.spin * 1.6;
+            const px = Math.cos(a) * this.radius * 1.35;
+            const py = Math.sin(a) * this.radius * 0.42;
+            // Fade the ones on the far side, so the disc reads as tilted
+            ctx.globalAlpha = 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(a));
+            ctx.fillStyle = '#d28aff';
+            const s = 2.4;
+            ctx.fillRect(px - s / 2, py - s / 2, s, s);
+        }
+        ctx.globalAlpha = 1;
         ctx.rotate(-this.spin * 0.6);
 
         // The hole itself: genuinely black in the middle
@@ -325,42 +336,48 @@ export class BlackHoleZone extends Zone {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        // Pull field: a dashed boundary that spins faster as the hole tightens
-        ctx.rotate(this.spin * 0.4);
-        ctx.globalAlpha = fade * 0.35;
-        ctx.strokeStyle = '#7a3cff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([12, 10]);
+        // Pull field: a haze reaching exactly as far as the gravity does. It
+        // was a dashed spinning ring, which is the single most UI-looking
+        // shape in the game, sitting on the weapon that already throws the
+        // most damage numbers on screen.
+        ctx.globalAlpha = fade;
+        const halo = ctx.createRadialGradient(0, 0, this.horizon * 0.9, 0, 0, this.radius * 2);
+        halo.addColorStop(0, 'rgba(122, 60, 255, 0.32)');
+        halo.addColorStop(0.5, 'rgba(100, 40, 220, 0.16)');
+        halo.addColorStop(1, 'rgba(80, 20, 180, 0)');
         ctx.beginPath();
         ctx.arc(0, 0, this.radius * 2, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.rotate(-this.spin * 0.4);
+        ctx.fillStyle = halo;
+        ctx.fill();
 
-        // Accretion spiral, baked once
+        // The accretion spiral, drawn as matter falling in rather than as a
+        // stroked line. Same baked path, sampled into points.
         ctx.rotate(this.spin);
-        ctx.globalAlpha = fade * 0.85;
-        ctx.strokeStyle = '#d08cff';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        for (let i = 0; i < this.spiral.length; i++) {
+        ctx.fillStyle = '#d08cff';
+        for (let i = 0; i < this.spiral.length; i += 2) {
             const px = this.spiral[i].x * scale * 1.7;
             const py = this.spiral[i].y * scale * 1.7;
-            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            // Brighter and tighter the closer it is to falling in
+            const t = i / this.spiral.length;
+            ctx.globalAlpha = fade * (0.25 + 0.6 * (1 - t));
+            const s = 1.6 + 2.2 * (1 - t);
+            ctx.fillRect(px - s / 2, py - s / 2, s, s);
         }
-        ctx.stroke();
         ctx.rotate(-this.spin);
 
-        // Event horizon: the line the player has to read, so it is the brightest
-        // thing here and it pulses
+        // Event horizon. Still the thing the player has to read, but the edge
+        // is a hard falloff in the fill, not a stroked circle on top of it.
         ctx.globalAlpha = fade;
+        const pulse = 0.55 + 0.35 * Math.sin(this.spin * 3);
+        const eh = ctx.createRadialGradient(0, 0, 0, 0, 0, this.horizon * 1.25);
+        eh.addColorStop(0, '#000000');
+        eh.addColorStop(0.72, '#000000');
+        eh.addColorStop(0.8, `rgba(255, 210, 255, ${pulse})`);
+        eh.addColorStop(1, 'rgba(200, 140, 255, 0)');
         ctx.beginPath();
-        ctx.arc(0, 0, this.horizon, 0, Math.PI * 2);
-        ctx.fillStyle = '#000000';
+        ctx.arc(0, 0, this.horizon * 1.25, 0, Math.PI * 2);
+        ctx.fillStyle = eh;
         ctx.fill();
-        ctx.strokeStyle = `rgba(255, 210, 255, ${0.55 + 0.35 * Math.sin(this.spin * 3)})`;
-        ctx.lineWidth = 3;
-        ctx.stroke();
 
         ctx.globalAlpha = 1;
         ctx.restore();

@@ -609,8 +609,10 @@ export class SporeZone extends Zone {
         ctx.ellipse(0, 0, r, r * 0.78, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Mycelium threads — one path for the whole web
-        ctx.globalAlpha = 0.55 * fade;
+        // Mycelium threads. Faint on purpose — they are texture under the
+        // spores, not the drawing. Hard strokes are the thing this art style
+        // keeps having to be talked out of.
+        ctx.globalAlpha = 0.3 * fade;
         ctx.strokeStyle = this.contagious ? '#7fc42c' : '#5d6a2c';
         ctx.lineWidth = 2;
         ctx.lineCap = 'round';
@@ -621,13 +623,6 @@ export class SporeZone extends Zone {
         }
         ctx.stroke();
 
-        // Mushrooms pushing up out of the mycelium
-        ctx.globalAlpha = fade;
-        for (const cap of this.caps) {
-            if (cap.grow <= 0) continue;
-            this.drawMushroom(ctx, cap.x, cap.y, cap.scale * cap.grow, cap.variant);
-        }
-
         // Spore puffs drifting above the mat
         for (const puff of this.puffs) {
             const lift = Math.sin(this.age * puff.drift + puff.phase) * 5;
@@ -637,7 +632,19 @@ export class SporeZone extends Zone {
             ctx.arc(puff.x, puff.y + lift, puff.r * breathe, 0, Math.PI * 2);
             ctx.fill();
         }
+        ctx.restore();
 
+        // Mushrooms are drawn OUTSIDE the growth scale: a mushroom grows where
+        // it sprouted, it does not slide outward as the patch spreads. Under
+        // the scaled transform every cap crept away from its own spot, which
+        // looked like the whole colony was being pushed off the ground.
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+        ctx.globalAlpha = fade;
+        for (const cap of this.caps) {
+            if (cap.grow <= 0) continue;
+            this.drawMushroom(ctx, cap.x, cap.y, cap.scale * cap.grow, cap.variant);
+        }
         ctx.globalAlpha = 1;
         ctx.restore();
     }

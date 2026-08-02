@@ -1311,13 +1311,24 @@ h2.lucky {
   color: var(--c-dim);
 }
 
+/* Achievements are square tiles, the shape a player expects a trophy case to
+   be, sized off one knob so the grid stays sane whether there are twelve of
+   them or forty. They used to be full-width rows, which read as a settings
+   list. Deliberately their own class rather than a reuse of .upgrade-card:
+   those cards are built to be clicked and animate on focus, and these are not
+   interactive at all. */
 .achievement-list {
+  --achv-tile: clamp(116px, 12.5vmin, 176px);
+
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 6px;
-  width: min(760px, 94vw);
+  grid-template-columns: repeat(auto-fill, minmax(var(--achv-tile), 1fr));
+  gap: calc(var(--achv-tile) * 0.06);
+  width: min(860px, 94vw);
   max-height: calc(100vh - 300px);
   overflow-y: auto;
+  /* Room for the tiles' outset ring: an `overflow` container clips it, which
+     is why the corner tiles used to look like their border was cut off */
+  padding: 4px;
   margin-bottom: 20px;
   scrollbar-width: thin;
   scrollbar-color: var(--c-cyan) rgba(0, 0, 0, 0.4);
@@ -1325,14 +1336,19 @@ h2.lucky {
 
 .achievement {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  justify-content: flex-start;
+  gap: calc(var(--achv-tile) * 0.05);
+  aspect-ratio: 1;
+  padding: calc(var(--achv-tile) * 0.09);
+  /* A long requirement must not spill past the square */
+  overflow: hidden;
   background: var(--c-panel);
   box-shadow: 0 0 0 2px #2f3a63;
-  text-align: left;
+  text-align: center;
   animation: card-rise 200ms steps(4) both;
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
 .achievement--done {
@@ -1341,19 +1357,21 @@ h2.lucky {
 }
 
 .achievement-icon {
-  font-size: 20px;
-  line-height: 1;
+  font-size: calc(var(--achv-tile) * 0.3);
+  line-height: 1.1;
 }
 
 .achievement-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: calc(var(--achv-tile) * 0.03);
+  min-width: 0;
 }
 
 .achievement-text strong {
-  font-size: 0.7em;
-  letter-spacing: 0.08em;
+  font-size: calc(var(--achv-tile) * 0.085);
+  letter-spacing: 0.06em;
+  line-height: 1.25;
   color: var(--c-ink);
 }
 
@@ -1363,8 +1381,9 @@ h2.lucky {
 
 .achievement-text em {
   font-style: normal;
-  font-size: 0.58em;
-  letter-spacing: 0.04em;
+  font-size: calc(var(--achv-tile) * 0.072);
+  letter-spacing: 0.02em;
+  line-height: 1.3;
   color: var(--c-dim);
 }
 

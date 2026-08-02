@@ -246,7 +246,7 @@ export const WEAPONS = [
         evolution: {
             name: "Fusion Core",
             emoji: "⚛️",
-            description: "The crater keeps erupting: three waves, one a second"
+            description: "Every shard that bites bursts into more shards"
         }
     },
     {
