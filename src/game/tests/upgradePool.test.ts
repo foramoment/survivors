@@ -17,8 +17,10 @@ import {
     formatStatPreview,
     WEAPON_SLOT_CAP,
     POWERUP_STACK_CAP,
+    SIGNATURE_WEAPONS,
+    canOfferWeapon,
 } from '../core/UpgradePool';
-import { WEAPONS, POWERUPS } from '../data/GameData';
+import { CLASSES, WEAPONS, POWERUPS } from '../data/GameData';
 import { i18n } from '../core/I18n';
 import { Player } from '../entities/Player';
 
@@ -32,6 +34,64 @@ function mulberry32(seed: number): () => number {
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
 }
+
+describe('Signature weapons', () => {
+    it('every class owns exactly one, and no two classes share', () => {
+        expect(SIGNATURE_WEAPONS.size).toBe(CLASSES.length);
+        for (const cls of CLASSES) {
+            expect(SIGNATURE_WEAPONS.get(cls.weaponId), cls.id).toBe(cls.id);
+        }
+    });
+
+    it('a signature weapon is only offered to its own class', () => {
+        const storm = CLASSES.find(c => c.id === 'storm_mage')!;
+        expect(canOfferWeapon(storm.weaponId, 'storm_mage')).toBe(true);
+        expect(canOfferWeapon(storm.weaponId, 'berserker')).toBe(false);
+        // Everything nobody has claimed stays in the shared pool
+        expect(canOfferWeapon('chrono_disc', 'berserker')).toBe(true);
+    });
+
+    it('never draws another class into a run as a new weapon', () => {
+        const rng = mulberry32(7);
+        const foreign = CLASSES.filter(c => c.id !== 'berserker').map(c => c.weaponId);
+
+        for (let i = 0; i < 300; i++) {
+            const options = buildUpgradeOptions({
+                weaponLevels: new Map(),
+                powerupLevels: new Map(),
+                classId: 'berserker',
+                count: 4,
+                rng,
+            });
+            const drawn = options.filter(o => o.type === 'weapon').map(o => o.data.id);
+            for (const id of drawn) expect(foreign, id).not.toContain(id);
+        }
+    });
+
+    it('still offers your own signature weapon for levelling', () => {
+        const rng = mulberry32(11);
+        const berserker = CLASSES.find(c => c.id === 'berserker')!;
+        let seen = false;
+
+        for (let i = 0; i < 200 && !seen; i++) {
+            const options = buildUpgradeOptions({
+                weaponLevels: new Map([[berserker.weaponId, 3]]),
+                powerupLevels: new Map(),
+                classId: 'berserker',
+                count: 3,
+                rng,
+            });
+            seen = options.some(o => o.type === 'weapon' && o.data.id === berserker.weaponId);
+        }
+        expect(seen).toBe(true);
+    });
+
+    it('leaves enough shared weapons to fill every slot', () => {
+        const shared = WEAPONS.filter(w => !SIGNATURE_WEAPONS.has(w.id));
+        // Signature + shared must cover WEAPON_SLOT_CAP or a run cannot fill up
+        expect(shared.length + 1).toBeGreaterThanOrEqual(WEAPON_SLOT_CAP);
+    });
+});
 
 describe('UpgradePool', () => {
     it('always offers at least one owned-weapon upgrade when one exists', () => {
@@ -139,7 +199,7 @@ describe('UpgradePool', () => {
             // These are the numbers that decide whether a build is a build or
             // an off switch — a regression here is a balance bug, not a typo.
             const ceilings: Record<string, number> = {
-                might: 0.25,        // x1.25 damage
+                might: 0.36,        // x1.36 damage
                 critChance: 0.4,    // 40%, never a guaranteed crit on its own
                 critDamage: 2.0,    // x2 -> x4
                 cooldown: -0.4,     // x0.6

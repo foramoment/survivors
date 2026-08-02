@@ -673,6 +673,7 @@ export class GameManager {
         const options = buildUpgradeOptions({
             weaponLevels: this.weaponLevels,
             powerupLevels: this.powerupLevels,
+            classId: this.player?.classId,
             count,
         });
 

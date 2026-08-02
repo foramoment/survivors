@@ -73,9 +73,15 @@ export const CLASSES = [
         perLevel: { stat: 'area', value: 0.01 } as ClassPerLevel,
     },
     {
+        // Mind Blast rather than Lightning Chain: an AoE stun on a shrinking
+        // cooldown is the one pairing where this class's −1%/level actually
+        // changes how the run plays, instead of just firing the same bolt more
+        // often. It is safe to hand out because stun has a hard downtime rule
+        // (core/StatusEffects): an enemy is frozen at most a third of the time
+        // no matter how much cooldown the Mage stacks.
         id: 'storm_mage', name: "Storm Mage", emoji: "⚡",
         bonus: "Damage +15% · −1% cooldown per level",
-        weaponId: 'lightning_chain', hp: 75,
+        weaponId: 'mind_blast', hp: 75,
         stats: { might: 1.15 },
         perLevel: { stat: 'cooldown', value: -0.01 } as ClassPerLevel,
     },
@@ -135,10 +141,15 @@ export const POWERUPS: PowerupData[] = [
     // certainty you trip over — the old curve reached a guaranteed crit on the
     // seventh pick.
     { id: 'targeting_hud', name: "Targeting HUD", description: "Chance for a hit to land as a critical", type: "critChance", value: 0.05, maxStacks: 8, emoji: "🎯" },
-    // The tightest cap in the pool, on purpose: raw damage multiplies with
-    // everything else you own, so it is the stat that quietly decides whether
-    // the late game is a fight or a formality. +25% total, five picks.
-    { id: 'plasma_core', name: "Plasma Core", description: "Raw damage amplifier", type: "might", value: 0.05, maxStacks: 5, emoji: "💪" },
+    // Still the tightest cap in the pool — raw damage multiplies with
+    // everything else you own, so it decides whether the late game is a fight
+    // or a formality. +36% over six picks.
+    //
+    // The first cut of this was Vampire Survivors' exact number (+5% x5), but
+    // that game spreads its damage across many more sources; here the only
+    // three are this, crit and weapon level, so Might carries more of the load
+    // and 25% left nothing to build toward.
+    { id: 'plasma_core', name: "Plasma Core", description: "Raw damage amplifier", type: "might", value: 0.06, maxStacks: 6, emoji: "💪" },
     // Also speeds up how often damage zones tick — that used to be its own
     // powerup (Rapid Tick) which hit an internal floor after three picks and
     // then did nothing at all.

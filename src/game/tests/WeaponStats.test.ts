@@ -61,9 +61,9 @@ const EXPECTED_STATS: Record<string, any> = {
         pierce: 999,
     },
     orbital_strike: {
-        damage: 40,
+        damage: 48,
         // A strike that aims itself needs a real wait between shots
-        cooldown: 4.0,
+        cooldown: 3.0,
         area: 100,
         speed: 0,
         duration: 1.0,

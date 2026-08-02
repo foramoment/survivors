@@ -181,10 +181,13 @@ export class OrbitalStrikeWeapon extends Weapon {
     description = "Marks a spot, then drops a kinetic round on it.";
 
     readonly stats = {
-        damage: 40,
-        // A self-aiming area strike that needs no positioning at all was firing
-        // every two seconds. Four is the price of never having to aim it.
-        cooldown: 4.0,
+        // Fewer, heavier shells. At 2s this was a self-aiming area strike that
+        // never had to be positioned; at 4s it was too slow to carry the Exo
+        // Marine, whose signature weapon it is. Three seconds and a bigger
+        // round keeps roughly the old damage per second while making each
+        // strike an event you watch land.
+        damage: 48,
+        cooldown: 3.0,
         area: 100,
         speed: 0,
         duration: 1.0,
@@ -216,7 +219,7 @@ export class OrbitalStrikeWeapon extends Weapon {
 
         if (this.evolved) {
             this.fireBarrage();
-            this.cooldown = 9.0 * this.owner.stats.cooldown;
+            this.cooldown = 8.0 * this.owner.stats.cooldown;
         } else {
             this.fireShell(this.pickTarget(), this.blastRadius(), this.damage, 0.9, false);
             this.cooldown = this.baseCooldown * this.owner.stats.cooldown;

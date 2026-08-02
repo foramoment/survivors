@@ -10,6 +10,8 @@
  *   weapon (level 5) even higher, so the payoff is reachable.
  * - The player can hold at most WEAPON_SLOT_CAP distinct weapons; once full,
  *   new weapons stop appearing and picks focus on what they have.
+ * - Each class's starting weapon is exclusive to it (see SIGNATURE_WEAPONS),
+ *   so the shared pool of new weapons is eight, not fourteen.
  * - Powerups stack FLAT up to their own `maxStacks`, and stop being offered
  *   once maxed. See the PowerupData comment in data/GameData for why the old
  *   shared 25%-per-stack curve had to go.
@@ -17,8 +19,32 @@
  *   when one exists.
  */
 
-import { POWERUPS, WEAPONS } from '../data/GameData';
+import { CLASSES, POWERUPS, WEAPONS } from '../data/GameData';
 import { t } from './I18n';
+
+/**
+ * weaponId -> the class it belongs to.
+ *
+ * A class's starting weapon is its **signature**: nobody else can be offered
+ * it. Six of the fourteen weapons are spoken for this way, and the remaining
+ * eight are the shared pool everyone draws from.
+ *
+ * The point is that "which character" stops meaning "which weapon do I open
+ * with" and starts meaning "which weapon can I only have here". A Storm Mage
+ * run is the only run with Lightning Chain in it; if you want the swept Void
+ * Ray you play the Void Walker. It also gives the class perks something fixed
+ * to be designed around, since the pairing can no longer be diluted by drawing
+ * the same weapon on somebody else.
+ */
+export const SIGNATURE_WEAPONS: ReadonlyMap<string, string> = new Map(
+    CLASSES.map(c => [c.weaponId, c.id])
+);
+
+/** Can this class be offered this weapon as a NEW pick? */
+export function canOfferWeapon(weaponId: string, classId: string | undefined): boolean {
+    const owner = SIGNATURE_WEAPONS.get(weaponId);
+    return owner === undefined || owner === classId;
+}
 
 export const WEAPON_SLOT_CAP = 5;
 /** Fallback cap for a powerup that forgot to declare `maxStacks` */
@@ -44,6 +70,8 @@ export interface OfferContext {
     /** powerup name -> times taken */
     powerupLevels: Map<string, number>;
     count: number;
+    /** Who is playing — decides which signature weapons may be offered */
+    classId?: string;
     rng?: () => number;
 }
 
@@ -118,7 +146,10 @@ function buildEntries(ctx: OfferContext): WeightedEntry[] {
                 option: { type: 'weapon', data: weapon },
                 weight: level === 5 ? WEIGHT_EVOLVE_READY : WEIGHT_OWNED_WEAPON,
             });
-        } else if (ownedWeaponCount < WEAPON_SLOT_CAP) {
+        } else if (ownedWeaponCount < WEAPON_SLOT_CAP && canOfferWeapon(weapon.id, ctx.classId)) {
+            // Another class's signature weapon is never offered — see
+            // SIGNATURE_WEAPONS. Owned weapons above are exempt: your own
+            // signature must still show up to be levelled.
             entries.push({ option: { type: 'weapon', data: weapon }, weight: WEIGHT_NEW_WEAPON });
         }
     }
