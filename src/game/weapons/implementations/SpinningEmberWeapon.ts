@@ -1,275 +1,216 @@
 /**
- * SPINNING EMBER WEAPON
+ * BLOOD CLEAVER — the Berserker's weapon.
  *
- * A permanent ring of embers orbiting the player. Rewritten because the old
- * version was two `🔥` glyphs on a fixed circle that existed for four seconds
- * out of every seven — it did nothing most of the time, and the moment it did
- * anything it was a flat contact hit.
+ * It used to be Spinning Ember: a permanent ring of orbiting embers. The ring
+ * was fine and it belonged to nobody. The Berserker is built entirely around
+ * fighting hurt — +50% HP, **minus** two armour, and an Adrenal Surge that only
+ * switches on below 35% health — and a halo of fire orbiting your body says
+ * nothing about any of that. The class asked a question its own weapon did not
+ * answer.
  *
- * What it does now:
- *   - the ring never goes down; orbs are re-lit the instant one burns out, so
- *     this is the weapon you rely on while nothing else is off cooldown
- *   - orbs *ignite* what they touch (a burn DoT via core/StatusEffects), so a
- *     brush keeps paying after the orb has swung past
- *   - the orbit breathes in and out, sweeping a band instead of tracing one
- *     thin circle a walking enemy can sit inside
+ * So the cleaver answers it: a heavy sweep around the player whose damage rises
+ * with **how much health you are missing**. At full HP it is an ordinary swing.
+ * Bleeding out, it is the hardest hit in the game. Everything the class already
+ * gives you — the missing armour, the huge pool to spend, the adrenaline
+ * threshold — now points the same direction, and the whole character reads as
+ * one idea: get hurt, hit harder, do not die.
  *
- * Evolved — Inferno Lash: every couple of seconds the ring snaps outward in a
- * whip and the orbs lay burning ground on the way, turning the ring from a
- * personal bubble into an area denial tool.
+ * It also shoves what it hits, because a class that wants to be surrounded
+ * still needs to be able to breathe.
+ *
+ * Evolved — Ruin: the sweep lands twice and leaves the ground burning where it
+ * passed.
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import { OrbitingProjectile, BurningTrailZone } from '../base';
+import { BurningTrailZone } from '../base';
+import { Entity } from '../../Entity';
 import { type Vector2, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { status } from '../../core/StatusEffects';
-import type { Entity } from '../../Entity';
-import type { HitResult } from '../../core/CollisionSystem';
 
-// BurningTrailZone moved to weapons/base/Zone.ts — the Cluster Bomb and the
-// swept Void Ray lay the same burning ground now, so it stopped being this
-// weapon's private class.
 export { BurningTrailZone };
 
-/** Seconds before an orb may hit the same enemy again */
-const HIT_INTERVAL = 0.25;
+/**
+ * Bonus damage at zero health, as a multiplier on top of the base swing.
+ *
+ * 1.6 means a Berserker at the Adrenal Surge threshold (35% HP) is swinging for
+ * roughly 2x, and one about to die for 2.6x. Deliberately large: this is the
+ * only place in the game that pays you for being nearly dead, and a timid
+ * number here would just be a worse version of every other damage stat.
+ */
+const MISSING_HP_SCALE = 1.6;
 
 // ============================================
-// EMBER ORB - the orbiting body
+// CLEAVE ARC - the visual of one swing
 // ============================================
-export class EmberOrb extends OrbitingProjectile {
-    /** Burn applied to anything the orb touches */
-    burnDps: number = 0;
-    /** How far the orbit breathes in and out */
-    pulseAmplitude: number = 18;
-    pulseSpeed: number = 2.2;
-    /** 0..1 — how far the ring is currently whipped outward (evolved) */
-    lash: number = 0;
-    onSpawnTrail?: (zone: BurningTrailZone) => void;
-    trailDamage: number = 0;
-    trailDuration: number = 1.5;
 
-    private readonly baseDistance: number;
-    private clock: number = 0;
-    private trailTimer: number = 0;
-    /** Recently burned targets, so one pass does not re-ignite every frame */
-    private touched: Map<any, number> = new Map();
+/**
+ * A crescent sweeping around the player. Baked as one arc and animated by
+ * angle and alpha only, so a swing costs two strokes however wide it is.
+ */
+export class CleaveArc extends Entity {
+    private age: number = 0;
+    private readonly life: number = 0.26;
+    private readonly reach: number;
+    private readonly hot: number;
 
-    constructor(owner: any, distance: number, speed: number, duration: number, damage: number) {
-        super(owner, distance, speed, duration, damage, '');
-        this.baseDistance = distance;
-        this.radius = 13;
+    constructor(x: number, y: number, reach: number, hot: number) {
+        super(x, y, reach);
+        this.reach = reach;
+        this.hot = hot;
     }
 
     update(dt: number) {
-        this.clock += dt;
-
-        // Breathing orbit — the ring sweeps a band, not a hairline circle
-        const breathe = Math.sin(this.clock * this.pulseSpeed) * this.pulseAmplitude;
-        this.distance = this.baseDistance * (1 + this.lash * 0.85) + breathe;
-
-        super.update(dt);
-
-        for (const [enemy, until] of this.touched) {
-            if (this.clock > until) this.touched.delete(enemy);
-        }
-
-        // Only the lash lays ground fire; a resting ring would carpet the arena
-        if (this.lash > 0.15 && this.onSpawnTrail) {
-            this.trailTimer -= dt;
-            if (this.trailTimer <= 0) {
-                this.trailTimer = 0.12;
-                const trail = new BurningTrailZone(
-                    this.pos.x, this.pos.y, 26, this.trailDuration, this.trailDamage,
-                );
-                trail.burnDps = this.burnDps * 0.5;
-                trail.source = this.source;
-                this.onSpawnTrail(trail);
-            }
-        }
-    }
-
-    /**
-     * One hit per enemy per HIT_INTERVAL.
-     *
-     * CollisionSystem calls handleHit every frame an overlap lasts, and the old
-     * orbiting fireball just returned its full damage each time — so the weapon
-     * dealt more damage on a 144 Hz screen than on a 60 Hz one. Gating on the
-     * orb's own clock makes a pass through an enemy worth the same everywhere.
-     */
-    handleHit(enemy: Entity): HitResult {
-        const readyAt = this.touched.get(enemy) ?? 0;
-        if (this.clock < readyAt) return { damage: 0, continueChecking: true };
-        this.touched.set(enemy, this.clock + HIT_INTERVAL);
-
-        if (this.burnDps > 0) {
-            status.infect(enemy as any, {
-                dps: this.burnDps,
-                duration: 2.5,
-                source: this.source,
-                kind: 'burn',
-            });
-            particles.emitHit(enemy.pos.x, enemy.pos.y, '#ff8a2c');
-        }
-        // Embers never burn out on contact — the ring is a constant, not ammo
-        return { damage: this.damage, continueChecking: true };
+        this.age += dt;
+        if (this.age >= this.life) this.isDead = true;
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        const t = Math.min(1, this.age / this.life);
+        const alpha = 1 - t;
+        if (alpha <= 0) return;
+
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
-        const flicker = 1 + Math.sin(this.clock * 16) * 0.12;
-        const r = this.radius * flicker;
+        // The crescent travels the full circle over the swing
+        const head = t * Math.PI * 2.2;
+        const tail = Math.max(0, head - 2.1);
+        const r = this.reach * (0.7 + 0.3 * t);
 
-        // Tail smeared along the direction of travel
-        const tangent = this.angle + Math.PI / 2;
-        ctx.globalAlpha = 0.4;
-        ctx.strokeStyle = '#ff6a18';
-        ctx.lineWidth = r * 0.9;
-        ctx.lineCap = 'round';
+        // Hotter the more wounded the swing was — the read is "this one hurt"
+        const glow = `rgba(255, ${Math.round(120 - 70 * this.hot)}, ${Math.round(90 - 60 * this.hot)}, `;
+
+        ctx.lineCap = 'butt';
+        ctx.strokeStyle = `${glow}${(0.35 * alpha).toFixed(3)})`;
+        ctx.lineWidth = this.reach * 0.34;
         ctx.beginPath();
-        ctx.moveTo(-Math.cos(tangent) * r * 1.9, -Math.sin(tangent) * r * 1.9);
-        ctx.lineTo(0, 0);
+        ctx.arc(0, 0, r, tail, head);
         ctx.stroke();
 
-        ctx.globalAlpha = 1;
-        const core = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-        core.addColorStop(0, '#fff4c4');
-        core.addColorStop(0.4, '#ffb03c');
-        core.addColorStop(0.75, '#ff5a1e');
-        core.addColorStop(1, 'rgba(180, 40, 0, 0)');
+        ctx.strokeStyle = `rgba(255, 240, 220, ${(0.9 * alpha).toFixed(3)})`;
+        ctx.lineWidth = Math.max(2, this.reach * 0.07);
         ctx.beginPath();
-        ctx.arc(0, 0, r, 0, Math.PI * 2);
-        ctx.fillStyle = core;
-        ctx.fill();
+        ctx.arc(0, 0, r, Math.max(tail, head - 0.5), head);
+        ctx.stroke();
 
         ctx.restore();
     }
 }
 
 export class SpinningEmberWeapon extends Weapon {
-    name = "Spinning Ember";
+    name = "Blood Cleaver";
     emoji = "🔥";
-    description = "A ring of embers that never goes out and sets things alight.";
-
-    private orbs: EmberOrb[] = [];
-    /** Counts down to the next Inferno Lash (evolved only) */
-    private lashTimer: number = 0;
-    private lashPhase: number = 0;
-    private lashHit: boolean = false;
+    description = "A heavy sweep that hits harder the more health you are missing.";
 
     readonly stats = {
-        // Higher than the old 15 on purpose: a pass used to land ~7 frames of
-        // damage, now it lands one gated tick plus a burn
-        damage: 26,
-        cooldown: 0.5,   // re-light check, not a real cast cooldown
-        area: 96,
-        speed: 2.6,
-        duration: 6,
-        count: 2,
-        countScaling: 0.5,
+        damage: 30,
+        cooldown: 1.4,
+        area: 110,
+        speed: 0,
+        duration: 1,
     };
+
+    /** How hard a hit shoves — the class needs room as much as it needs damage */
+    private static readonly KNOCKBACK = 210;
 
     constructor(owner: Player) {
         super(owner);
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
         this.area = this.stats.area;
-        this.speed = this.stats.speed;
+        this.duration = this.stats.duration;
     }
 
-    /** Orbs at the current level (2 at level 1, +1 every two levels, 5 evolved) */
-    private orbCount(): number {
-        const base = this.stats.count + Math.floor((this.level - 1) * this.stats.countScaling);
-        return this.evolved ? base + 2 : base;
+    /** Reach grows with level as well as with the area stat */
+    private reach(): number {
+        return this.area * this.owner.stats.area * (1 + (this.level - 1) * 0.07);
     }
+
+    /** 0 at full health, 1 at death's door */
+    private wounded(): number {
+        const max = this.owner.maxHp || 1;
+        return Math.max(0, Math.min(1, 1 - this.owner.hp / max));
+    }
+
+    /** Seconds until Ruin's follow-up lands; <= 0 means nothing pending */
+    private pendingSecond: number = 0;
 
     update(dt: number) {
-        this.orbs = this.orbs.filter(o => !o.isDead);
+        // Ruin's follow-up runs on its own countdown, before the cooldown gate,
+        // so it lands whether or not the next swing is ready
+        if (this.pendingSecond > 0) {
+            this.pendingSecond -= dt;
+            if (this.pendingSecond <= 0) this.swing(this.wounded(), 0.7);
+        }
 
-        // The ring is a standing effect: top it back up rather than waiting out
-        // a cooldown with nothing on screen
         this.cooldown -= dt;
-        if (this.cooldown <= 0) {
-            this.cooldown = this.baseCooldown;
-            this.relight();
+        if (this.cooldown > 0) return;
+
+        this.swing(this.wounded());
+        if (this.evolved) {
+            // Ruin lands a second time a beat later, so the pair reads as one
+            // heavy combination rather than a doubled number
+            this.pendingSecond = 0.18;
         }
 
-        if (this.evolved) this.updateLash(dt);
+        this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
     }
 
-    private relight() {
-        const wanted = this.orbCount();
-        if (this.orbs.length >= wanted) return;
+    private swing(hot: number, scale: number = 1) {
+        const reach = this.reach();
+        const multiplier = (1 + hot * MISSING_HP_SCALE) * scale;
 
-        const radius = this.area * this.owner.stats.area;
-        const duration = this.stats.duration * this.owner.stats.duration;
+        const arc = new CleaveArc(this.owner.pos.x, this.owner.pos.y, reach, hot);
+        this.onSpawn(arc);
+        particles.emitShrapnel(this.owner.pos.x, this.owner.pos.y, reach * 0.5,
+            ['#ffdccc', '#ff6b35', '#b32020'], 5);
 
-        // Re-spread every orb so the ring stays even as it refills
-        const existing = this.orbs.length;
-        for (let i = existing; i < wanted; i++) {
-            const orb = new EmberOrb(
-                this.owner,
-                radius,
-                this.speed * this.owner.stats.speed,
-                duration,
-                this.damage,
-            );
-            orb.angle = (Math.PI * 2 / wanted) * i;
-            orb.source = this;
-            orb.burnDps = this.damage * 0.35;
-            orb.trailDamage = this.damage * 0.4;
-            orb.trailDuration = 1.5 * this.owner.stats.duration;
-            orb.onSpawnTrail = zone => this.onSpawn(zone);
-            this.onSpawn(orb);
-            this.orbs.push(orb);
-        }
-    }
-
-    /**
-     * Inferno Lash: the ring winds up, snaps outward, and reels back in. The
-     * whip is what lays the burning ground, so the ability has a rhythm you can
-     * play around instead of a permanent carpet of fire.
-     */
-    private updateLash(dt: number) {
-        this.lashTimer -= dt;
-        if (this.lashTimer <= 0) {
-            this.lashTimer = 2.4;
-            this.lashPhase = 1;
-            this.lashHit = false;
-            particles.emitHit(this.owner.pos.x, this.owner.pos.y, '#ffb03c');
-        }
-
-        if (this.lashPhase > 0) {
-            this.lashPhase = Math.max(0, this.lashPhase - dt * 1.6);
-            // Fast out, slow back
-            const extend = Math.sin((1 - this.lashPhase) * Math.PI);
-            for (const orb of this.orbs) orb.lash = extend;
-
-            // The whip hit lands once at full extension, not on every frame the
-            // ring happens to be wide
-            if (extend > 0.85 && !this.lashHit) {
-                this.lashHit = true;
-                this.whipDamage();
-            }
-        }
-    }
-
-    private whipDamage() {
-        const reach = this.area * this.owner.stats.area * 1.85;
+        let struck = 0;
         for (const enemy of levelSpatialHash.getWithinRadius(this.owner.pos, reach)) {
-            const d = distance(this.owner.pos, enemy.pos);
-            if (d < reach * 0.55 || d > reach) continue;
+            if (enemy.isDead || distance(this.owner.pos, enemy.pos) > reach) continue;
+
             damageSystem.dealDamage({
-                baseDamage: this.damage * 0.5,
+                baseDamage: this.damage * multiplier,
                 source: this,
                 target: enemy,
                 position: enemy.pos,
             });
+
+            const dx = enemy.pos.x - this.owner.pos.x;
+            const dy = enemy.pos.y - this.owner.pos.y;
+            const len = Math.hypot(dx, dy) || 1;
+            enemy.applyKnockback(dx / len, dy / len, SpinningEmberWeapon.KNOCKBACK);
+
+            if (struck < 4) {
+                struck++;
+                particles.emitHit(enemy.pos.x, enemy.pos.y, '#ff6b35');
+            }
+
+            if (this.evolved) {
+                status.infect(enemy, {
+                    dps: this.damage * 0.18,
+                    duration: 2,
+                    source: this,
+                    kind: 'burn',
+                });
+            }
+        }
+
+        // Ruin scorches the ground it swept
+        if (this.evolved) {
+            const fire = new BurningTrailZone(
+                this.owner.pos.x, this.owner.pos.y,
+                reach * 0.8,
+                1.8 * this.owner.stats.duration,
+                this.damage * 0.1,
+            );
+            fire.burnDps = this.damage * 0.16;
+            fire.source = this;
+            this.onSpawn(fire);
         }
     }
 }

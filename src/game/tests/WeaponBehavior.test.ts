@@ -54,7 +54,7 @@ vi.mock('../core/DamageSystem', () => ({
 }));
 
 import { levelSpatialHash } from '../core/SpatialHash';
-import { VoidRayWeapon, SweepingLance } from '../weapons/implementations/VoidRayWeapon';
+import { VoidRayWeapon, VoidBolt } from '../weapons/implementations/VoidRayWeapon';
 import { PlasmaCannonWeapon } from '../weapons/implementations/PlasmaCannonWeapon';
 import { AcidPoolWeapon } from '../weapons/implementations/AcidPoolWeapon';
 import { ChronoDiscWeapon } from '../weapons/implementations/ChronoDiscWeapon';
@@ -92,11 +92,11 @@ describe('VoidRayWeapon', () => {
     });
 
     it('should initialize with correct stats from weapon stats object', () => {
-        expect(weapon.damage).toBe(40);
-        expect(weapon.baseCooldown).toBe(2.0);
+        expect(weapon.damage).toBe(34);
+        expect(weapon.baseCooldown).toBe(1.1);
     });
 
-    it('should fire a SweepingLance when enemy in range and cooldown ready', () => {
+    it('should fire a bolt when enemy in range and cooldown ready', () => {
         const enemy = createMockEnemy(200, 100);
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
 
@@ -104,7 +104,7 @@ describe('VoidRayWeapon', () => {
         weapon.update(0.1);
 
         expect(spawnedEntities).toHaveLength(1);
-        expect(spawnedEntities[0]).toBeInstanceOf(SweepingLance);
+        expect(spawnedEntities[0]).toBeInstanceOf(VoidBolt);
         expect((spawnedEntities[0] as any).source).toBe(weapon);
     });
 
@@ -127,34 +127,17 @@ describe('VoidRayWeapon', () => {
         expect(spawnedEntities).toHaveLength(0);
     });
 
-    it('sweeps through further enemies rather than the nearest one', () => {
-        // The sweep deliberately skips anything inside SWEEP_MIN_REACH: dragging
-        // the beam onto a body already touching the last one is invisible
-        const near = createMockEnemy(200, 100);   // 100px from the owner
-        const far = createMockEnemy(200, 400);    // 300px from `near`
-        const tooClose = createMockEnemy(230, 110);
-        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([near, far, tooClose]);
+    it('aims the bolt at the nearest enemy', () => {
+        const near = createMockEnemy(200, 100);   // straight to the right
+        const far = createMockEnemy(100, 500);
+        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([near, far]);
 
         weapon.cooldown = 0;
         weapon.update(0.1);
 
-        const lance = spawnedEntities[0] as any;
-        // owner -> near -> far, with the body 30px off `near` passed over
-        expect(lance.nodes).toHaveLength(3);
-        expect(lance.nodes[2]).toEqual({ x: far.pos.x, y: far.pos.y });
-    });
-
-    it('takes longer to recharge when evolved', () => {
-        const enemy = createMockEnemy(200, 100);
-        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
-
-        for (let i = 0; i < 5; i++) weapon.upgrade();
-        expect(weapon.evolved).toBe(true);
-
-        weapon.cooldown = 0;
-        weapon.update(0.1);
-
-        expect(weapon.cooldown).toBeCloseTo(weapon.baseCooldown * mockOwner.stats.cooldown * 1.35);
+        const bolt = spawnedEntities[0] as any;
+        expect(bolt.velocity.x).toBeGreaterThan(0);
+        expect(Math.abs(bolt.velocity.y)).toBeLessThan(1);
     });
 
     it('should reset cooldown after firing', () => {

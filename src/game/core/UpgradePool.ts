@@ -110,7 +110,7 @@ export function formatPowerupBonus(type: string, value: number): string {
  */
 const PERCENT_TYPES = [
     'might', 'area', 'cooldown', 'speed', 'duration', 'moveSpeed', 'growth',
-    'critChance', 'critDamage', 'killEcho', 'adrenaline', 'siphon',
+    'critChance', 'critDamage', 'killEcho', 'adrenaline', 'siphon', 'firstStrike',
 ];
 
 /** Render one stat value the way a card should show it */

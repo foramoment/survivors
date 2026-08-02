@@ -125,10 +125,10 @@ export const RU: Record<string, string> = {
     'arena.rifts': 'РАЗЛОМЫ ПУСТОТЫ',
 
     // ---------------------------------------------------------------- weapons
-    'weapon.void_ray.name': 'Луч Пустоты',
-    'weapon.void_ray.desc': 'Захватывает цель и протаскивает луч сквозь толпу, оставляя огонь',
-    'weapon.void_ray.evoName': 'Пушка Пустоты',
-    'weapon.void_ray.evoDesc': 'Три рывка зигзагом — до дальнего края толпы',
+    'weapon.void_ray.name': 'Болт Пустоты',
+    'weapon.void_ray.desc': 'Прошивает строй насквозь и рвёт пространство там, где встал',
+    'weapon.void_ray.evoName': 'Залп Пустоты',
+    'weapon.void_ray.evoDesc': 'Три болта веером, глубже прошив, шире разрывы',
 
     'weapon.phantom_slash.name': 'Фантомный Разрез',
     'weapon.phantom_slash.desc': 'Бьёт тем сильнее, чем плотнее враги вокруг тебя',
@@ -180,10 +180,10 @@ export const RU: Record<string, string> = {
     'weapon.lightning_chain.evoName': 'Гроза',
     'weapon.lightning_chain.evoDesc': 'Более медленные дуги оставляют трещащие поля статики',
 
-    'weapon.spinning_ember.name': 'Кружащие Угли',
-    'weapon.spinning_ember.desc': 'Кольцо углей, которое не гаснет и поджигает всё вокруг',
-    'weapon.spinning_ember.evoName': 'Плеть Инферно',
-    'weapon.spinning_ember.evoDesc': 'Кольцо хлещет наружу и выжигает землю',
+    'weapon.spinning_ember.name': 'Кровавый Тесак',
+    'weapon.spinning_ember.desc': 'Тяжёлый размах, который бьёт тем сильнее, чем меньше у тебя HP',
+    'weapon.spinning_ember.evoName': 'Разорение',
+    'weapon.spinning_ember.evoDesc': 'Размах приходит дважды и выжигает землю под ногами',
 
     'weapon.frost_nova.name': 'Ледяная Новая',
     'weapon.frost_nova.desc': 'Стужа, брошенная в самую гущу толпы — всё в ней еле ползёт',
@@ -243,6 +243,8 @@ export const RU: Record<string, string> = {
     'powerup.kill_echo.desc': 'Убитые иногда детонируют и поджигают уцелевших',
     'powerup.adrenal_surge.name': 'Выброс Адреналина',
     'powerup.adrenal_surge.desc': 'На последнем издыхании бьёшь сильнее и бежишь быстрее',
+    'powerup.first_strike.name': 'Первый Удар',
+    'powerup.first_strike.desc': 'Куда больнее бьёт по тем, кого ещё не задели',
     'powerup.vital_siphon.name': 'Сифон Жизни',
     'powerup.vital_siphon.desc': 'С убитых иногда падает ремкомплект',
     'powerup.extra_roll.name': 'Запасной Патрон',

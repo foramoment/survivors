@@ -26,23 +26,36 @@ export const DISCHARGE_DAMAGE = 34;
 export const DISCHARGE_KNOCKBACK = 420;
 
 /**
- * Kill Echo's blast, as a fraction of **the max HP of each enemy it hits** —
- * not of the corpse that produced it.
+ * Kill Echo's blast, as a fraction of **the CURRENT HP of each enemy it hits**.
  *
- * This is the third attempt and the first one that is bounded by construction.
- * Scaling off the *corpse* meant a fat body was a bomb: kill one late-tier
- * elite in the middle of a pack and it deleted the pack, because its HP had
- * nothing to do with theirs. Scaling off the corpse's *current* HP does not
- * work either — at the moment of death that is zero.
+ * Three designs, and the reasoning for landing here:
  *
- * Off the victim's own maximum, the blast is a fixed fraction of whatever it
- * touches. It cannot one-shot anything, it cannot spike on a big corpse, it
- * stays exactly as relevant at minute twenty as at minute one, and five and a
- * half echoes are needed to kill anything outright — which, combined with the
- * no-chaining rule in GameManager.killEcho, makes a screen wipe arithmetically
- * impossible.
+ *   1. `0.55 x the corpse's max HP` — a fat body was a bomb. Kill one late
+ *      elite inside a pack and it deleted the pack, then every one of those
+ *      deaths rolled its own echo. A screen wipe.
+ *   2. `0.18 x the victim's max HP` — fixes the fat-corpse spike, but leaves a
+ *      hole the user spotted: bosses walk surrounded by trash, and each piece
+ *      of trash you kill takes a flat 18% off the *boss's* enormous maximum.
+ *      You melt a boss by farming its escort.
+ *   3. Current HP, which is what this is. The same mechanic as Blade of the
+ *      Ruined King in League — percent of *current* health, so it hits like a
+ *      truck on something untouched and fades to nothing on something nearly
+ *      dead. (The item's number moved around a lot across patches, somewhere
+ *      in the 8–12% range; I would not trust a specific patch value from me.)
+ *
+ * Why it is the right tool: the damage **shrinks as the target weakens**, which
+ * is precisely backwards from what a cascade needs. Combined with the rule
+ * below that an echo can never land a killing blow, the perk physically cannot
+ * chain — it softens, and your weapons finish. That also makes it a companion
+ * to a build rather than a replacement for one.
  */
-export const KILL_ECHO_DAMAGE_SHARE = 0.18;
+export const KILL_ECHO_DAMAGE_SHARE = 0.15;
+/**
+ * Bosses take a quarter, the same courtesy every stun source gives them. A
+ * percent-of-current-health effect is at its strongest against exactly the kind
+ * of health pool a boss has.
+ */
+export const KILL_ECHO_BOSS_RESIST = 0.25;
 /**
  * Tightened from 84. Enemies travel packed together, so a generous radius here
  * is not "a blast" — it is "everything on top of the corpse", every time.

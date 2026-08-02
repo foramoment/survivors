@@ -15,12 +15,14 @@ import { FrostNovaWeapon } from '../weapons/implementations/FrostNovaWeapon';
 import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWeapon';
 
 const EXPECTED_STATS: Record<string, any> = {
+    // Rebuilt as a plain gun: the first class in the list has to teach the
+    // game, and two exotic versions of this weapon both failed to
     void_ray: {
-        damage: 40,
-        cooldown: 2.0,
-        area: 110, // drives beam width and the burning trail it lays
-        speed: 0,
-        duration: 0.5,
+        damage: 34,
+        cooldown: 1.1,
+        area: 46,      // rip radius
+        speed: 620,
+        duration: 0.9, // flight time
     },
     phantom_slash: {
         damage: 15,
@@ -105,17 +107,14 @@ const EXPECTED_STATS: Record<string, any> = {
         duration: 0.3,
         pierce: 3,
     },
+    // Rebuilt as the Berserker's Blood Cleaver: a ring of orbiting embers said
+    // nothing about a class designed around fighting at low health
     spinning_ember: {
-        // Reworked into a permanent ring: the "cooldown" is a re-light check,
-        // and damage went up because a pass now lands one gated tick instead of
-        // one hit per frame of overlap
-        damage: 26,
-        cooldown: 0.5,
-        area: 96,
-        speed: 2.6,
-        duration: 6,
-        count: 2,
-        countScaling: 0.5,
+        damage: 30,
+        cooldown: 1.4,
+        area: 110,
+        speed: 0,
+        duration: 1,
     },
     frost_nova: {
         damage: 8,

@@ -43,7 +43,7 @@ describe('I18n', () => {
         i18n.setLang('en');
         expect(tf('weapon.void_ray.name', 'Void Ray')).toBe('Void Ray');
         i18n.setLang('ru');
-        expect(tf('weapon.void_ray.name', 'Void Ray')).toBe('Луч Пустоты');
+        expect(tf('weapon.void_ray.name', 'Void Bolt')).toBe('Болт Пустоты');
         expect(tf('weapon.made_up.name', 'Fallback')).toBe('Fallback');
     });
 

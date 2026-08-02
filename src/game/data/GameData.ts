@@ -207,8 +207,15 @@ export const POWERUPS: PowerupData[] = [
     // Capped at six: at eight, half of everything you killed was detonating,
     // which is visual noise on top of a perk that already had to be defused
     { id: 'kill_echo', name: "Kill Echo", description: "The dead sometimes detonate and set the survivors alight", type: "killEcho", value: 0.06, maxStacks: 6, emoji: "☠️" },
+    // The one damage bonus that cannot feed a cascade: it only ever applies to
+    // an opening hit, so it can never help finish anything. See
+    // DamageSystem.openerBonus.
+    { id: 'first_strike', name: "First Strike", description: "Hit far harder on anything still untouched", type: "firstStrike", value: 0.12, maxStacks: 6, emoji: "🩹" },
     { id: 'adrenal_surge', name: "Adrenal Surge", description: "Hit harder and move faster while nearly dead", type: "adrenaline", value: 0.1, maxStacks: 8, emoji: "🩸" },
-    { id: 'vital_siphon', name: "Vital Siphon", description: "Kills sometimes leave a repair cell behind", type: "siphon", value: 0.025, maxStacks: 8, emoji: "💗" },
+    // Capped at five. At eight it is a 20% drop chance, and a twenty-minute run
+    // kills enough to turn that into 3-4 HP/s of free sustain — four times what
+    // maxed regen gives, on a perk that is not supposed to be the regen perk.
+    { id: 'vital_siphon', name: "Vital Siphon", description: "Kills sometimes leave a repair cell behind", type: "siphon", value: 0.025, maxStacks: 5, emoji: "💗" },
     // Hard-capped at two: every level-up already comes with one free reroll, and
     // past three the draw stops being a decision and becomes a menu you shop in
     { id: 'extra_roll', name: "Spare Cartridge", description: "One more reroll on every level-up", type: "reroll", value: 1, maxStacks: 2, emoji: "🎲" },
@@ -217,14 +224,14 @@ export const POWERUPS: PowerupData[] = [
 export const WEAPONS = [
     {
         id: 'void_ray',
-        name: "Void Ray",
+        name: "Void Bolt",
         emoji: "🔫",
-        description: "Locks on, then drags the beam through the crowd, leaving fire",
+        description: "Punches through a column and tears a rip where it stops",
         class: VoidRayWeapon,
         evolution: {
-            name: "Void Cannon",
+            name: "Void Volley",
             emoji: "💜",
-            description: "Three sweeps that zigzag out to the far side of the pack"
+            description: "Three bolts in a fan, deeper punch-through, wider rips"
         }
     },
     {
@@ -349,14 +356,14 @@ export const WEAPONS = [
     },
     {
         id: 'spinning_ember',
-        name: "Spinning Ember",
+        name: "Blood Cleaver",
         emoji: "🔥",
-        description: "A ring of embers that never goes out and sets things alight",
+        description: "A heavy sweep that hits harder the more health you are missing",
         class: SpinningEmberWeapon,
         evolution: {
-            name: "Inferno Lash",
+            name: "Ruin",
             emoji: "🌋",
-            description: "The ring whips outward and lays burning ground"
+            description: "The sweep lands twice and leaves the ground burning"
         }
     },
     {

@@ -70,12 +70,35 @@ class DamageSystemClass {
         // `effectiveMight` folds in conditional bonuses (Adrenal Surge); plain
         // `stats.might` is the fallback for the mock owners used in tests
         const might = player.effectiveMight ?? player.stats.might;
-        const finalDamage = baseDamage * might * GLOBAL_DAMAGE * critMultiplier;
+        const opener = 1 + this.openerBonus(player, target);
+        const finalDamage = baseDamage * might * GLOBAL_DAMAGE * critMultiplier * opener;
 
         return this.applyDamage(finalDamage, target, position, isCrit, source);
     }
 
 
+
+    /**
+     * First Strike: extra damage against a target still at full health.
+     *
+     * The one damage bonus in the game that cannot feed a cascade. It applies
+     * to the *opening* hit and nothing else, so it can never help finish
+     * anything, never compounds with itself, and never turns a wounded pack
+     * into a chain reaction — the failure mode every other on-hit multiplier we
+     * have tried eventually found.
+     *
+     * What it changes is aim: it rewards spreading damage across fresh bodies
+     * rather than dumping everything into whatever is already dying, which is
+     * the opposite of how the auto-targeting weapons naturally behave.
+     *
+     * A hair of slack on the "full health" test, because damage-over-time ticks
+     * can shave a fraction off a target between the shot and the hit.
+     */
+    private openerBonus(player: any, target: any): number {
+        const bonus = player.stats?.firstStrike ?? 0;
+        if (bonus <= 0 || !target?.maxHp) return 0;
+        return target.hp >= target.maxHp * 0.999 ? bonus : 0;
+    }
 
     /**
      * Internal method to apply damage and emit events

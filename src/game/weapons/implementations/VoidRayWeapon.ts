@@ -1,308 +1,147 @@
 /**
- * VOID RAY WEAPON
+ * VOID BOLT — the Void Walker's gun.
  *
- * A lance that is *dragged* across the field rather than pointed at one enemy.
+ * This weapon has been rebuilt twice, and both previous versions failed the
+ * same test for opposite reasons. A straight beam that hit everything on a line
+ * was mechanically fine and completely inert to watch. The swept lance that
+ * replaced it was the most intricate thing in the pool — lock on, drag the
+ * burning end through the crowd, three zigzags when evolved — and the user's
+ * verdict was that it dealt good damage and never once felt good.
  *
- * The old Void Ray charged for half a second and fired a straight line at
- * whatever was nearest. It hit everything along that line, which sounds fine
- * and played as the dullest weapon in the pool: there was no moment to watch,
- * no decision in it, and levelling it changed a damage number and nothing else.
+ * The thing both missed: this is the **first class in the list**. It is what a
+ * new player picks, and its job is to teach the game — point at things, watch
+ * them die, understand why. A gun is the correct answer to that, and "boring on
+ * paper" is not the same as "boring in the hand".
  *
- * What it does now: a **thin** lance snaps out at a target, detonates in a
- * small burst on it, then is dragged on to the next one — cutting whatever the
- * line crosses and setting fire to what the bursts catch. The whole thing is
- * over in about a fifth of a second, because the beam is the widest object
- * this weapon puts on the arena and it has no business lingering there.
+ * So: a fast bolt that punches through a couple of bodies and tears a small rip
+ * in space where it finally stops. The rip is the only exotic part, and it is
+ * there because the Void Walker should leave holes behind — it pulls weakly and
+ * grinds, which is what makes lining up a shot down a column worth doing.
  *
- * The reach lives in the impact bursts, not in the beam's thickness. An early
- * pass made the lance fat enough to cover a third of the screen, which hid the
- * fight behind the weapon that was supposed to be winning it.
- *
- * Evolved — Void Cannon: three sweeps instead of one, and each one reaches for
- * something *further out* rather than the nearest body, so the beam zigzags
- * across the whole pack instead of wobbling between two enemies at your feet.
+ * Evolved — Void Volley: three bolts in a tight fan, deeper punch-through, and
+ * a rip big enough to matter.
  */
-import { Weapon } from '../../Weapon';
+import { ProjectileWeapon, Projectile, Zone, type ProjectileParams } from '../base';
 import type { Player } from '../../entities/Player';
-import { Projectile, BurningTrailZone } from '../base';
-import { type Vector2, distance } from '../../core/Utils';
-import { damageSystem } from '../../core/DamageSystem';
+import { type Vector2, distance, normalize } from '../../core/Utils';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { particles } from '../../core/ParticleSystem';
-import { status } from '../../core/StatusEffects';
 import { juice } from '../../core/JuiceSystem';
 
-/** Closest a sweep will reach for — anything nearer is not worth swinging to */
-const SWEEP_MIN_REACH = 130;
-/** Furthest a sweep will reach */
-const SWEEP_MAX_REACH = 430;
+/** How far the weapon looks for something to shoot */
+const RANGE = 520;
+
+// ============================================
+// VOID RIP - the hole a spent bolt leaves
+// ============================================
+
 /**
- * Seconds one sweep takes, however long the path is.
- *
- * Short on purpose. The beam is the widest thing this weapon puts on screen,
- * and a lance that lingers is a lance sitting on top of the fight you are
- * trying to read. It snaps across and gets out of the way.
+ * A small tear that drags what is near it and grinds for a little. It exists so
+ * that where the bolt *stops* matters, which is the only thing turning "aim at
+ * the nearest enemy" into a position you can read.
  */
-const SWEEP_TIME = 0.14;
-/** Distance between the fires dropped along the swept path */
-const TRAIL_SPACING = 150;
-/** Ceiling on trail fires per shot, so a long zigzag can't carpet the arena */
-const MAX_TRAILS = 6;
+export class VoidRip extends Zone {
+    pullStrength: number = 140;
+    private spin: number = Math.random() * Math.PI * 2;
+    private readonly maxDuration: number;
 
-// ============================================
-// SWEEPING LANCE - the beam itself
-// ============================================
-
-export class SweepingLance extends Projectile {
-    owner: any;
-    /** Player, then every enemy position the beam is dragged through */
-    private nodes: Vector2[];
-    private halfWidth: number;
-    private falloff: number;
-
-    private stage: 'charge' | 'sweep' | 'fade' = 'charge';
-    private timer: number = 0;
-    private chargeTime: number = 0.16;
-    private fadeTime: number = 0.14;
-
-    /** How far along the whole path the burning end currently is */
-    private travelled: number = 0;
-    private pathLength: number = 0;
-    private headSpeed: number = 0;
-    /** Index of the last node the head has passed */
-    private resolved: number = 0;
-    private hit: Set<any> = new Set();
-
-    private lastTrailAt: number = 0;
-    private trailsDropped: number = 0;
-
-    color: string;
-    /** Fires dropped on the floor the beam swept over */
-    onTrail?: (x: number, y: number) => void;
-    /** Fired at every point the beam settles on — the small impact burst */
-    onNode?: (x: number, y: number) => void;
-
-    constructor(owner: any, nodes: Vector2[], damage: number, width: number, isEvolved: boolean) {
-        super(owner.pos.x, owner.pos.y, { x: 0, y: 0 }, 4, damage, 0, '');
-        this.canCollide = false;
-        this.owner = owner;
-        this.nodes = nodes;
-        this.halfWidth = width * 0.5;
-        // A four-node zigzag that hits full damage at every stop would make the
-        // evolution a straight multiplication of the base
-        this.falloff = isEvolved ? 0.85 : 1;
-        this.color = isEvolved ? '#ff6cf0' : '#bd6cff';
-
-        for (let i = 1; i < nodes.length; i++) {
-            this.pathLength += distance(nodes[i - 1], nodes[i]);
-        }
-        // One sweep per leg after the first, so a longer zigzag takes longer
-        const sweeps = Math.max(1, nodes.length - 2);
-        this.headSpeed = this.pathLength / (SWEEP_TIME * sweeps + SWEEP_TIME);
-    }
-
-    /** The beam always leaves the emitter, wherever the player has walked to */
-    private get origin(): Vector2 {
-        return this.owner.pos;
+    constructor(x: number, y: number, radius: number, duration: number, damage: number) {
+        super(x, y, radius, duration, damage, 0.35, '');
+        this.maxDuration = duration;
+        this.growOver(0.45, 1);
     }
 
     update(dt: number) {
-        this.timer += dt;
+        super.update(dt);
+        this.spin += dt * 3;
 
-        if (this.stage === 'charge') {
-            if (this.timer >= this.chargeTime) {
-                this.stage = 'sweep';
-                this.timer = 0;
-                juice.addTrauma(0.08);
-                particles.emitBeamCharge(this.origin.x, this.origin.y);
-            }
-            return;
+        for (const enemy of levelSpatialHash.getWithinRadius(this.pos, this.radius)) {
+            const dist = distance(this.pos, enemy.pos);
+            if (dist > this.radius || dist < 1 || enemy.isBoss) continue;
+            const pull = (this.pullStrength / dist) * dt;
+            enemy.pos.x += ((this.pos.x - enemy.pos.x) / dist) * pull;
+            enemy.pos.y += ((this.pos.y - enemy.pos.y) / dist) * pull;
         }
-
-        if (this.stage === 'sweep') {
-            this.travelled = Math.min(this.pathLength, this.travelled + this.headSpeed * dt);
-            this.resolveTo(this.travelled);
-            this.dropTrail();
-            if (this.travelled >= this.pathLength) {
-                this.stage = 'fade';
-                this.timer = 0;
-            }
-            return;
-        }
-
-        if (this.timer >= this.fadeTime) this.isDead = true;
-    }
-
-    /**
-     * Cut everything between the last resolved point and where the head is now.
-     *
-     * Damage is applied per whole leg the instant the head clears it, not per
-     * frame: a beam that re-checked its own line every frame would hit the same
-     * enemy a dozen times and bury the screen in damage numbers.
-     */
-    private resolveTo(travelled: number) {
-        let walked = 0;
-        for (let i = 1; i < this.nodes.length; i++) {
-            const legStart = i === 1 ? this.origin : this.nodes[i - 1];
-            const leg = distance(legStart, this.nodes[i]);
-            if (travelled < walked + leg) break;
-            walked += leg;
-            if (i <= this.resolved) continue;
-            this.resolved = i;
-            this.cutSegment(legStart, this.nodes[i], Math.pow(this.falloff, i - 1));
-            // The beam does not just pass over the target, it bites into it
-            this.onNode?.(this.nodes[i].x, this.nodes[i].y);
-        }
-    }
-
-    private cutSegment(a: Vector2, b: Vector2, damageScale: number) {
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const nx = dx / len;
-        const ny = dy / len;
-        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-
-        let sparks = 0;
-        for (const enemy of levelSpatialHash.getNearby(mid, len / 2 + this.halfWidth + 40)) {
-            if (enemy.isDead || this.hit.has(enemy)) continue;
-            const t = (enemy.pos.x - a.x) * nx + (enemy.pos.y - a.y) * ny;
-            if (t < 0 || t > len) continue;
-            const perp = Math.abs((enemy.pos.x - a.x) * -ny + (enemy.pos.y - a.y) * nx);
-            if (perp > this.halfWidth + enemy.radius) continue;
-
-            this.hit.add(enemy);
-            damageSystem.dealDamage({
-                baseDamage: this.damage * damageScale,
-                source: this.source ?? this,
-                target: enemy,
-                position: enemy.pos,
-            });
-            // Particle budget: a sweep through forty bodies is one frame
-            if (sparks < 4) {
-                sparks++;
-                particles.emitHit(enemy.pos.x, enemy.pos.y, this.color);
-            }
-        }
-    }
-
-    /** Lay fire along the path at a fixed spacing, not per frame */
-    private dropTrail() {
-        if (!this.onTrail || this.trailsDropped >= MAX_TRAILS) return;
-        if (this.travelled - this.lastTrailAt < TRAIL_SPACING) return;
-        this.lastTrailAt = this.travelled;
-        this.trailsDropped++;
-        const head = this.headPoint();
-        this.onTrail(head.x, head.y);
-    }
-
-    /** Where the burning end of the beam is right now */
-    private headPoint(): Vector2 {
-        if (this.stage === 'charge') return this.nodes[1] ?? this.origin;
-
-        let walked = 0;
-        for (let i = 1; i < this.nodes.length; i++) {
-            const legStart = i === 1 ? this.origin : this.nodes[i - 1];
-            const leg = distance(legStart, this.nodes[i]);
-            if (this.travelled <= walked + leg) {
-                const t = leg > 0 ? (this.travelled - walked) / leg : 1;
-                return {
-                    x: legStart.x + (this.nodes[i].x - legStart.x) * t,
-                    y: legStart.y + (this.nodes[i].y - legStart.y) * t,
-                };
-            }
-            walked += leg;
-        }
-        return this.nodes[this.nodes.length - 1];
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        const start = this.origin;
-        const head = this.headPoint();
+        const fade = Math.max(0, Math.min(1, this.duration / (this.maxDuration * 0.5)));
+        if (fade <= 0) return;
 
         ctx.save();
-        ctx.translate(-camera.x, -camera.y);
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+        ctx.scale(this.growScale, this.growScale);
 
-        if (this.stage === 'charge') {
-            // Aiming line: thin, dashed, growing brighter as the shot builds
-            const t = this.timer / this.chargeTime;
-            ctx.beginPath();
-            ctx.moveTo(start.x, start.y);
-            ctx.lineTo(head.x, head.y);
-            ctx.strokeStyle = this.color;
-            ctx.globalAlpha = t;
-            ctx.lineWidth = 2;
-            ctx.setLineDash([6, 6]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.globalAlpha = 1;
-
-            ctx.beginPath();
-            ctx.arc(start.x, start.y, 6 + 8 * t, 0, Math.PI * 2);
-            ctx.fillStyle = this.color;
-            ctx.shadowColor = this.color;
-            ctx.shadowBlur = 14;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.restore();
-            return;
-        }
-
-        const alpha = this.stage === 'fade' ? Math.max(0, 1 - this.timer / this.fadeTime) : 1;
-        const width = this.halfWidth * 2 * (0.6 + 0.4 * alpha);
-
-        // The beam bends through every node it has already swept past, so you
-        // can read the whole path the lance has carved
-        ctx.globalAlpha = alpha;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        // No outline — a haze around a genuinely black centre, same rule as
+        // every other zone in the game
+        const haze = ctx.createRadialGradient(0, 0, 0, 0, 0, this.baseRadius);
+        haze.addColorStop(0, `rgba(0, 0, 0, ${0.85 * fade})`);
+        haze.addColorStop(0.45, `rgba(90, 30, 170, ${0.5 * fade})`);
+        haze.addColorStop(1, 'rgba(120, 60, 220, 0)');
         ctx.beginPath();
-        ctx.moveTo(start.x, start.y);
-        for (let i = 1; i <= this.resolved && i < this.nodes.length; i++) {
-            ctx.lineTo(this.nodes[i].x, this.nodes[i].y);
-        }
-        ctx.lineTo(head.x, head.y);
-
-        // One glow pass, then a hard core and a white filament
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = width;
-        ctx.shadowColor = this.color;
-        ctx.shadowBlur = 16;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        ctx.strokeStyle = 'rgba(255, 225, 255, 0.85)';
-        ctx.lineWidth = Math.max(2, width * 0.45);
-        ctx.stroke();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = Math.max(1, width * 0.16);
-        ctx.stroke();
-
-        // Emitter flare and the burning end being dragged along
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(start.x, start.y, width * 0.45, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(head.x, head.y, width * 0.6, 0, Math.PI * 2);
+        ctx.arc(0, 0, this.baseRadius, 0, Math.PI * 2);
+        ctx.fillStyle = haze;
         ctx.fill();
 
-        ctx.globalAlpha = 1;
+        // Matter falling in, as points rather than a stroked spiral
+        ctx.fillStyle = `rgba(210, 140, 255, ${0.8 * fade})`;
+        for (let i = 0; i < 6; i++) {
+            const a = this.spin + (i / 6) * Math.PI * 2;
+            const r = this.baseRadius * (0.55 + 0.3 * Math.sin(this.spin * 1.7 + i));
+            ctx.fillRect(Math.cos(a) * r - 1.5, Math.sin(a) * r - 1.5, 3, 3);
+        }
+
         ctx.restore();
     }
 }
 
-export class VoidRayWeapon extends Weapon {
-    name = "Void Ray";
+// ============================================
+// VOID BOLT - the projectile
+// ============================================
+
+export class VoidBolt extends Projectile {
+    /** Called where the bolt finally stops */
+    onSpent?: (x: number, y: number) => void;
+
+    constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number) {
+        super(x, y, velocity, duration, damage, pierce, '');
+        this.radius = 7;
+    }
+
+    protected onDeath(): void {
+        this.onSpent?.(this.pos.x, this.pos.y);
+    }
+
+    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        ctx.save();
+        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+        ctx.rotate(Math.atan2(this.velocity.y, this.velocity.x));
+
+        // A stretched slug: the streak is what reads as speed at a glance
+        ctx.fillStyle = '#3d1a6e';
+        ctx.fillRect(-18, -3.5, 24, 7);
+        ctx.fillStyle = '#a95cff';
+        ctx.fillRect(-12, -2.5, 18, 5);
+        ctx.fillStyle = '#f2e0ff';
+        ctx.fillRect(-1, -2, 8, 4);
+
+        ctx.restore();
+    }
+}
+
+export class VoidRayWeapon extends ProjectileWeapon {
+    name = "Void Bolt";
     emoji = "🔫";
-    description = "Locks on, then drags the beam through the crowd.";
+    description = "Punches through a column and tears a rip where it stops.";
+    projectileEmoji = "";
+    pierce = 2;
 
     readonly stats = {
-        damage: 40,
-        cooldown: 2.0,
-        area: 110,
-        speed: 0,
-        duration: 0.5,
+        damage: 34,
+        cooldown: 1.1,
+        area: 46,      // rip radius
+        speed: 620,
+        duration: 0.9, // flight time
     };
 
     constructor(owner: Player) {
@@ -310,138 +149,73 @@ export class VoidRayWeapon extends Weapon {
         this.baseCooldown = this.stats.cooldown;
         this.damage = this.stats.damage;
         this.area = this.stats.area;
+        this.speed = this.stats.speed;
         this.duration = this.stats.duration;
     }
 
-    /** Legs after the lock-on: one normally, three when evolved */
-    private sweepCount(): number {
+    /** Bolts per shot: one, three when evolved */
+    private boltCount(): number {
         return this.evolved ? 3 : 1;
     }
 
-    /**
-     * Beam width. Deliberately **thin** — a lance is a line, not a corridor.
-     *
-     * The first cut of the swept lance was 26–46px wide, which swallowed a
-     * third of the screen for the length of the sweep and hid the fight behind
-     * its own glow. The reach now comes from the burst at each impact point
-     * (see `impactBurst`), not from the beam being fat.
-     */
-    private beamWidth(): number {
-        return (9 + this.level * 1.5) * this.owner.stats.area;
-    }
-
-    /** Radius of the little detonation where the beam settles on a target */
-    private burstRadius(): number {
-        return this.area * 0.5 * this.owner.stats.area;
+    /** Bodies a bolt punches through: +1 every second level */
+    private punchThrough(): number {
+        return this.pierce + Math.floor((this.level - 1) / 2) + (this.evolved ? 2 : 0);
     }
 
     update(dt: number) {
         this.cooldown -= dt;
         if (this.cooldown > 0) return;
 
-        const first = this.findClosestEnemy(SWEEP_MAX_REACH);
-        if (!first) return;
+        const target = this.findClosestEnemy(RANGE);
+        if (!target) return;
 
-        const taken = new Set<any>([first]);
-        const nodes: Vector2[] = [
-            { ...this.owner.pos },
-            { x: first.pos.x, y: first.pos.y },
-        ];
+        const dir = normalize({
+            x: target.pos.x - this.owner.pos.x,
+            y: target.pos.y - this.owner.pos.y,
+        });
+        const aim = Math.atan2(dir.y, dir.x);
+        const count = this.boltCount();
+        const speed = this.speed * this.owner.stats.speed;
 
-        let from: Vector2 = nodes[1];
-        for (let i = 0; i < this.sweepCount(); i++) {
-            const next = this.pickSweepTarget(from, taken);
-            if (!next) break;
-            taken.add(next);
-            from = { x: next.pos.x, y: next.pos.y };
-            nodes.push(from);
+        for (let i = 0; i < count; i++) {
+            // A tight fan, not a shotgun: the volley should still read as one
+            // shot going one way
+            const angle = aim + (i - (count - 1) / 2) * 0.13;
+            const bolt = new VoidBolt(
+                this.owner.pos.x, this.owner.pos.y,
+                { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
+                this.duration * this.owner.stats.duration,
+                this.damage,
+                this.punchThrough(),
+            );
+            bolt.source = this;
+            bolt.onSpent = (x, y) => this.tearRip(x, y);
+            this.onSpawn(bolt);
         }
 
-        // Nothing to sweep to: still fire the lock-on leg rather than eating
-        // the cooldown for free
-        const lance = new SweepingLance(this.owner, nodes, this.damage, this.beamWidth(), this.evolved);
-        lance.source = this;
-        lance.onTrail = (x, y) => this.layFire(x, y);
-        lance.onNode = (x, y) => this.impactBurst(x, y);
-        this.onSpawn(lance);
-
-        // Three legs of cutting and a trail of fire is worth a longer wait
-        const cdMultiplier = this.evolved ? 1.35 : 1.0;
-        this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
+        particles.emitHit(this.owner.pos.x, this.owner.pos.y, '#a95cff');
+        this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
     }
 
-    /**
-     * The next enemy to drag the beam to — deliberately **not** the closest.
-     *
-     * Sweeping to whatever is nearest makes the beam twitch between two bodies
-     * standing next to each other, which is both invisible and useless. Picking
-     * at random from everything in an annulus around the current end gives a
-     * long leg that crosses the enemies in between, which is where the damage
-     * actually comes from.
-     */
-    private pickSweepTarget(from: Vector2, exclude: Set<any>): any | null {
-        const candidates: any[] = [];
-        let fallback: any = null;
-        let fallbackDist = Infinity;
-
-        for (const enemy of levelSpatialHash.getWithinRadius(from, SWEEP_MAX_REACH)) {
-            if (enemy.isDead || exclude.has(enemy)) continue;
-            const d = distance(from, enemy.pos);
-            if (d > SWEEP_MAX_REACH) continue;
-            if (d >= SWEEP_MIN_REACH) {
-                candidates.push(enemy);
-            } else if (d < fallbackDist) {
-                fallbackDist = d;
-                fallback = enemy;
-            }
-        }
-
-        if (candidates.length === 0) return fallback;
-        return candidates[Math.floor(Math.random() * candidates.length)];
-    }
-
-    /**
-     * The small detonation where the beam settles on a target.
-     *
-     * This is what carries the weapon now that the beam itself is a thread: a
-     * tight burst that catches the bodies pressed around the one it locked
-     * onto, and sets them alight. Small on purpose — three of these along a
-     * zigzag should read as three bites, not as three explosions.
-     */
-    private impactBurst(x: number, y: number) {
-        const radius = this.burstRadius();
-        const spot = { x, y };
-
-        particles.emitHit(x, y, this.evolved ? '#ff6cf0' : '#bd6cff');
-        juice.shockwave(x, y, radius * 1.5, this.evolved ? '#ff6cf0' : '#bd6cff', 0.22, 3);
-
-        for (const enemy of levelSpatialHash.getWithinRadius(spot, radius)) {
-            if (enemy.isDead || distance(spot, enemy.pos) > radius) continue;
-            damageSystem.dealDamage({
-                baseDamage: this.damage * 0.45,
-                source: this,
-                target: enemy,
-                position: enemy.pos,
-            });
-            status.infect(enemy, {
-                dps: this.damage * 0.2,
-                duration: 2,
-                source: this,
-                kind: 'burn',
-            });
-        }
-    }
-
-    /** Burning floor left where the beam passed */
-    private layFire(x: number, y: number) {
-        const fire = new BurningTrailZone(
-            x, y,
-            this.area * 0.3 * this.owner.stats.area,
-            1.2 * this.owner.stats.duration,
-            this.damage * 0.08,
+    /** ProjectileWeapon's factory is unused — update() fires the fan itself */
+    protected createProjectile(params: ProjectileParams): Projectile {
+        return new VoidBolt(
+            params.x, params.y, params.velocity,
+            params.duration, params.damage, params.pierce,
         );
-        fire.burnDps = this.damage * 0.15;
-        fire.source = this;
-        this.onSpawn(fire);
+    }
+
+    private tearRip(x: number, y: number) {
+        const radius = this.area * this.owner.stats.area * (this.evolved ? 1.5 : 1);
+        const rip = new VoidRip(
+            x, y,
+            radius,
+            (this.evolved ? 1.6 : 1.1) * this.owner.stats.duration,
+            this.damage * 0.22,
+        );
+        rip.source = this;
+        this.onSpawn(rip);
+        juice.shockwave(x, y, radius * 1.3, '#a95cff', 0.22, 3);
     }
 }

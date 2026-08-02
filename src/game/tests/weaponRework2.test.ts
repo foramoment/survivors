@@ -7,10 +7,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SporeCloudWeapon, FungalBloomZone } from '../weapons/implementations/SporeCloudWeapon';
 import { NanobotSwarmWeapon, NaniteHiveCloud } from '../weapons/implementations/NanobotSwarmWeapon';
-import { VoidRayWeapon } from '../weapons/implementations/VoidRayWeapon';
+import { VoidRayWeapon, VoidBolt, VoidRip } from '../weapons/implementations/VoidRayWeapon';
 import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWeapon';
 import { MindBlastWeapon, PsiBlastZone } from '../weapons/implementations/MindBlastWeapon';
-import { LobbedProjectile, PlasmaExplosionZone, SporeZone, BurningTrailZone } from '../weapons/base';
+import { LobbedProjectile, PlasmaExplosionZone, SporeZone } from '../weapons/base';
 import { Enemy } from '../entities/Enemy';
 import { levelSpatialHash } from '../core/SpatialHash';
 import { damageSystem } from '../core/DamageSystem';
@@ -109,114 +109,54 @@ describe('Nanobot Swarm', () => {
     });
 });
 
-describe('Void Ray', () => {
-    /** Run a lance to completion — charge, then the whole sweep */
-    function runLance(lance: any) {
-        for (let i = 0; i < 240 && !lance.isDead; i++) lance.update(1 / 60);
-    }
-
-    it('cuts everything the swept line crosses, not just the lock-on target', () => {
+describe('Void Bolt', () => {
+    it('punches through more bodies as it levels, and more still when evolved', () => {
         const weapon = new VoidRayWeapon(mockOwner());
         const spawned = collect(weapon);
-
-        const target = enemyAt(300, 0);
-        const bystander = enemyAt(150, 5);
-        const offAxis = enemyAt(150, 400);
-        levelSpatialHash.insertAll([target, bystander, offAxis]);
-        (weapon as any).findClosestEnemy = () => target as any;
-        // Keep the shot to its lock-on leg so the assertion is about the line,
-        // not about where the sweep happened to swing
-        (weapon as any).pickSweepTarget = () => null;
-
-        const hits: any[] = [];
-        vi.spyOn(damageSystem, 'dealDamage').mockImplementation((p: any) => {
-            hits.push(p.target);
-            return { finalDamage: 0, isCrit: false, killed: false };
-        });
-
-        weapon.update(0.1);
-        runLance(spawned[0]);
-
-        expect(hits).toContain(target);
-        expect(hits).toContain(bystander);
-        expect(hits).not.toContain(offAxis);
-    });
-
-    it('cuts a body on the line exactly once, however long the sweep takes', () => {
-        const weapon = new VoidRayWeapon(mockOwner());
-        const spawned = collect(weapon);
-
-        const target = enemyAt(300, 0);
-        // On the beam's path but far from the impact point, so it is only ever
-        // touched by the line — the target itself also takes the impact burst
-        const bystander = enemyAt(150, 4);
-        levelSpatialHash.insertAll([target, bystander]);
-        (weapon as any).findClosestEnemy = () => target as any;
-        (weapon as any).pickSweepTarget = () => null;
-
-        const spy = vi.spyOn(damageSystem, 'dealDamage')
-            .mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
-
-        weapon.update(0.1);
-        runLance(spawned[0]);
-
-        expect(spy.mock.calls.filter(c => (c[0] as any).target === bystander)).toHaveLength(1);
-    });
-
-    it('detonates a small burst on the body it settles on', () => {
-        const weapon = new VoidRayWeapon(mockOwner());
-        const spawned = collect(weapon);
-
-        const target = enemyAt(300, 0);
+        const target = enemyAt(200, 0);
         levelSpatialHash.insertAll([target]);
-        (weapon as any).findClosestEnemy = () => target as any;
-        (weapon as any).pickSweepTarget = () => null;
 
-        const spy = vi.spyOn(damageSystem, 'dealDamage')
-            .mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
+        const pierceAt = (level: number, evolved = false) => {
+            weapon.level = level;
+            weapon.evolved = evolved;
+            weapon.cooldown = 0;
+            spawned.length = 0;
+            weapon.update(0.1);
+            return (spawned[0] as any).pierce;
+        };
 
-        weapon.update(0.1);
-        runLance(spawned[0]);
-
-        // Line cut plus the impact burst, and the burst sets it alight
-        expect(spy.mock.calls.filter(c => (c[0] as any).target === target)).toHaveLength(2);
-        expect(target.infection?.kind).toBe('burn');
+        expect(pierceAt(3)).toBeGreaterThan(pierceAt(1));
+        expect(pierceAt(6, true)).toBeGreaterThan(pierceAt(6));
     });
 
-    it('leaves burning ground along the path it swept', () => {
+    it('evolved fires a fan of three, not one bolt', () => {
         const weapon = new VoidRayWeapon(mockOwner());
         const spawned = collect(weapon);
-
-        const target = enemyAt(400, 0);
-        levelSpatialHash.insertAll([target]);
-        (weapon as any).findClosestEnemy = () => target as any;
-        (weapon as any).pickSweepTarget = () => null;
+        levelSpatialHash.insertAll([enemyAt(200, 0)]);
 
         weapon.update(0.1);
-        runLance(spawned[0]);
+        expect(spawned.filter(e => e instanceof VoidBolt)).toHaveLength(1);
 
-        const fires = spawned.filter(e => e instanceof BurningTrailZone);
-        expect(fires.length).toBeGreaterThan(0);
-        expect(fires.every(f => (f as any).burnDps > 0)).toBe(true);
-    });
-
-    it('evolved zigzags through three further targets on a longer cooldown', () => {
-        const weapon = new VoidRayWeapon(mockOwner());
-        weapon.level = 6;
         weapon.evolved = true;
-        const spawned = collect(weapon);
+        weapon.cooldown = 0;
+        spawned.length = 0;
+        weapon.update(0.1);
+        expect(spawned.filter(e => e instanceof VoidBolt)).toHaveLength(3);
+    });
 
-        // A line of enemies each beyond SWEEP_MIN_REACH of the last
-        const chain = [enemyAt(200, 0), enemyAt(200, 200), enemyAt(0, 200), enemyAt(-200, 200)];
-        levelSpatialHash.insertAll(chain);
-        (weapon as any).findClosestEnemy = () => chain[0] as any;
+    it('tears a rip where the bolt is spent', () => {
+        const weapon = new VoidRayWeapon(mockOwner());
+        const spawned = collect(weapon);
+        levelSpatialHash.insertAll([enemyAt(200, 0)]);
 
         weapon.update(0.1);
+        const bolt = spawned[0] as any;
+        spawned.length = 0;
+        bolt.kill();
 
-        const lance = spawned[0] as any;
-        // owner + lock-on + three sweeps
-        expect(lance.nodes).toHaveLength(5);
-        expect(weapon.cooldown).toBeCloseTo(weapon.baseCooldown * 1.35);
+        const rip = spawned.find(e => e instanceof VoidRip) as VoidRip;
+        expect(rip).toBeDefined();
+        expect(rip.pullStrength).toBeGreaterThan(0);
     });
 });
 

@@ -58,6 +58,8 @@ export class Player extends Entity {
         siphon: 0,
         /** Extra level-up rerolls on top of the free one */
         reroll: 0,
+        /** Bonus damage against a target still at full health */
+        firstStrike: 0,
     };
 
     classId: string = 'void_walker';

@@ -29,7 +29,7 @@ import { achievements, type RunSnapshot } from './core/Achievements';
 import { RepairCell } from './entities/RepairCell';
 import {
     dischargeThreshold, DISCHARGE_RADIUS, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
-    KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE,
+    KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE, KILL_ECHO_BOSS_RESIST,
 } from './core/Tactics';
 import { screenManager } from './ui/ScreenManager';
 
@@ -527,13 +527,13 @@ export class GameManager {
      * tougher, and dealt with `skipModifiers` so the player's damage stats do
      * not multiply it.
      *
-     * **An echo kill cannot echo.** The old comment here claimed
-     * `skipModifiers` prevented chaining; it does not — it only stops the
-     * damage being amplified. Anything the blast killed still went through the
-     * death loop and rolled its own echo, one generation per frame, with no
-     * limit. On a hard stage, where a corpse carries five figures of HP, a
-     * single detonation in a dense pack cleared the screen. That is the bug the
-     * `echoed` flag closes.
+     * **An echo cannot kill, so an echo cannot chain.** The original comment
+     * here claimed `skipModifiers` prevented chaining; it does not — it only
+     * stops the damage being amplified. Anything the blast killed still went
+     * through the death loop and rolled its own echo, one generation per frame,
+     * with no limit, and on a hard stage that cleared the screen. The blast is
+     * now non-lethal by construction (and `Enemy.echoed` stays as a second
+     * lock), so the perk softens a pack and your weapons finish it.
      */
     private killEcho(enemy: Enemy) {
         if (!this.player) return;
@@ -548,28 +548,34 @@ export class GameManager {
         for (const other of levelSpatialHash.getWithinRadius(enemy.pos, radius)) {
             if (other === enemy || other.isDead) continue;
             if (distance(enemy.pos, other.pos) > radius) continue;
-            // A share of what IT can take, not of what the corpse could — see
-            // KILL_ECHO_DAMAGE_SHARE
-            damageSystem.dealDamage({
-                baseDamage: other.maxHp * KILL_ECHO_DAMAGE_SHARE,
-                source: null,
-                target: other,
-                position: other.pos,
-                skipModifiers: true,
-            });
-            if (other.isDead) {
-                other.echoed = true;
-            } else {
-                // What survives walks away on fire. A burn cannot cascade —
-                // it resolves over seconds, not inside this frame — so the
-                // perk keeps a presence without being able to run away again.
-                status.infect(other, {
-                    dps: other.maxHp * KILL_ECHO_BURN_SHARE,
-                    duration: 2.5,
-                    source: undefined,
-                    kind: 'burn',
+            // A share of the target's CURRENT health, so the blast fades as it
+            // weakens — see KILL_ECHO_DAMAGE_SHARE
+            const share = other.isBoss ? KILL_ECHO_DAMAGE_SHARE * KILL_ECHO_BOSS_RESIST : KILL_ECHO_DAMAGE_SHARE;
+            // ...and it may never land the killing blow. That is what makes a
+            // cascade impossible rather than merely unlikely: no echo produces
+            // a corpse, so no echo produces another echo.
+            const damage = Math.min(other.hp * share, Math.max(0, other.hp - 1));
+
+            if (damage > 0) {
+                damageSystem.dealDamage({
+                    baseDamage: damage,
+                    source: null,
+                    target: other,
+                    position: other.pos,
+                    skipModifiers: true,
                 });
             }
+
+            // Survivors walk away on fire. The burn CAN finish them, and that
+            // is fine: it resolves over seconds through StatusEffects, not
+            // inside this frame, so it is a kill the perk earned rather than a
+            // chain reaction.
+            status.infect(other, {
+                dps: other.maxHp * KILL_ECHO_BURN_SHARE,
+                duration: 2.5,
+                source: undefined,
+                kind: 'burn',
+            });
         }
     }
 

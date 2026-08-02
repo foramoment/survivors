@@ -17,7 +17,8 @@ import { status } from '../core/StatusEffects';
 import { damageSystem } from '../core/DamageSystem';
 import { AcidPoolWeapon, CorrosivePool } from '../weapons/implementations/AcidPoolWeapon';
 import { FrostNovaWeapon, AbsoluteZeroZone } from '../weapons/implementations/FrostNovaWeapon';
-import { SpinningEmberWeapon, EmberOrb } from '../weapons/implementations/SpinningEmberWeapon';
+import { SpinningEmberWeapon } from '../weapons/implementations/SpinningEmberWeapon';
+import { BurningTrailZone } from '../weapons/base';
 import { PhantomSlashWeapon } from '../weapons/implementations/PhantomSlashWeapon';
 import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWeapon';
 import { SporeCloudWeapon } from '../weapons/implementations/SporeCloudWeapon';
@@ -223,51 +224,59 @@ describe('Frost Nova', () => {
     });
 });
 
-describe('Spinning Ember', () => {
-    it('keeps the ring topped up instead of cycling on and off', () => {
+describe('Blood Cleaver', () => {
+    /** Damage the cleaver lands on one enemy at a given health fraction */
+    function swingDamage(hpFraction: number): number {
+        const player = new Player(0, 0);
+        player.hp = player.maxHp * hpFraction;
+        const weapon = new SpinningEmberWeapon(player);
+        weapon.onSpawn = () => { };
+        const enemy = makeEnemy(30, 0);
+        placeEnemies([enemy]);
+
+        const spy = vi.spyOn(damageSystem, 'dealDamage')
+            .mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
+        weapon.update(0.1);
+        const dealt = (spy.mock.calls[0]?.[0] as any)?.baseDamage ?? 0;
+        spy.mockRestore();
+        return dealt;
+    }
+
+    it('hits harder the more health the wielder is missing', () => {
+        // The whole reason this weapon belongs to the Berserker: the class has
+        // negative armour and an adrenaline threshold, so it lives down here
+        const healthy = swingDamage(1);
+        const bloodied = swingDamage(0.35);
+        const dying = swingDamage(0.05);
+
+        expect(bloodied).toBeGreaterThan(healthy);
+        expect(dying).toBeGreaterThan(bloodied);
+        // ...and roughly 2.6x at death's door, not a rounding difference
+        expect(dying / healthy).toBeGreaterThan(2);
+    });
+
+    it('shoves what it cuts, so being surrounded stays survivable', () => {
         const player = new Player(0, 0);
         const weapon = new SpinningEmberWeapon(player);
+        weapon.onSpawn = () => { };
+        const enemy = makeEnemy(30, 0);
+        placeEnemies([enemy]);
+
+        weapon.update(0.1);
+        expect(Math.hypot(enemy.knockback.x, enemy.knockback.y)).toBeGreaterThan(0);
+    });
+
+    it('evolved scorches the ground and sets what it cuts alight', () => {
+        const player = new Player(0, 0);
+        const weapon = new SpinningEmberWeapon(player);
+        weapon.evolved = true;
         const spawned: Entity[] = [];
         weapon.onSpawn = e => spawned.push(e);
-        placeEnemies([]);
+        const enemy = makeEnemy(30, 0);
+        placeEnemies([enemy]);
 
-        weapon.update(1);
-        const first = spawned.filter(e => e instanceof EmberOrb).length;
-        expect(first).toBeGreaterThan(0);
-
-        // Nothing expired, so nothing new should be lit
-        weapon.update(1);
-        expect(spawned.filter(e => e instanceof EmberOrb).length).toBe(first);
-
-        // Kill one; the ring refills on the next re-light check
-        (spawned[0] as any).isDead = true;
-        weapon.update(1);
-        expect(spawned.filter(e => e instanceof EmberOrb).length).toBe(first + 1);
-    });
-
-    it('hits an enemy at most once per interval, not once per frame', () => {
-        const player = new Player(0, 0);
-        const orb = new EmberOrb(player, 60, 2, 5, 20);
-        const enemy = makeEnemy(0, 0);
-
-        orb.update(0.016);
-        expect(orb.handleHit(enemy).damage).toBeGreaterThan(0);
-        orb.update(0.016);
-        expect(orb.handleHit(enemy).damage).toBe(0);
-
-        // ...and lands again once the interval has passed
-        for (let i = 0; i < 20; i++) orb.update(0.016);
-        expect(orb.handleHit(enemy).damage).toBeGreaterThan(0);
-    });
-
-    it('ignites what it touches', () => {
-        const player = new Player(0, 0);
-        const orb = new EmberOrb(player, 60, 2, 5, 20);
-        orb.burnDps = 6;
-        const enemy = makeEnemy(0, 0);
-
-        orb.update(0.016);
-        orb.handleHit(enemy);
+        weapon.update(0.1);
+        expect(spawned.some(e => e instanceof BurningTrailZone)).toBe(true);
         expect(enemy.infection?.kind).toBe('burn');
     });
 });
