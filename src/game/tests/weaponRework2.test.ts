@@ -1,16 +1,16 @@
 /**
  * Behaviour tests for the second weapon rework pass:
- * Spore Cloud (infection), Nanobot Swarm (hive drones), Void Ray (line
- * damage + collapse), Plasma Grenade (cluster + capped chains), Mind Blast
+ * Spore Cloud (infection), Nanobot Swarm (hive drones), Void Ray (swept lance
+ * + burning trail), Plasma Grenade (cluster + capped chains), Mind Blast
  * (stun + cascade).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SporeCloudWeapon, FungalBloomZone } from '../weapons/implementations/SporeCloudWeapon';
 import { NanobotSwarmWeapon, NaniteHiveCloud } from '../weapons/implementations/NanobotSwarmWeapon';
-import { VoidRayWeapon, VoidCollapseZone } from '../weapons/implementations/VoidRayWeapon';
+import { VoidRayWeapon } from '../weapons/implementations/VoidRayWeapon';
 import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWeapon';
 import { MindBlastWeapon, PsiBlastZone } from '../weapons/implementations/MindBlastWeapon';
-import { LobbedProjectile, PlasmaExplosionZone, SporeZone } from '../weapons/base';
+import { LobbedProjectile, PlasmaExplosionZone, SporeZone, BurningTrailZone } from '../weapons/base';
 import { Enemy } from '../entities/Enemy';
 import { levelSpatialHash } from '../core/SpatialHash';
 import { damageSystem } from '../core/DamageSystem';
@@ -22,7 +22,7 @@ function mockOwner() {
         pos: { x: 0, y: 0 },
         stats: {
             might: 1, area: 1, cooldown: 1, speed: 1, duration: 1,
-            critChance: 0, critDamage: 1.5, tick: 0,
+            critChance: 0, critDamage: 1.5,
         },
     } as any;
 }
@@ -110,7 +110,12 @@ describe('Nanobot Swarm', () => {
 });
 
 describe('Void Ray', () => {
-    it('the beam damages everything along its line, not just the target', () => {
+    /** Run a lance to completion — charge, then the whole sweep */
+    function runLance(lance: any) {
+        for (let i = 0; i < 240 && !lance.isDead; i++) lance.update(1 / 60);
+    }
+
+    it('cuts everything the swept line crosses, not just the lock-on target', () => {
         const weapon = new VoidRayWeapon(mockOwner());
         const spawned = collect(weapon);
 
@@ -119,6 +124,9 @@ describe('Void Ray', () => {
         const offAxis = enemyAt(150, 400);
         levelSpatialHash.insertAll([target, bystander, offAxis]);
         (weapon as any).findClosestEnemy = () => target as any;
+        // Keep the shot to its lock-on leg so the assertion is about the line,
+        // not about where the sweep happened to swing
+        (weapon as any).pickSweepTarget = () => null;
 
         const hits: any[] = [];
         vi.spyOn(damageSystem, 'dealDamage').mockImplementation((p: any) => {
@@ -127,43 +135,65 @@ describe('Void Ray', () => {
         });
 
         weapon.update(0.1);
-        const beam = spawned[0];
-        for (let i = 0; i < 40; i++) beam.update(1 / 60);
+        runLance(spawned[0]);
 
         expect(hits).toContain(target);
         expect(hits).toContain(bystander);
         expect(hits).not.toContain(offAxis);
     });
 
-    it('evolved drops a collapse that pulls enemies in and then detonates', () => {
+    it('hits each enemy once however long the sweep takes', () => {
         const weapon = new VoidRayWeapon(mockOwner());
-        weapon.level = 6;
-        weapon.evolved = true;
         const spawned = collect(weapon);
 
         const target = enemyAt(300, 0);
         levelSpatialHash.insertAll([target]);
         (weapon as any).findClosestEnemy = () => target as any;
+        (weapon as any).pickSweepTarget = () => null;
+
+        const spy = vi.spyOn(damageSystem, 'dealDamage')
+            .mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
 
         weapon.update(0.1);
-        for (let i = 0; i < 40; i++) spawned[0].update(1 / 60);
+        runLance(spawned[0]);
 
-        const collapse = spawned.find(e => e instanceof VoidCollapseZone) as VoidCollapseZone;
-        expect(collapse).toBeDefined();
+        expect(spy.mock.calls.filter(c => (c[0] as any).target === target)).toHaveLength(1);
+    });
 
-        // Pull phase drags the enemy toward the centre (it lands right on the
-        // impact point, so step it aside first)
-        target.pos.x = collapse.pos.x + 70;
-        target.pos.y = collapse.pos.y;
-        const before = Math.hypot(target.pos.x - collapse.pos.x, target.pos.y - collapse.pos.y);
-        for (let i = 0; i < 20; i++) collapse.update(1 / 60);
-        const after = Math.hypot(target.pos.x - collapse.pos.x, target.pos.y - collapse.pos.y);
-        expect(after).toBeLessThan(before);
+    it('leaves burning ground along the path it swept', () => {
+        const weapon = new VoidRayWeapon(mockOwner());
+        const spawned = collect(weapon);
 
-        // ...then it goes off
-        const spy = vi.spyOn(damageSystem, 'dealDamage').mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
-        for (let i = 0; i < 40; i++) collapse.update(1 / 60);
-        expect(spy).toHaveBeenCalled();
+        const target = enemyAt(400, 0);
+        levelSpatialHash.insertAll([target]);
+        (weapon as any).findClosestEnemy = () => target as any;
+        (weapon as any).pickSweepTarget = () => null;
+
+        weapon.update(0.1);
+        runLance(spawned[0]);
+
+        const fires = spawned.filter(e => e instanceof BurningTrailZone);
+        expect(fires.length).toBeGreaterThan(0);
+        expect(fires.every(f => (f as any).burnDps > 0)).toBe(true);
+    });
+
+    it('evolved zigzags through three further targets on a longer cooldown', () => {
+        const weapon = new VoidRayWeapon(mockOwner());
+        weapon.level = 6;
+        weapon.evolved = true;
+        const spawned = collect(weapon);
+
+        // A line of enemies each beyond SWEEP_MIN_REACH of the last
+        const chain = [enemyAt(200, 0), enemyAt(200, 200), enemyAt(0, 200), enemyAt(-200, 200)];
+        levelSpatialHash.insertAll(chain);
+        (weapon as any).findClosestEnemy = () => chain[0] as any;
+
+        weapon.update(0.1);
+
+        const lance = spawned[0] as any;
+        // owner + lock-on + three sweeps
+        expect(lance.nodes).toHaveLength(5);
+        expect(weapon.cooldown).toBeCloseTo(weapon.baseCooldown * 1.35);
     });
 });
 
@@ -185,6 +215,27 @@ describe('Plasma Grenade', () => {
         expect(lobs).toHaveLength(3);
         // Staggered so the volley doesn't land in a single frame
         expect(new Set(lobs.map(l => l.delay)).size).toBe(3);
+    });
+
+    it('gains a canister every second level, and each one hits for less', () => {
+        const weapon = new PlasmaGrenadeWeapon(mockOwner());
+        const spawned = collect(weapon);
+        const target = enemyAt(200, 0);
+        (weapon as any).findClosestEnemy = () => target as any;
+
+        const counts: number[] = [];
+        for (let level = 1; level <= 5; level++) {
+            weapon.level = level;
+            weapon.cooldown = 0;
+            spawned.length = 0;
+            weapon.update(0.1);
+            counts.push(spawned.filter(e => e instanceof LobbedProjectile).length);
+        }
+        expect(counts).toEqual([1, 1, 2, 2, 3]);
+
+        // Total output grows as sqrt(count), so extra canisters buy reach and
+        // not a free damage multiplier
+        expect((weapon as any).canisterPower(4)).toBeCloseTo(0.5);
     });
 
     it('caps and delays chain explosions', () => {

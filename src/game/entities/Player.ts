@@ -7,7 +7,13 @@ import { adrenalineMultiplier } from '../core/Tactics';
 import type { ClassPerLevel } from '../data/GameData';
 
 export class Player extends Entity {
-    speed: number = 200;
+    /**
+     * Base move speed in px/s. Enemies run at 40–120 (see ENEMY_CONFIG), so
+     * even at 190 the player is comfortably faster than anything on the map —
+     * the threat is the number of directions they come from, not their pace.
+     * Trimmed from 200 alongside the move-speed nerfs, not instead of them.
+     */
+    speed: number = 190;
     hp: number = 100;
     maxHp: number = 100;
     xp: number = 0;
@@ -40,7 +46,6 @@ export class Player extends Entity {
         regen: 0,
         critChance: 0,
         critDamage: 2,
-        tick: 0,
 
         // Tactics — behaviour switches, not multipliers (see core/Tactics.ts)
         /** Capacitor stacks: absorbed damage detonates around the player */

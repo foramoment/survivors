@@ -92,7 +92,10 @@ export abstract class ZoneWeapon extends Weapon {
     }
 
     spawnZone() {
-        const baseInterval = Math.max(0.1, this.interval - this.owner.stats.tick);
+        // Zones tick faster on the same stat that makes weapons fire faster.
+        // This used to be its own `tick` stat fed by a Rapid Tick powerup that
+        // bottomed out after three picks and then did nothing.
+        const baseInterval = Math.max(0.1, this.interval * this.owner.stats.cooldown);
 
         const zone = new Zone(
             this.owner.pos.x,

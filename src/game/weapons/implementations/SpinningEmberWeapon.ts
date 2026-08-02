@@ -20,7 +20,7 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import { OrbitingProjectile, Zone } from '../base';
+import { OrbitingProjectile, BurningTrailZone } from '../base';
 import { type Vector2, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
@@ -29,83 +29,10 @@ import { status } from '../../core/StatusEffects';
 import type { Entity } from '../../Entity';
 import type { HitResult } from '../../core/CollisionSystem';
 
-// ============================================
-// BURNING TRAIL ZONE - ground left by an Inferno Lash
-// ============================================
-export class BurningTrailZone extends Zone {
-    /** Baked once: flames only bob, they never move to a new spot */
-    private readonly flames: { x: number; y: number; scale: number; phase: number }[] = [];
-    private readonly maxDuration: number;
-    private age: number = 0;
-    burnDps: number = 0;
-
-    constructor(x: number, y: number, radius: number, duration: number, damage: number) {
-        super(x, y, radius, duration, damage, 0.3, '');
-        this.maxDuration = duration;
-
-        for (let i = 0; i < 4; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * radius * 0.6;
-            this.flames.push({
-                x: Math.cos(angle) * dist,
-                y: Math.sin(angle) * dist * 0.7,
-                scale: 0.6 + Math.random() * 0.6,
-                phase: Math.random() * Math.PI * 2,
-            });
-        }
-    }
-
-    update(dt: number) {
-        super.update(dt);
-        this.age += dt;
-
-        // Zone damage is applied by CollisionSystem on the tick; this class
-        // only adds the lingering burn
-        if (this.timer >= this.interval && this.burnDps > 0) {
-            for (const enemy of levelSpatialHash.getWithinRadius(this.pos, this.radius)) {
-                if (distance(this.pos, enemy.pos) > this.radius) continue;
-                status.infect(enemy, {
-                    dps: this.burnDps,
-                    duration: 2,
-                    source: this.source,
-                    kind: 'burn',
-                });
-            }
-        }
-    }
-
-    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        ctx.save();
-        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-
-        const fade = Math.max(0, Math.min(1, this.duration / (this.maxDuration * 0.5)));
-
-        const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
-        glow.addColorStop(0, `rgba(255, 150, 50, ${0.45 * fade})`);
-        glow.addColorStop(0.5, `rgba(255, 80, 20, ${0.26 * fade})`);
-        glow.addColorStop(1, 'rgba(200, 50, 0, 0)');
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = glow;
-        ctx.fill();
-
-        // Chunky pixel flames — cheaper and more on-style than gradient tongues
-        for (const flame of this.flames) {
-            const flicker = 1 + Math.sin(this.age * 12 + flame.phase) * 0.25;
-            const p = Math.max(2, Math.round(3 * flame.scale * flicker));
-            ctx.globalAlpha = fade;
-            ctx.fillStyle = '#ff5a1e';
-            ctx.fillRect(flame.x - p, flame.y - p, p * 2, p * 2);
-            ctx.fillStyle = '#ffb23c';
-            ctx.fillRect(flame.x - p / 2, flame.y - p * 1.6, p, p * 1.6);
-            ctx.fillStyle = '#fff0b0';
-            ctx.fillRect(flame.x - 1, flame.y - p * 1.8, 2, p * 0.8);
-        }
-
-        ctx.globalAlpha = 1;
-        ctx.restore();
-    }
-}
+// BurningTrailZone moved to weapons/base/Zone.ts — the Cluster Bomb and the
+// swept Void Ray lay the same burning ground now, so it stopped being this
+// weapon's private class.
+export { BurningTrailZone };
 
 /** Seconds before an orb may hit the same enemy again */
 const HIT_INTERVAL = 0.25;

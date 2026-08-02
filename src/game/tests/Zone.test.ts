@@ -75,13 +75,15 @@ describe('Zone', () => {
             expect(enemy.speedMultiplier).toBe(0.5); // 1 - 0.5 slow
         });
 
-        it('should NOT slow below 0.1', () => {
+        it('should NOT slow below the soft-CC floor', () => {
+            // A 95% slow held over the arena is a stun without a stun's
+            // downtime rule — see Zone.SLOW_FLOOR
             const zone = new Zone(0, 0, 50, 5, 10, 0.5, '❄️', 0.95);
             const enemy = { speedMultiplier: 1 };
 
             zone.onOverlap(enemy);
 
-            expect(enemy.speedMultiplier).toBe(0.1); // Minimum
+            expect(enemy.speedMultiplier).toBe(0.35);
         });
 
         it('should NOT apply slow if slowEffect is 0', () => {

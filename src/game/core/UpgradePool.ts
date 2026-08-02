@@ -10,8 +10,9 @@
  *   weapon (level 5) even higher, so the payoff is reachable.
  * - The player can hold at most WEAPON_SLOT_CAP distinct weapons; once full,
  *   new weapons stop appearing and picks focus on what they have.
- * - Powerups stack up to POWERUP_STACK_CAP times; each stack is stronger
- *   than the last (value × 1.25^stack) so late picks stay meaningful.
+ * - Powerups stack FLAT up to their own `maxStacks`, and stop being offered
+ *   once maxed. See the PowerupData comment in data/GameData for why the old
+ *   shared 25%-per-stack curve had to go.
  * - Every draw is guaranteed to contain at least one owned-weapon upgrade
  *   when one exists.
  */
@@ -20,9 +21,10 @@ import { POWERUPS, WEAPONS } from '../data/GameData';
 import { t } from './I18n';
 
 export const WEAPON_SLOT_CAP = 5;
+/** Fallback cap for a powerup that forgot to declare `maxStacks` */
 export const POWERUP_STACK_CAP = 8;
-/** Each repeat pick of the same powerup is 25% stronger than the previous */
-export const POWERUP_STACK_GROWTH = 1.25;
+/** Repeat picks are worth exactly the base value unless a powerup opts out */
+export const POWERUP_FLAT_GROWTH = 1;
 
 const WEIGHT_OWNED_WEAPON = 9;
 const WEIGHT_EVOLVE_READY = 14;
@@ -48,21 +50,20 @@ export interface OfferContext {
 /**
  * Effective bonus of a powerup at a given stack (0 = first pick).
  *
- * `growth` defaults to the global 25%-per-stack curve. A powerup can opt out by
- * declaring `stackGrowth: 1` in GameData, which makes every stack worth exactly
- * the base value — see Nano-Repair, where compounding regen out-healed the whole
- * game.
+ * Flat by default: every pick is worth exactly the base value. A powerup may
+ * opt into a compounding curve with `stackGrowth` in GameData, but nothing does
+ * today — a shared curve is how "+18% duration" quietly became +357%.
  */
 export function getPowerupValue(
     baseValue: number,
     stack: number,
-    growth: number = POWERUP_STACK_GROWTH
+    growth: number = POWERUP_FLAT_GROWTH
 ): number {
     return baseValue * Math.pow(growth, stack);
 }
 
 /** Stat types shown as a flat amount with a unit instead of a percentage */
-const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'regen', 'tick', 'discharge', 'reroll'];
+const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'regen', 'discharge', 'reroll'];
 
 /** Human-readable bonus string, e.g. "+8%" or "+15 Max HP" */
 export function formatPowerupBonus(type: string, value: number): string {

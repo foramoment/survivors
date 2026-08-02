@@ -2,8 +2,8 @@
  * Тесты поведения конкретных реализаций оружия
  *
  * Проверяют:
- * 1. VoidRayWeapon - создание VoidRayBeam, evolved bonus
- * 2. PlasmaCannonWeapon - создание PlasmaProjectile, evolved FusionCoreSingularity
+ * 1. VoidRayWeapon - создание SweepingLance, выбор дальних целей
+ * 2. PlasmaCannonWeapon - создание PlasmaProjectile, эволюция = афтершоки
  * 3. AcidPoolWeapon - создание LobbedProjectile → AcidZone
  * 4. ChronoDiscWeapon - создание BouncingProjectile
  * 5. LightningChainWeapon - создание ChainLightning
@@ -25,6 +25,8 @@ vi.mock('../core/ParticleSystem', () => ({
         emitSingularityDistortion: vi.fn(),
         emitLightning: vi.fn(),
         emitPlasmaBurst: vi.fn(),
+        emitAcidBubble: vi.fn(),
+        emitBeamCharge: vi.fn(),
         emitTrail: vi.fn()
     }
 }));
@@ -47,14 +49,13 @@ vi.mock('../core/DamageSystem', () => ({
 }));
 
 import { levelSpatialHash } from '../core/SpatialHash';
-import { VoidRayWeapon } from '../weapons/implementations/VoidRayWeapon';
-import { PlasmaCannonWeapon, FusionCoreSingularity } from '../weapons/implementations/PlasmaCannonWeapon';
+import { VoidRayWeapon, SweepingLance } from '../weapons/implementations/VoidRayWeapon';
+import { PlasmaCannonWeapon } from '../weapons/implementations/PlasmaCannonWeapon';
 import { AcidPoolWeapon } from '../weapons/implementations/AcidPoolWeapon';
 import { ChronoDiscWeapon } from '../weapons/implementations/ChronoDiscWeapon';
 import { LightningChainWeapon } from '../weapons/implementations/LightningChainWeapon';
-import { VoidRayBeam } from '../weapons/base/Beam';
 import { PlasmaProjectile, BouncingProjectile } from '../weapons/base/Projectile';
-import { AcidZone } from '../weapons/base/Zone';
+import { AcidZone, PlasmaExplosionZone } from '../weapons/base/Zone';
 
 // Mock owner
 const createMockOwner = () => ({
@@ -90,7 +91,7 @@ describe('VoidRayWeapon', () => {
         expect(weapon.baseCooldown).toBe(2.0);
     });
 
-    it('should fire VoidRayBeam when enemy in range and cooldown ready', () => {
+    it('should fire a SweepingLance when enemy in range and cooldown ready', () => {
         const enemy = createMockEnemy(200, 100);
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
 
@@ -98,7 +99,7 @@ describe('VoidRayWeapon', () => {
         weapon.update(0.1);
 
         expect(spawnedEntities).toHaveLength(1);
-        expect(spawnedEntities[0]).toBeInstanceOf(VoidRayBeam);
+        expect(spawnedEntities[0]).toBeInstanceOf(SweepingLance);
         expect((spawnedEntities[0] as any).source).toBe(weapon);
     });
 
@@ -121,21 +122,34 @@ describe('VoidRayWeapon', () => {
         expect(spawnedEntities).toHaveLength(0);
     });
 
-    it('should deal double damage when evolved', () => {
+    it('sweeps through further enemies rather than the nearest one', () => {
+        // The sweep deliberately skips anything inside SWEEP_MIN_REACH: dragging
+        // the beam onto a body already touching the last one is invisible
+        const near = createMockEnemy(200, 100);   // 100px from the owner
+        const far = createMockEnemy(200, 400);    // 300px from `near`
+        const tooClose = createMockEnemy(230, 110);
+        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([near, far, tooClose]);
+
+        weapon.cooldown = 0;
+        weapon.update(0.1);
+
+        const lance = spawnedEntities[0] as any;
+        // owner -> near -> far, with the body 30px off `near` passed over
+        expect(lance.nodes).toHaveLength(3);
+        expect(lance.nodes[2]).toEqual({ x: far.pos.x, y: far.pos.y });
+    });
+
+    it('takes longer to recharge when evolved', () => {
         const enemy = createMockEnemy(200, 100);
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
 
-        // Evolve weapon
         for (let i = 0; i < 5; i++) weapon.upgrade();
         expect(weapon.evolved).toBe(true);
 
         weapon.cooldown = 0;
         weapon.update(0.1);
 
-        const beam = spawnedEntities[0] as VoidRayBeam;
-        // Beam is created with damage * 2 for evolved
-        // We can check that it's evolved variant by checking the maxWidth/color
-        expect(beam).toBeInstanceOf(VoidRayBeam);
+        expect(weapon.cooldown).toBeCloseTo(weapon.baseCooldown * mockOwner.stats.cooldown * 1.35);
     });
 
     it('should reset cooldown after firing', () => {
@@ -195,15 +209,20 @@ describe('PlasmaCannonWeapon', () => {
         spawnedEntities.length = 0;
         plasma.onExplosion!(0, 0);
         expect(spawnedEntities.length).toBeGreaterThan(0);
-        // Base tier bursts but leaves no singularity behind
-        expect(spawnedEntities.some(e => e instanceof FusionCoreSingularity)).toBe(false);
+        // Base tier bursts, but the crater does not keep erupting
+        expect(spawnedEntities.some(e => e instanceof PlasmaExplosionZone)).toBe(false);
     });
 
-    it('should create FusionCoreSingularity on explosion when evolved', () => {
+    it('bursts on the first body it touches instead of piercing a column', () => {
+        // The round used to pierce 999 enemies and only detonate at maximum
+        // flight distance, which put the payoff behind the fight
+        expect(weapon.pierce).toBe(0);
+    });
+
+    it('rolls three delayed aftershocks out of the crater when evolved', () => {
         const enemy = createMockEnemy(200, 100);
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
 
-        // Evolve
         for (let i = 0; i < 5; i++) weapon.upgrade();
 
         weapon.cooldown = 0;
@@ -212,11 +231,16 @@ describe('PlasmaCannonWeapon', () => {
         const plasma = spawnedEntities[0] as PlasmaProjectile;
         expect(plasma.onExplosion).toBeDefined();
 
-        // Trigger explosion
+        spawnedEntities.length = 0;
         plasma.onExplosion!(100, 100);
 
-        // FusionCoreSingularity should be spawned
-        expect(spawnedEntities.length).toBeGreaterThan(1);
+        const waves = spawnedEntities.filter(
+            e => e instanceof PlasmaExplosionZone && (e as any).detonationDelay > 0
+        );
+        expect(waves).toHaveLength(3);
+        // One per second, each wider than the last
+        expect(waves.map(w => (w as any).detonationDelay)).toEqual([1, 2, 3]);
+        expect(waves[2].radius).toBeGreaterThan(waves[0].radius);
     });
 
     it('should have longer cooldown when evolved', () => {
@@ -287,7 +311,25 @@ describe('AcidPoolWeapon', () => {
         lobbed.onLand(250, 150);
 
         const zone = spawnedEntities[1] as AcidZone;
-        expect(zone.radius).toBeCloseTo(weapon.area * 1.5);
+        // `radius` starts at the seed and eases outward, so the settled size
+        // is the one to assert (see Zone.spreadIn)
+        expect(zone.fullRadius).toBeCloseTo(weapon.area * 1.5);
+        expect(zone.radius).toBeLessThan(zone.fullRadius);
+    });
+
+    it('the puddle spreads out from where the flask broke', () => {
+        const enemy = createMockEnemy(200, 100);
+        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([enemy]);
+
+        weapon.cooldown = 0;
+        weapon.update(0.1);
+        spawnedEntities[0].onLand(250, 150);
+
+        const zone = spawnedEntities[1] as AcidZone;
+        const seeded = zone.radius;
+        for (let i = 0; i < 30; i++) zone.update(1 / 60);
+        expect(zone.radius).toBeGreaterThan(seeded);
+        expect(zone.radius).toBeCloseTo(zone.fullRadius);
     });
 });
 

@@ -7,7 +7,7 @@ import type { Weapon } from '../../Weapon';
 import { type Vector2, normalize, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
-import { sprites } from '../../core/SpriteFactory';
+import { sprites, type ThrownKind } from '../../core/SpriteFactory';
 
 // ============================================
 // PROJECTILE - Base class for all flying entities
@@ -352,6 +352,13 @@ export class LobbedProjectile extends Projectile {
 
     /** Body colour of the canister and its landing marker */
     color: string = '#3ddc6e';
+    /**
+     * What is being thrown. Drives the sprite and how it tumbles — a fused
+     * grenade spins end over end, a flask of acid wobbles because you do not
+     * want to drop it. They shared one sprite until now, so a lob of acid and a
+     * lob of plasma were indistinguishable in the air.
+     */
+    kind: ThrownKind = 'grenade';
     /** Seconds before the throw actually starts (staggered volleys) */
     delay: number = 0;
     private spin: number = 0;
@@ -372,7 +379,7 @@ export class LobbedProjectile extends Projectile {
         }
 
         this.duration -= dt;
-        this.spin += dt * 7;
+        this.spin += dt * (this.kind === 'grenade' ? 7 : 2.4);
         const t = 1 - (this.duration / this.totalDuration);
         this.progress = t;
 
@@ -424,19 +431,20 @@ export class LobbedProjectile extends Projectile {
         ctx.ellipse(groundX, groundY, 8 * shadowScale, 4 * shadowScale, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // The canister itself
+        // The thrown object itself. A flask tumbles gently rather than
+        // spinning, so it stays readable as a flask all the way down.
         ctx.globalAlpha = 1;
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-        ctx.rotate(this.spin);
+        ctx.rotate(this.kind === 'grenade' ? this.spin : Math.sin(this.spin) * 0.5);
         ctx.imageSmoothingEnabled = false;
-        const sprite = sprites.getGrenadeSprite(this.color);
+        const sprite = sprites.getThrownSprite(this.kind, this.color);
         const size = 22;
         ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
         ctx.restore();
 
-        // Fuse light blinking faster as it gets closer to detonating
-        const blink = Math.sin(t * t * 60) > 0;
-        if (blink) {
+        // Only a grenade has a fuse to blink; on a flask the same dot read as
+        // an unexplained status pip
+        if (this.kind === 'grenade' && Math.sin(t * t * 60) > 0) {
             ctx.save();
             ctx.fillStyle = '#ffe14d';
             ctx.fillRect(this.pos.x - camera.x - 2, this.pos.y - camera.y - 10, 4, 4);

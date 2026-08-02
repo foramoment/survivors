@@ -6,9 +6,13 @@
  * (core/StatusEffects — the old code set an `enemy.stunDuration` field that
  * nothing ever read, so the stun did nothing at all).
  *
+ * The blast starts small and the mind widens with every level (see
+ * blastRadius) — the one axis where growth is legible on a weapon whose whole
+ * body is a circle.
+ *
  * Evolved — Psychic Cascade: the first blast jumps to further targets, one
- * every 0.18s, each a little weaker. It reads as a thought tearing through the
- * crowd instead of one static pink circle.
+ * every 0.18s, each a little weaker, on a longer cooldown. It reads as a
+ * thought tearing through the crowd instead of one static pink circle.
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
@@ -117,10 +121,15 @@ export class MindBlastWeapon extends Weapon {
     readonly stats = {
         damage: 20,
         cooldown: 3,
-        area: 120,
+        // Halved from 120. A level-1 blast used to open at the size the weapon
+        // was meant to reach at level 5, so the only thing levelling changed
+        // was the damage number and the psi-star had nowhere to grow.
+        area: 60,
         speed: 0,
         duration: 0.5,
     };
+    /** Blast radius gained per weapon level, as a share of the base */
+    private static readonly RADIUS_PER_LEVEL = 0.2;
 
     /** Pending cascade jumps: {x, y, damage, delay} */
     private cascade: { x: number, y: number, damage: number, delay: number, hops: number }[] = [];
@@ -151,13 +160,22 @@ export class MindBlastWeapon extends Weapon {
                 const target = targets[0];
                 this.detonate(target.pos.x, target.pos.y, this.damage, this.evolved ? 3 : 0);
                 juice.addTrauma(0.08);
-                this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
+                // A cascade is four stunning blasts walking through the pack —
+                // at the base cooldown it kept the whole crowd frozen
+                const cdMultiplier = this.evolved ? 1.6 : 1.0;
+                this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
             }
         }
     }
 
+    /** The mind grows: +20% of the base radius per weapon level */
+    private blastRadius(): number {
+        const growth = 1 + (this.level - 1) * MindBlastWeapon.RADIUS_PER_LEVEL;
+        return this.area * this.owner.stats.area * growth;
+    }
+
     private detonate(x: number, y: number, damage: number, hopsLeft: number) {
-        const radius = this.area * this.owner.stats.area;
+        const radius = this.blastRadius();
         const zone = new PsiBlastZone(x, y, radius, damage, this.evolved ? 1.4 : 0.7);
         zone.source = this;
 

@@ -21,6 +21,7 @@ export {
     Zone,
     FrostZone,
     AcidZone,
+    BurningTrailZone,
     SporeZone,
     NanobotCloud,
     DelayedExplosionZone,
@@ -31,7 +32,6 @@ export {
 // Beam types
 export {
     Beam,
-    VoidRayBeam,
     ChainLightning
 } from './Beam';
 

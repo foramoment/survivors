@@ -51,18 +51,20 @@ export class CorrosivePool extends AcidZone {
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         super.draw(ctx, camera);
 
-        // Etched rim so a corroding pool reads differently from a plain puddle
+        // A bright acid line eaten into the floor, so a corroding pool reads
+        // differently from a plain puddle.
+        //
+        // This used to be a marching dashed ring — which is a selection
+        // indicator, not a puddle. It was the same offence as the dashed edge
+        // we pulled off the spore patch: a UI element painted into the arena.
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-        ctx.globalAlpha = 0.5;
-        ctx.strokeStyle = '#b4ff3c';
+        ctx.globalAlpha = 0.45;
+        ctx.strokeStyle = '#c9ff5c';
         ctx.lineWidth = 2;
-        ctx.setLineDash([5, 7]);
-        ctx.lineDashOffset = -this.duration * 18;
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.96, 0, Math.PI * 2);
+        ctx.arc(0, 0, this.radius * 0.9, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.setLineDash([]);
         ctx.restore();
     }
 }
@@ -114,7 +116,11 @@ export class AcidPoolWeapon extends Weapon {
             this.throwFlask(spot, 0.8, 0);
         }
 
-        this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
+        // Three flasks for the price of one throw was the evolution paying
+        // nothing: same cooldown, triple the corrosion coverage. The deluge is
+        // still far stronger, it just arrives less often.
+        const cdMultiplier = this.evolved ? 1.6 : 1.0;
+        this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
     }
 
     private throwFlask(target: Vector2, flight: number, delay: number) {
@@ -122,6 +128,7 @@ export class AcidPoolWeapon extends Weapon {
         lob.source = this;
         lob.height = 70;
         lob.delay = delay;
+        lob.kind = 'flask';
         lob.color = this.evolved ? '#b4ff3c' : '#5fe08a';
         lob.onLand = (x, y) => this.splash(x, y);
         this.onSpawn(lob);
@@ -138,7 +145,7 @@ export class AcidPoolWeapon extends Weapon {
             radius,
             this.duration * this.owner.stats.duration,
             this.damage * 0.5,
-            Math.max(0.15, 0.5 - this.owner.stats.tick),
+            Math.max(0.15, 0.5 * this.owner.stats.cooldown),
         );
         pool.source = this;
 

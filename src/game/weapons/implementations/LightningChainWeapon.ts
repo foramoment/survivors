@@ -33,6 +33,7 @@ export class StaticFieldZone extends Zone {
     constructor(x: number, y: number, radius: number, damage: number, duration: number = 1.6) {
         super(x, y, radius, duration, damage, 0.35, '');
         this.maxDuration = duration;
+        this.spreadIn(0.15);
         this.rebuildArcs();
     }
 

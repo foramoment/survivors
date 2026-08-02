@@ -87,7 +87,6 @@ export const EN: Record<string, string> = {
     'bonus.maxHp': 'Max HP',
     'bonus.armor': 'armor',
     'bonus.regen': 'HP/s',
-    'bonus.tick': 's zone tick',
     'bonus.discharge': 'charge',
     'bonus.reroll': 'reroll',
 

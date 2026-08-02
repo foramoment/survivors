@@ -995,17 +995,20 @@ export class GameManager {
     applyPowerup(opt: any) {
         if (!this.player) return;
 
-        // Stacking: each repeat pick of the same powerup is stronger
+        // Stacking is flat by default and capped per powerup (see GameData)
         const stack = this.powerupLevels.get(opt.name) ?? 0;
         const value = getPowerupValue(opt.value, stack, opt.stackGrowth);
-        this.powerupLevels.set(opt.name, Math.min(POWERUP_STACK_CAP, stack + 1));
+        const cap = opt.maxStacks ?? POWERUP_STACK_CAP;
+        this.powerupLevels.set(opt.name, Math.min(cap, stack + 1));
 
         // Apply stat boost
         if (opt.type in this.player.stats) {
             (this.player.stats as any)[opt.type] += value;
         }
 
-        // Stacked negative modifiers must not go degenerate
+        // Backstop only: the powerup caps keep cooldown at 0.60, and only a
+        // long Storm Mage run can push it lower. Zone tick intervals scale with
+        // this stat too, so it must never reach zero.
         if (this.player.stats.cooldown < 0.25) this.player.stats.cooldown = 0.25;
 
         // Special handling for maxHp

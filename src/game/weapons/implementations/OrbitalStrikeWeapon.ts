@@ -182,7 +182,9 @@ export class OrbitalStrikeWeapon extends Weapon {
 
     readonly stats = {
         damage: 40,
-        cooldown: 2.0,
+        // A self-aiming area strike that needs no positioning at all was firing
+        // every two seconds. Four is the price of never having to aim it.
+        cooldown: 4.0,
         area: 100,
         speed: 0,
         duration: 1.0,
@@ -193,13 +195,13 @@ export class OrbitalStrikeWeapon extends Weapon {
     /**
      * Shells per evolved salvo, before the finisher.
      *
-     * Six read as visual spam — seven reticles on screen at once buried the
-     * arena under targeting rings and damage numbers, and the heavy shell that
-     * is supposed to be the payoff got lost among them. Three plus the finisher
-     * is the same idea with room to see it happen, so the heavy shell lands
-     * harder to keep the salvo's total worth the seven-second cooldown.
+     * Six read as visual spam — seven reticles at once buried the arena under
+     * targeting rings, and the heavy shell that is supposed to be the payoff
+     * got lost among them. Four plus the finisher is the readable version.
      */
-    private static readonly BARRAGE_SHELLS = 3;
+    private static readonly BARRAGE_SHELLS = 4;
+    /** How far apart shells in a salvo land. Tight enough to overlap. */
+    private static readonly BARRAGE_SPACING = 1.3;
 
     constructor(owner: Player) {
         super(owner);
@@ -214,7 +216,7 @@ export class OrbitalStrikeWeapon extends Weapon {
 
         if (this.evolved) {
             this.fireBarrage();
-            this.cooldown = 7.0 * this.owner.stats.cooldown;
+            this.cooldown = 9.0 * this.owner.stats.cooldown;
         } else {
             this.fireShell(this.pickTarget(), this.blastRadius(), this.damage, 0.9, false);
             this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
@@ -248,31 +250,40 @@ export class OrbitalStrikeWeapon extends Weapon {
         };
     }
 
-    /** Walk a salvo across the field, finishing with one heavy shell */
+    /**
+     * Walk a salvo **across the crowd**, finishing with one heavy shell.
+     *
+     * The salvo used to be laid along a 420px line centred on the player, with
+     * 90px of jitter on top — which meant the shells landed a screen apart, in
+     * whatever direction the die rolled, mostly on empty floor. Four separate
+     * craters in four unrelated places do not read as a barrage; they read as
+     * the weapon firing once and something else going off in the distance.
+     *
+     * Now the line is centred on the thickest part of the crowd and its shells
+     * are spaced by their own blast radius, so they overlap into one advancing
+     * wall of fire that visibly crosses the pack.
+     */
     private fireBarrage() {
         const shells = OrbitalStrikeWeapon.BARRAGE_SHELLS;
         const radius = this.blastRadius() * 0.9;
-        // Shells sweep along a line through the player, so the salvo reads as
-        // a strafing run rather than random scatter
+        const centre = this.findDensestSpot(OrbitalStrikeWeapon.SPREAD, radius * 2) ?? this.pickTarget();
         const sweep = Math.random() * Math.PI * 2;
-        const spacing = OrbitalStrikeWeapon.SPREAD / (shells - 1);
+        const spacing = radius * OrbitalStrikeWeapon.BARRAGE_SPACING;
 
         for (let i = 0; i < shells; i++) {
             const offset = (i - (shells - 1) / 2) * spacing;
-            const jitterX = (Math.random() - 0.5) * 90;
-            const jitterY = (Math.random() - 0.5) * 90;
+            const jitter = radius * 0.25;
             const pos = {
-                x: this.owner.pos.x + Math.cos(sweep) * offset + jitterX,
-                y: this.owner.pos.y + Math.sin(sweep) * offset + jitterY,
+                x: centre.x + Math.cos(sweep) * offset + (Math.random() - 0.5) * jitter,
+                y: centre.y + Math.sin(sweep) * offset + (Math.random() - 0.5) * jitter,
             };
             // Staggered fuses make the salvo land as a rolling barrage
-            this.fireShell(pos, radius, this.damage, 0.75 + i * 0.22, false);
+            this.fireShell(pos, radius, this.damage, 0.75 + i * 0.18, false);
         }
 
-        // Finisher lands last and alone, on the thickest part of the crowd —
-        // with the sky clear of the other reticles it is the shot you watch
-        const heavySpot = this.findDensestSpot(OrbitalStrikeWeapon.SPREAD, radius * 2) ?? this.pickTarget();
-        this.fireShell(heavySpot, radius * 2.1, this.damage * 3.2, 0.75 + shells * 0.22 + 0.25, true);
+        // Finisher lands last and alone, on the middle of the run — with the
+        // sky clear of the other reticles it is the shot you watch
+        this.fireShell(centre, radius * 2.1, this.damage * 3.2, 0.75 + shells * 0.18 + 0.3, true);
     }
 
     private fireShell(pos: Vector2, radius: number, damage: number, delay: number, heavy: boolean) {

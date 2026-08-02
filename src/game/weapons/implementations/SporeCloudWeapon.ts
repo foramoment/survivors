@@ -13,51 +13,25 @@
  */
 import { ZoneWeapon, SporeZone } from '../base';
 import type { Player } from '../../entities/Player';
-import { type Vector2 } from '../../core/Utils';
 
 // ============================================
-// FUNGAL BLOOM ZONE - Growing, contagious patch
+// FUNGAL BLOOM ZONE - Contagious patch that creeps faster
 // ============================================
+
+/**
+ * The evolved patch is the same organism, growing harder: every SporeZone
+ * creeps now (see the base class), the bloom just does it twice as fast and
+ * spreads its infection from the dead.
+ *
+ * It used to also stroke a dashed ellipse around itself to mark "the infectious
+ * edge". That was a HUD element drawn into the world, and the patch's own edge
+ * already says the same thing.
+ */
 export class FungalBloomZone extends SporeZone {
-    private baseRadius: number;
-    private growthRate: number = 0.12; // +12% of the base radius per second
-    private lastGeometryRadius: number;
-
     constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number) {
         super(x, y, radius, duration, damage, interval);
-        this.baseRadius = radius;
-        this.lastGeometryRadius = radius;
         this.contagious = true;
-    }
-
-    update(dt: number) {
-        super.update(dt);
-
-        this.radius = this.baseRadius * (1 + this.growthRate * this.age);
-
-        // Re-bake the mushrooms/puffs only when the patch has grown enough to
-        // look sparse — not every frame.
-        if (this.radius > this.lastGeometryRadius * 1.35) {
-            this.lastGeometryRadius = this.radius;
-            this.rebuildGeometry();
-        }
-    }
-
-    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        super.draw(ctx, camera);
-
-        // Spore ring marking the infectious edge
-        ctx.save();
-        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-        ctx.globalAlpha = 0.35 + 0.15 * Math.sin(this.age * 3);
-        ctx.strokeStyle = '#b6ff4d';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 8]);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, this.radius, this.radius * 0.78, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.restore();
+        this.creepRate = 0.14;
     }
 }
 
@@ -97,7 +71,7 @@ export class SporeCloudWeapon extends ZoneWeapon {
     }
 
     spawnZone() {
-        const baseInterval = Math.max(0.1, this.interval - this.owner.stats.tick);
+        const baseInterval = Math.max(0.1, this.interval * this.owner.stats.cooldown);
         const radius = this.zoneRadius();
 
         if (this.evolved) {

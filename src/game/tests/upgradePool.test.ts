@@ -108,31 +108,54 @@ describe('UpgradePool', () => {
     });
 
     describe('powerup stacking', () => {
-        it('each stack is 25% stronger than the previous', () => {
+        it('every stack is worth exactly the base value', () => {
             expect(getPowerupValue(0.08, 0)).toBeCloseTo(0.08);
-            expect(getPowerupValue(0.08, 1)).toBeCloseTo(0.1);
-            expect(getPowerupValue(0.08, 4)).toBeCloseTo(0.08 * 1.25 ** 4);
+            expect(getPowerupValue(0.08, 1)).toBeCloseTo(0.08);
+            expect(getPowerupValue(0.08, 7)).toBeCloseTo(0.08);
         });
 
         it('preserves sign for negative modifiers (cooldown)', () => {
-            expect(getPowerupValue(-0.06, 3)).toBeLessThan(-0.06);
+            expect(getPowerupValue(-0.06, 3)).toBeCloseTo(-0.06);
         });
 
-        it('stackGrowth: 1 makes a powerup stack flat', () => {
-            expect(getPowerupValue(0.1, 0, 1)).toBeCloseTo(0.1);
-            expect(getPowerupValue(0.1, 7, 1)).toBeCloseTo(0.1);
+        it('a powerup can still opt into a compounding curve', () => {
+            expect(getPowerupValue(0.1, 0, 1.25)).toBeCloseTo(0.1);
+            expect(getPowerupValue(0.1, 3, 1.25)).toBeCloseTo(0.1 * 1.25 ** 3);
         });
 
-        it('regen is flat and caps below 1 HP/s at max stacks', () => {
+        it('regen caps below 1 HP/s at max stacks', () => {
             const regen = POWERUPS.find(p => p.type === 'regen')!;
-            expect(regen.stackGrowth).toBe(1);
 
             let total = 0;
-            for (let stack = 0; stack < POWERUP_STACK_CAP; stack++) {
+            for (let stack = 0; stack < (regen.maxStacks ?? POWERUP_STACK_CAP); stack++) {
                 total += getPowerupValue(regen.value, stack, regen.stackGrowth);
             }
             expect(total).toBeCloseTo(0.8);
             expect(total).toBeLessThan(1);
+        });
+
+        it('no powerup can multiply its stat past what a card promises', () => {
+            // The ceiling of every percentage stat, read straight off the pool.
+            // These are the numbers that decide whether a build is a build or
+            // an off switch — a regression here is a balance bug, not a typo.
+            const ceilings: Record<string, number> = {
+                might: 0.25,        // x1.25 damage
+                critChance: 0.4,    // 40%, never a guaranteed crit on its own
+                critDamage: 2.0,    // x2 -> x4
+                cooldown: -0.4,     // x0.6
+                duration: 0.8,      // x1.8
+                area: 0.64,
+                moveSpeed: 0.15,    // the player already outruns every enemy
+            };
+            for (const [type, expected] of Object.entries(ceilings)) {
+                const powerup = POWERUPS.find(p => p.type === type)!;
+                const cap = powerup.maxStacks ?? POWERUP_STACK_CAP;
+                let total = 0;
+                for (let stack = 0; stack < cap; stack++) {
+                    total += getPowerupValue(powerup.value, stack, powerup.stackGrowth);
+                }
+                expect(total, type).toBeCloseTo(expected);
+            }
         });
 
         it('a powerup can cap its own stacks below the global cap', () => {

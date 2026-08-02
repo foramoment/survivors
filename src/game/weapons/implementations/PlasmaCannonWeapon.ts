@@ -1,111 +1,30 @@
 /**
  * PLASMA CANNON WEAPON
  *
- * A heavy round that pierces everything in its path and detonates at the end of
- * its flight. Its problem was that the two halves fought each other: the round
- * is fun *because* it skewers a whole column, but the payoff only happened at
- * maximum range, so against a crowd standing next to you the shot flew past
- * everything and exploded on empty floor.
+ * A heavy round that **bursts on the first thing it hits**.
  *
- * Both forms now pay off along the way:
- *   - the round **ignites** what it passes through, so the pierce itself is the
- *     damage, not just a way to reach the explosion
- *   - the detonation throws a ring of short-range piercing shards, so it works
- *     at the range you are actually fighting at
+ * It used to pierce a whole column and only detonate at the end of its flight,
+ * which meant the payoff happened wherever the round ran out of range — usually
+ * on empty floor well behind the crowd you were actually fighting. The pierce
+ * was the more interesting half on paper and the useless half in practice: at
+ * the range this game is played at, the shot went through the two enemies on
+ * top of you and exploded off-screen.
  *
- * Evolved — Fusion Core: more shards, and they leave the singularity behind
- * that pulls the survivors back into each other.
+ * So the impact *is* the weapon now. The round hits, detonates, ignites what it
+ * caught, and throws a ring of short-range shards that set fire to whatever
+ * they reach. Everything happens where you were aiming.
+ *
+ * Evolved — Fusion Core: the same impact, then the fire keeps going off. Three
+ * aftershocks roll out of the crater, one per second, each wider than the last.
  */
-import { ProjectileWeapon, PlasmaProjectile, Projectile, Zone, type ProjectileParams } from '../base';
+import { ProjectileWeapon, PlasmaProjectile, Projectile, PlasmaExplosionZone, type ProjectileParams } from '../base';
 import type { Player } from '../../entities/Player';
 import type { Entity } from '../../Entity';
-import { type Vector2, distance } from '../../core/Utils';
+import { type Vector2 } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
-import { levelSpatialHash } from '../../core/SpatialHash';
 import { status } from '../../core/StatusEffects';
 import { juice } from '../../core/JuiceSystem';
 import type { HitResult } from '../../core/CollisionSystem';
-
-// ============================================
-// EVOLVED PLASMA CANNON - FUSION CORE
-// Creates singularity pull zone on explosion
-// ============================================
-
-export class FusionCoreSingularity extends Zone {
-    private rotationAngle: number = 0;
-    pullStrength: number = 180;
-
-    constructor(x: number, y: number, radius: number, duration: number, damage: number) {
-        super(x, y, radius, duration, damage, 0.2, '');
-    }
-
-    update(dt: number) {
-        super.update(dt);
-        this.rotationAngle += dt * 4;
-
-        // Pull enemies toward center
-        const enemiesInSingularity = levelSpatialHash.getWithinRadius(this.pos, this.radius * 1.5);
-
-        for (const enemy of enemiesInSingularity) {
-            const dx = this.pos.x - enemy.pos.x;
-            const dy = this.pos.y - enemy.pos.y;
-            const dist = distance(this.pos, enemy.pos);
-
-            if (dist < this.radius * 1.5 && dist > 5) {
-                const pullForce = this.pullStrength / dist;
-                enemy.pos.x += (dx / dist) * pullForce * dt;
-                enemy.pos.y += (dy / dist) * pullForce * dt;
-            }
-        }
-
-        // Emit particles
-        if (Math.random() > 0.8) {
-            particles.emitHit(this.pos.x, this.pos.y, '#00ff66');
-        }
-    }
-
-    draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        ctx.save();
-        ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-
-        const fade = Math.min(1, this.duration);
-
-        // Pull effect lines
-        ctx.rotate(this.rotationAngle);
-        for (let i = 0; i < 8; i++) {
-            ctx.rotate(Math.PI / 4);
-            ctx.beginPath();
-            ctx.moveTo(this.radius * 1.2, 0);
-            ctx.lineTo(this.radius * 0.3, 0);
-            ctx.strokeStyle = `rgba(0, 255, 100, ${0.4 * fade})`;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
-        ctx.rotate(-this.rotationAngle);
-
-        // Core gradient
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * 0.5);
-        gradient.addColorStop(0, `rgba(100, 255, 150, ${0.9 * fade})`);
-        gradient.addColorStop(0.5, `rgba(0, 200, 100, ${0.6 * fade})`);
-        gradient.addColorStop(1, `rgba(0, 100, 50, 0)`);
-
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.5, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.shadowColor = '#00ff66';
-        ctx.shadowBlur = 20 * fade;
-        ctx.fill();
-
-        // Energy ring
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.8, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(0, 255, 100, ${0.5 * fade})`;
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        ctx.restore();
-    }
-}
 
 // ============================================
 // PLASMA SHARD - the burst thrown by a detonation
@@ -165,17 +84,22 @@ export class PlasmaShard extends Projectile {
 export class PlasmaCannonWeapon extends ProjectileWeapon {
     name = "Plasma Cannon";
     emoji = "🔋";
-    description = "Fires massive explosive plasma rounds.";
+    description = "Heavy round that bursts on impact into igniting shards.";
     projectileEmoji = "🟢";
-    pierce = 999;
+    /** Zero: the round detonates on the first body it touches */
+    pierce = 0;
 
     readonly stats = {
         damage: 40,
         cooldown: 2.5,
-        area: 80,      // Explosion radius (FusionCoreSingularity)
+        area: 80,      // Blast radius
         speed: 200,
         duration: 1.5,
     };
+
+    /** Evolved aftershocks: how many, and the seconds between them */
+    private static readonly AFTERSHOCKS = 3;
+    private static readonly AFTERSHOCK_INTERVAL = 1.0;
 
     constructor(owner: Player) {
         super(owner);
@@ -207,8 +131,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
             params.x, params.y, params.velocity,
             params.duration, params.damage, params.pierce
         );
-        // Piercing a column is the round's identity; a burn on each body makes
-        // the pierce itself worth something instead of just a path to the blast
+        // The body it bursts against catches fire too, not just the ring
         proj.igniteDps = this.damage * 0.3;
         return proj;
     }
@@ -218,18 +141,21 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
     }
 
     /**
-     * The detonation throws a ring of piercing shards. Fireworks, and — more to
-     * the point — reach at the range the fight is actually happening at, which
-     * a round that only explodes at maximum flight distance never had.
+     * The detonation throws a ring of piercing shards that set fire to what
+     * they reach. Fireworks, and — more to the point — reach at the range the
+     * fight is actually happening at.
      */
     private detonate(x: number, y: number) {
+        const radius = this.area * this.owner.stats.area;
         const shards = this.evolved ? 8 : 5;
-        const speed = 380 * this.owner.stats.speed;
-        const life = 0.42 * this.owner.stats.duration;
+        // Shards carry further than they used to: with the round no longer
+        // piercing, this ring is how the weapon covers a line of bodies
+        const speed = 460 * this.owner.stats.speed;
+        const life = 0.5 * this.owner.stats.duration;
         const base = Math.random() * Math.PI * 2;
 
-        particles.emitPlasmaBurst(x, y, this.area * this.owner.stats.area, this.evolved);
-        juice.shockwave(x, y, this.area * this.owner.stats.area * 1.4, '#3dff86', 0.3, 4);
+        particles.emitPlasmaBurst(x, y, radius, this.evolved);
+        juice.shockwave(x, y, radius * 1.4, '#3dff86', 0.3, 4);
 
         for (let i = 0; i < shards; i++) {
             const angle = base + (i / shards) * Math.PI * 2;
@@ -244,17 +170,39 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
             this.onSpawn(shard);
         }
 
-        if (this.evolved) {
-            const pullRadius = this.area * this.owner.stats.area;
-            const pullDuration = 2.0 * this.owner.stats.duration;
-            const pullZone = new FusionCoreSingularity(x, y, pullRadius, pullDuration, this.damage * 0.15);
-            pullZone.source = this;
-            this.onSpawn(pullZone);
+        if (this.evolved) this.rollAftershocks(x, y, radius);
+    }
+
+    /**
+     * Three waves rolling out of the crater, one per second, each wider and
+     * weaker than the last.
+     *
+     * They are deliberately small: the point is that the ground you just hit
+     * stays dangerous for three seconds, so the crater becomes a place enemies
+     * have to path around — not a second, third and fourth full blast. Each
+     * wave is a delayed detonation on its own timer, so nothing resolves in the
+     * same frame as anything else (see the VFX rules in CLAUDE.md).
+     */
+    private rollAftershocks(x: number, y: number, radius: number) {
+        for (let i = 1; i <= PlasmaCannonWeapon.AFTERSHOCKS; i++) {
+            const wave = new PlasmaExplosionZone(
+                x, y,
+                radius * (0.75 + i * 0.25),
+                this.damage * 0.22,
+                false,
+            );
+            wave.source = this;
+            wave.detonationDelay = i * PlasmaCannonWeapon.AFTERSHOCK_INTERVAL;
+            wave.onDetonate = (cx, cy, r) => {
+                particles.emitPlasmaBurst(cx, cy, r, true);
+                juice.shockwave(cx, cy, r * 1.3, '#ffb03c', 0.28, 3);
+            };
+            this.onSpawn(wave);
         }
     }
 }
 
-/** Plasma round that sets fire to everything it passes through */
+/** Plasma round that sets fire to the body it bursts against */
 class IgnitingPlasmaProjectile extends PlasmaProjectile {
     igniteDps: number = 0;
 

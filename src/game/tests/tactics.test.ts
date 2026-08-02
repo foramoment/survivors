@@ -22,13 +22,19 @@ describe('Tactics powerups', () => {
         }
     });
 
-    it('the four tactics exist and all stack flat', () => {
+    it('the four tactics exist', () => {
         const tactics = ['static_discharge', 'kill_echo', 'adrenal_surge', 'vital_siphon'];
         for (const id of tactics) {
-            const powerup = POWERUPS.find(p => p.id === id);
-            expect(powerup, id).toBeDefined();
-            // A compounding chance-to-trigger runs past 100% before the cap
-            expect(powerup!.stackGrowth, id).toBe(1);
+            expect(POWERUPS.find(p => p.id === id), id).toBeDefined();
+        }
+    });
+
+    it('every powerup stacks flat and declares its own cap', () => {
+        // Stacking is flat by default now; a compounding curve is what turned
+        // "+18% duration" into +357% at the shared 8-stack cap
+        for (const powerup of POWERUPS) {
+            expect(powerup.stackGrowth ?? 1, powerup.id).toBe(1);
+            expect(powerup.maxStacks, powerup.id).toBeGreaterThan(0);
         }
     });
 

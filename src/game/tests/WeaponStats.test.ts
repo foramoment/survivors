@@ -18,7 +18,7 @@ const EXPECTED_STATS: Record<string, any> = {
     void_ray: {
         damage: 40,
         cooldown: 2.0,
-        area: 110, // collapse radius when evolved
+        area: 110, // drives beam width and the burning trail it lays
         speed: 0,
         duration: 0.5,
     },
@@ -62,7 +62,8 @@ const EXPECTED_STATS: Record<string, any> = {
     },
     orbital_strike: {
         damage: 40,
-        cooldown: 2.0,
+        // A strike that aims itself needs a real wait between shots
+        cooldown: 4.0,
         area: 100,
         speed: 0,
         duration: 1.0,
@@ -70,7 +71,8 @@ const EXPECTED_STATS: Record<string, any> = {
     mind_blast: {
         damage: 20,
         cooldown: 3,
-        area: 120,
+        // Opens at half the old size and widens with every weapon level
+        area: 60,
         speed: 0,
         duration: 0.5,
     },

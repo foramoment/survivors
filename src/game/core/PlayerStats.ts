@@ -19,7 +19,6 @@ export const VALID_PLAYER_STATS = [
     'regen',
     'critChance',
     'critDamage',
-    'tick',
     'maxHp',
 
     // Tactics

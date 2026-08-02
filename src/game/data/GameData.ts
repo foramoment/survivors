@@ -30,17 +30,28 @@ export interface ClassPerLevel {
     value: number;
 }
 
+/**
+ * A class bonus line must list **everything** the class actually starts with.
+ * These used to be a rough summary — the Astro Biologist's +10% area and the
+ * Berserker's +10% damage were simply missing, and "Might +15%" told a Storm
+ * Mage player nothing, because the stat is called `might` in the code and
+ * "damage" in the player's head.
+ *
+ * No class grants move speed any more. The player already outruns the fastest
+ * enemy by 60% at base, so a class-wide head start on top of that was the
+ * difference between kiting and being untouchable.
+ */
 export const CLASSES = [
     {
         id: 'void_walker', name: "Void Walker", emoji: "🌑",
-        bonus: "Speed +10% · +1% damage per level",
+        bonus: "Damage +10% · +1% damage per level",
         weaponId: 'void_ray', hp: 90,
-        stats: { moveSpeed: 1.1 },
+        stats: { might: 1.1 },
         perLevel: { stat: 'might', value: 0.01 } as ClassPerLevel,
     },
     {
         id: 'cyber_samurai', name: "Cyber Samurai", emoji: "🤖",
-        bonus: "Crit 15% · +1% crit damage per level",
+        bonus: "Crit chance 15% · +1% crit damage per level",
         weaponId: 'phantom_slash', hp: 85,
         stats: { critChance: 0.15 },
         perLevel: { stat: 'critDamage', value: 0.01 } as ClassPerLevel,
@@ -56,14 +67,14 @@ export const CLASSES = [
         // Regen kept in step with the flat Nano-Repair stack (0.1 HP/s): a
         // class perk is worth ~2.5 picks, not 6.
         id: 'astro_biologist', name: "Astro Biologist", emoji: "🧬",
-        bonus: "Regen +0.25 · +1% area per level",
+        bonus: "Regen +0.25/s, Area +10% · +1% area per level",
         weaponId: 'spore_cloud', hp: 95,
         stats: { regen: 0.25, area: 1.1 },
         perLevel: { stat: 'area', value: 0.01 } as ClassPerLevel,
     },
     {
         id: 'storm_mage', name: "Storm Mage", emoji: "⚡",
-        bonus: "Might +15% · −1% cooldown per level",
+        bonus: "Damage +15% · −1% cooldown per level",
         weaponId: 'lightning_chain', hp: 75,
         stats: { might: 1.15 },
         perLevel: { stat: 'cooldown', value: -0.01 } as ClassPerLevel,
@@ -72,16 +83,30 @@ export const CLASSES = [
         // The only class that starts with a tactic: adrenaline turns its
         // missing armour into the reason to keep fighting at low HP
         id: 'berserker', name: "Berserker", emoji: "🔥",
-        bonus: "HP +50%, Armor −2, Adrenaline · +1% crit per level",
+        bonus: "HP +50%, Damage +10%, Armor −2 · Adrenaline: harder and faster below 35% HP · +1% crit chance per level",
         weaponId: 'spinning_ember', hp: 150,
         stats: { armor: -2, might: 1.1, adrenaline: 0.15 },
         perLevel: { stat: 'critChance', value: 0.01 } as ClassPerLevel,
     },
 ];
 
-// Base values are the FIRST pick; repeat picks stack and grow 25% per stack
-// (see core/UpgradePool.ts getPowerupValue). `stackGrowth: 1` opts a powerup
-// out of that curve — every stack is then worth exactly `value`.
+/**
+ * Powerups stack FLAT: every pick of the same card is worth exactly `value`,
+ * and `maxStacks` says how many picks it takes before the card stops being
+ * offered.
+ *
+ * It used to be a 25%-per-stack compounding curve with one shared cap of 8,
+ * which meant every powerup was secretly worth **19.8x its base value** by the
+ * time it was maxed. That is where "+18% duration" turned into +357% and every
+ * zone in the game could be kept up permanently; where +10% move speed turned
+ * into +198% and nothing could ever touch the player; and where two of the
+ * cards (Rapid Tick, Cooling System) hit an internal floor several picks before
+ * their cap and then did literally nothing while still promising a bonus.
+ *
+ * Flat + a cap per card is the Vampire Survivors model: you can read the
+ * ceiling off the card, a maxed stat is done, and the pool moves on to
+ * something else. A card can still opt back into a curve with `stackGrowth`.
+ */
 export interface PowerupData {
     /** Stable key for translations (see data/locales) */
     id: string;
@@ -89,53 +114,71 @@ export interface PowerupData {
     description: string;
     /** Key in Player.stats (plus the special-cased `maxHp`) */
     type: string;
+    /** Worth of ONE pick. Flat unless `stackGrowth` says otherwise. */
     value: number;
     emoji: string;
-    /** Per-stack multiplier. Omit for the global 25% curve; 1 = flat stacking. */
+    /** Per-stack multiplier. Omit for flat stacking (the default). */
     stackGrowth?: number;
-    /** Overrides POWERUP_STACK_CAP for this powerup alone */
-    maxStacks?: number;
+    /** How many times this powerup can be taken. Always set it. */
+    maxStacks: number;
 }
 
 export const POWERUPS: PowerupData[] = [
     // Basic
     // Regen is the one powerup that can invalidate the whole game: enough of it
-    // and standing still inside a crowd out-heals the incoming damage. It is
-    // deliberately FLAT (no 25% compounding) at 0.1 HP/s per stack, so the
-    // 8-stack cap is 0.8 HP/s — noticeable between fights, never a substitute
-    // for moving. It used to compound to ~1.4 HP/s, which did exactly that.
-    { id: 'nano_repair', name: "Nano-Repair", description: "Hull nanites knit you back together", type: "regen", value: 0.1, stackGrowth: 1, emoji: "❤️" },
-    { id: 'targeting_hud', name: "Targeting HUD", description: "Chance for a hit to land as a critical", type: "critChance", value: 0.06, emoji: "🎯" },
-    { id: 'plasma_core', name: "Plasma Core", description: "Raw damage amplifier", type: "might", value: 0.08, emoji: "💪" },
-    { id: 'cooling_system', name: "Cooling System", description: "Weapons fire more often", type: "cooldown", value: -0.06, emoji: "❄️" },
+    // and standing still inside a crowd out-heals the incoming damage. 0.1 HP/s
+    // per pick, 0.8 at the cap — noticeable between fights, never a substitute
+    // for moving.
+    { id: 'nano_repair', name: "Nano-Repair", description: "Hull nanites knit you back together", type: "regen", value: 0.1, maxStacks: 8, emoji: "❤️" },
+    // Crit starts at 0%, so this is the only way to build it (bar the Samurai's
+    // 15%). 40% at the cap makes crit a direction you commit to rather than a
+    // certainty you trip over — the old curve reached a guaranteed crit on the
+    // seventh pick.
+    { id: 'targeting_hud', name: "Targeting HUD", description: "Chance for a hit to land as a critical", type: "critChance", value: 0.05, maxStacks: 8, emoji: "🎯" },
+    // The tightest cap in the pool, on purpose: raw damage multiplies with
+    // everything else you own, so it is the stat that quietly decides whether
+    // the late game is a fight or a formality. +25% total, five picks.
+    { id: 'plasma_core', name: "Plasma Core", description: "Raw damage amplifier", type: "might", value: 0.05, maxStacks: 5, emoji: "💪" },
+    // Also speeds up how often damage zones tick — that used to be its own
+    // powerup (Rapid Tick) which hit an internal floor after three picks and
+    // then did nothing at all.
+    { id: 'cooling_system', name: "Cooling System", description: "Weapons fire and zones tick more often", type: "cooldown", value: -0.05, maxStacks: 8, emoji: "❄️" },
 
     // Creative
-    { id: 'gravity_well', name: "Gravity Well", description: "Crystals fly to you from farther away", type: "magnet", value: 30, emoji: "🧲" },
-    { id: 'chain_reaction', name: "Chain Reaction", description: "Bigger blasts, wider zones", type: "area", value: 0.09, emoji: "💣" },
-    { id: 'vampiric_link', name: "Vampiric Link", description: "Drain more XP from every kill", type: "growth", value: 0.12, emoji: "🧛" },
-    { id: 'temporal_flux', name: "Temporal Flux", description: "Effects linger longer", type: "duration", value: 0.18, emoji: "⏰" },
-    { id: 'berserker_rage', name: "Berserker Rage", description: "Crits hit like a freight train", type: "critDamage", value: 0.3, emoji: "😡" },
-    { id: 'barrier_field', name: "Barrier Field", description: "Reinforced hull plating", type: "maxHp", value: 15, emoji: "🔮" },
-    { id: 'phase_shift', name: "Phase Shift", description: "Move faster between phases", type: "moveSpeed", value: 0.1, emoji: "👻" },
-    { id: 'rapid_tick', name: "Rapid Tick", description: "Zones damage more frequently", type: "tick", value: 0.1, emoji: "⏱️" },
+    // 250px at the cap. A 695px magnet (the old ceiling) collects the whole
+    // screen and deletes the reason to walk anywhere.
+    { id: 'gravity_well', name: "Gravity Well", description: "Crystals fly to you from farther away", type: "magnet", value: 25, maxStacks: 6, emoji: "🧲" },
+    { id: 'chain_reaction', name: "Chain Reaction", description: "Bigger blasts, wider zones", type: "area", value: 0.08, maxStacks: 8, emoji: "💣" },
+    { id: 'vampiric_link', name: "Vampiric Link", description: "Drain more XP from every kill", type: "growth", value: 0.1, maxStacks: 6, emoji: "🧛" },
+    // Duration times cooldown reduction is what lets a zone weapon cover the
+    // ground permanently. +80% at the cap keeps a puddle worth stacking without
+    // turning the arena into a carpet you never have to re-lay.
+    { id: 'temporal_flux', name: "Temporal Flux", description: "Effects linger longer", type: "duration", value: 0.1, maxStacks: 8, emoji: "⏰" },
+    // Crit damage starts at 2x, so the cap is a clean 4x. It used to reach
+    // 7.95x, which — multiplied by a guaranteed crit — was most of the reason
+    // late-game enemies evaporated.
+    { id: 'berserker_rage', name: "Berserker Rage", description: "Crits hit like a freight train", type: "critDamage", value: 0.25, maxStacks: 8, emoji: "😡" },
+    { id: 'barrier_field', name: "Barrier Field", description: "Reinforced hull plating", type: "maxHp", value: 20, maxStacks: 8, emoji: "🔮" },
+    // The player already outruns the fastest enemy by a wide margin at base
+    // speed, so this is a nudge, not a build: three picks, +15% total. At the
+    // old ceiling (+198%) nothing on the map could reach you and the station
+    // blackout — which speeds enemies up — stopped meaning anything.
+    { id: 'phase_shift', name: "Phase Shift", description: "Move faster between phases", type: "moveSpeed", value: 0.05, maxStacks: 3, emoji: "👻" },
     // Armor is subtracted from every touching enemy's damage-per-second, so it
-    // compounds with crowd size on its own. Left on the 25% curve the 8-stack
-    // cap would be ~20 armor and shrug off a late-game swarm entirely; flat
-    // stacking caps it at 8, which is a real but survivable wall.
-    { id: 'void_shield', name: "Void Shield", description: "Flat damage reduction", type: "armor", value: 1, stackGrowth: 1, emoji: "🌌" },
+    // compounds with crowd size on its own; 8 is a real but survivable wall.
+    { id: 'void_shield', name: "Void Shield", description: "Flat damage reduction", type: "armor", value: 1, maxStacks: 8, emoji: "🌌" },
 
-    // Tactics — these switch a behaviour on instead of nudging a number, so
-    // they all stack FLAT: a compounding chance-to-trigger runs past 100% long
-    // before the 8-pick cap and stops meaning anything. Rules and numbers live
-    // in core/Tactics.ts. Overclock (+projectile speed) was removed to make
-    // room: it was the one powerup whose effect you could not feel.
-    { id: 'static_discharge', name: "Static Discharge", description: "Damage taken charges a capacitor that blows the crowd off you", type: "discharge", value: 1, stackGrowth: 1, emoji: "⚡" },
-    { id: 'kill_echo', name: "Kill Echo", description: "The dead sometimes detonate", type: "killEcho", value: 0.06, stackGrowth: 1, emoji: "☠️" },
-    { id: 'adrenal_surge', name: "Adrenal Surge", description: "Hit harder and move faster while nearly dead", type: "adrenaline", value: 0.1, stackGrowth: 1, emoji: "🩸" },
-    { id: 'vital_siphon', name: "Vital Siphon", description: "Kills sometimes leave a repair cell behind", type: "siphon", value: 0.025, stackGrowth: 1, emoji: "💗" },
+    // Tactics — these switch a behaviour on instead of nudging a number. Rules
+    // and numbers live in core/Tactics.ts. Overclock (+projectile speed) was
+    // removed because it was the one powerup whose effect you could not feel;
+    // Rapid Tick (+zone tick rate) followed it into Cooling System.
+    { id: 'static_discharge', name: "Static Discharge", description: "Damage taken charges a capacitor that blows the crowd off you", type: "discharge", value: 1, maxStacks: 8, emoji: "⚡" },
+    { id: 'kill_echo', name: "Kill Echo", description: "The dead sometimes detonate", type: "killEcho", value: 0.06, maxStacks: 8, emoji: "☠️" },
+    { id: 'adrenal_surge', name: "Adrenal Surge", description: "Hit harder and move faster while nearly dead", type: "adrenaline", value: 0.1, maxStacks: 8, emoji: "🩸" },
+    { id: 'vital_siphon', name: "Vital Siphon", description: "Kills sometimes leave a repair cell behind", type: "siphon", value: 0.025, maxStacks: 8, emoji: "💗" },
     // Hard-capped at two: every level-up already comes with one free reroll, and
     // past three the draw stops being a decision and becomes a menu you shop in
-    { id: 'extra_roll', name: "Spare Cartridge", description: "One more reroll on every level-up", type: "reroll", value: 1, stackGrowth: 1, maxStacks: 2, emoji: "🎲" },
+    { id: 'extra_roll', name: "Spare Cartridge", description: "One more reroll on every level-up", type: "reroll", value: 1, maxStacks: 2, emoji: "🎲" },
 ];
 
 export const WEAPONS = [
@@ -143,12 +186,12 @@ export const WEAPONS = [
         id: 'void_ray',
         name: "Void Ray",
         emoji: "🔫",
-        description: "Charged lance that burns through everything in its path",
+        description: "Locks on, then drags the beam through the crowd, leaving fire",
         class: VoidRayWeapon,
         evolution: {
             name: "Void Cannon",
             emoji: "💜",
-            description: "Overshoots the target and collapses the impact point"
+            description: "Three sweeps that zigzag out to the far side of the pack"
         }
     },
     {
@@ -167,12 +210,12 @@ export const WEAPONS = [
         id: 'plasma_cannon',
         name: "Plasma Cannon",
         emoji: "🔋",
-        description: "Heavy round that burns through a column and bursts into shards",
+        description: "Heavy round that bursts on impact into igniting shards",
         class: PlasmaCannonWeapon,
         evolution: {
             name: "Fusion Core",
             emoji: "⚛️",
-            description: "A wider burst that leaves a singularity where it lands"
+            description: "The crater keeps erupting: three waves, one a second"
         }
     },
     {
@@ -220,7 +263,7 @@ export const WEAPONS = [
         evolution: {
             name: "Orbital Barrage",
             emoji: "☄️",
-            description: "Three shells, then one heavy round on the thickest crowd"
+            description: "A wall of shells walked across the crowd, then one heavy round"
         }
     },
     {

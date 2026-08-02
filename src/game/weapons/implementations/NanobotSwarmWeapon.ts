@@ -217,7 +217,7 @@ export class NanobotSwarmWeapon extends Weapon {
 
         if (this.cooldown <= 0 && !this.activeCloud) {
             const radius = (60 + this.level * 10) * this.owner.stats.area;
-            const baseInterval = Math.max(0.1, 0.5 - this.owner.stats.tick);
+            const baseInterval = Math.max(0.1, 0.5 * this.owner.stats.cooldown);
             const duration = this.duration * this.owner.stats.duration;
 
             const interval = Math.max(0.05, baseInterval);

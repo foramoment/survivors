@@ -36,19 +36,50 @@ export class AbsoluteZeroZone extends Zone {
     /** Damage of the burst when the field collapses */
     shatterDamage: number = 0;
 
-    private crystalAngle: number = 0;
     private readonly maxDuration: number;
     private frozen: Set<any> = new Set();
     private shattered: boolean = false;
+    /** Uneven slab edge and the cracks running through it, baked once */
+    private rim: Vector2[] = [];
+    private cracks: Vector2[][] = [];
 
     constructor(x: number, y: number, radius: number, damage: number, duration: number) {
         super(x, y, radius, duration, damage, 0.5, '');
         this.maxDuration = duration;
+        this.spreadIn(0.2);
+        this.bakeIce();
+    }
+
+    /** A slab of ice: a jagged outline plus cracks spidering out of the middle */
+    private bakeIce() {
+        const r = this.fullRadius;
+        const points = 14;
+        for (let i = 0; i < points; i++) {
+            const a = (i / points) * Math.PI * 2;
+            const wobble = 0.88 + Math.random() * 0.2;
+            this.rim.push({ x: Math.cos(a) * r * wobble, y: Math.sin(a) * r * wobble * 0.85 });
+        }
+
+        const crackCount = 5;
+        for (let i = 0; i < crackCount; i++) {
+            let angle = (i / crackCount) * Math.PI * 2 + Math.random() * 0.6;
+            const steps = 3;
+            const step = (r * (0.7 + Math.random() * 0.3)) / steps;
+            const path: Vector2[] = [{ x: 0, y: 0 }];
+            let x = 0;
+            let y = 0;
+            for (let s = 0; s < steps; s++) {
+                angle += (Math.random() - 0.5) * 0.8;
+                x += Math.cos(angle) * step;
+                y += Math.sin(angle) * step * 0.85;
+                path.push({ x, y });
+            }
+            this.cracks.push(path);
+        }
     }
 
     update(dt: number) {
         super.update(dt);
-        this.crystalAngle += dt;
 
         for (const enemy of levelSpatialHash.getWithinRadius(this.pos, this.radius)) {
             if (distance(this.pos, enemy.pos) > this.radius) continue;
@@ -85,52 +116,61 @@ export class AbsoluteZeroZone extends Zone {
         }
     }
 
+    /**
+     * A slab of ice frozen into the floor.
+     *
+     * The old version was a ring of eight triangles rotating slowly around the
+     * centre, which read as a loading spinner sitting on the arena — and it was
+     * the same shape whether the field had just landed or was about to shatter.
+     * Ice does not spin: it spreads, cracks, and goes white just before it
+     * breaks. That progression is the whole tell for when the shatter lands.
+     */
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
+        const g = this.spreadScale;
+        const fade = Math.max(0, Math.min(1, this.duration / Math.min(1, this.maxDuration)));
+        // Goes glassy-white over the last third: the shatter is coming
+        const strain = 1 - Math.max(0, Math.min(1, this.duration / (this.maxDuration * 0.35)));
+
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
+        ctx.scale(g, g);
 
-        const fade = Math.max(0, Math.min(1, this.duration / Math.min(1, this.maxDuration)));
-
-        // Ice floor
-        const floor = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
-        floor.addColorStop(0, `rgba(200, 240, 255, ${0.45 * fade})`);
-        floor.addColorStop(0.5, `rgba(100, 200, 255, ${0.28 * fade})`);
-        floor.addColorStop(1, 'rgba(50, 150, 255, 0)');
+        // The slab itself
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.moveTo(this.rim[0].x, this.rim[0].y);
+        for (let i = 1; i < this.rim.length; i++) ctx.lineTo(this.rim[i].x, this.rim[i].y);
+        ctx.closePath();
+
+        const floor = ctx.createRadialGradient(0, 0, 0, 0, 0, this.fullRadius);
+        floor.addColorStop(0, `rgba(226, 248, 255, ${(0.5 + 0.3 * strain) * fade})`);
+        floor.addColorStop(0.6, `rgba(126, 205, 252, ${(0.34 + 0.2 * strain) * fade})`);
+        floor.addColorStop(1, `rgba(60, 152, 224, ${0.12 * fade})`);
         ctx.fillStyle = floor;
         ctx.fill();
 
-        // Shards around the rim. One shadowBlur pass for the whole ring, not
-        // one per shard — see the VFX rules in CLAUDE.md.
-        ctx.rotate(this.crystalAngle);
-        ctx.fillStyle = `rgba(180, 230, 255, ${0.8 * fade})`;
-        ctx.shadowColor = '#88ddff';
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        for (let i = 0; i < 8; i++) {
-            const a = (i / 8) * Math.PI * 2;
-            const cos = Math.cos(a);
-            const sin = Math.sin(a);
-            const tip = this.radius * 1.1;
-            const base = this.radius * 0.7;
-            const mid = this.radius * 0.85;
-            ctx.moveTo(cos * base, sin * base);
-            ctx.lineTo(cos * mid - sin * 8, sin * mid + cos * 8);
-            ctx.lineTo(cos * tip, sin * tip);
-            ctx.lineTo(cos * mid + sin * 8, sin * mid - cos * 8);
-            ctx.closePath();
-        }
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.rotate(-this.crystalAngle);
-
-        // Inner ring
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.5, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(150, 220, 255, ${0.6 * fade})`;
+        // Hard rim — one pass, one glow (VFX rules in CLAUDE.md)
+        ctx.strokeStyle = `rgba(232, 250, 255, ${0.9 * fade})`;
         ctx.lineWidth = 3;
+        ctx.shadowColor = '#88ddff';
+        ctx.shadowBlur = 8;
         ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Cracks: they open up as the field nears its end
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(0.3 + 0.6 * strain) * fade})`;
+        ctx.lineWidth = 1 + 2 * strain;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (const crack of this.cracks) {
+            ctx.moveTo(crack[0].x, crack[0].y);
+            for (let i = 1; i < crack.length; i++) ctx.lineTo(crack[i].x, crack[i].y);
+        }
+        ctx.stroke();
+
+        // Frozen core
+        ctx.fillStyle = `rgba(255, 255, 255, ${(0.35 + 0.35 * strain) * fade})`;
+        const core = this.fullRadius * 0.13;
+        ctx.fillRect(-core, -core, core * 2, core * 2);
 
         ctx.restore();
     }
@@ -170,6 +210,7 @@ export class FrostNovaWeapon extends Weapon {
         const lob = new LobbedProjectile(this.owner.pos.x, this.owner.pos.y, target, 0.6, '');
         lob.source = this;
         lob.height = 90;
+        lob.kind = 'cryo';
         lob.color = this.evolved ? '#bfe9ff' : '#7fd8ff';
         lob.onLand = (x, y) => this.detonate(x, y, radius);
         this.onSpawn(lob);
@@ -188,8 +229,12 @@ export class FrostNovaWeapon extends Weapon {
             zone.source = this;
             this.onSpawn(zone);
         } else {
-            // Slow deepens with level: 50% at level 1 up to 80% at level 5
-            const slow = Math.min(0.8, 0.5 + (this.level - 1) * 0.06);
+            // Slow deepens with level: 42% at level 1 up to 62% at level 5.
+            // It used to reach 80%, and with duration and cooldown stacked the
+            // field covered the ground permanently — enemies crawling at a
+            // fifth of their speed forever is a stun without the stun's
+            // downtime rule. Zone.SLOW_FLOOR backstops this at 65%.
+            const slow = Math.min(0.62, 0.42 + (this.level - 1) * 0.05);
             const zone = new FrostZone(x, y, radius, duration, this.damage, 0.5, slow);
             zone.source = this;
             this.onSpawn(zone);

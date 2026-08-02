@@ -10,15 +10,19 @@
  * weakest thing in the pool; a short stun makes it the button you press to stop
  * a charge, the way Mind Blast does but on a much shorter cooldown.
  *
- * Evolved — Cluster Bomb: three canisters per throw, fanned around the target
- * and staggered by a few frames, each with a smaller blast and a longer stun.
- * Chain detonations are capped and delayed rather than fired all at once: a
- * full-screen volley used to spawn dozens of `emitExplosion` bursts in a single
- * frame, which is what made the game hitch.
+ * The throw grows with the weapon: one more canister every second level (see
+ * canisterCount), so levelling changes where you can cover rather than only how
+ * hard one crater hits.
+ *
+ * Evolved — Cluster Bomb: five canisters per throw on a longer cooldown, each
+ * with a smaller blast, a longer stun, and a patch of burning ground left in
+ * the crater. Chain detonations are capped and delayed rather than fired all at
+ * once: a full-screen volley used to spawn dozens of `emitExplosion` bursts in
+ * a single frame, which is what made the game hitch.
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import { LobbedProjectile, PlasmaExplosionZone } from '../base';
+import { LobbedProjectile, PlasmaExplosionZone, BurningTrailZone } from '../base';
 import { particles } from '../../core/ParticleSystem';
 import { juice } from '../../core/JuiceSystem';
 import { status } from '../../core/StatusEffects';
@@ -53,6 +57,32 @@ export class PlasmaGrenadeWeapon extends Weapon {
         this.duration = this.stats.duration;
     }
 
+    /**
+     * Canisters per throw: one more every second level, plus two on evolving.
+     * L1 1, L3 2, L5 3, evolved 5.
+     *
+     * Levelling this weapon used to do nothing but +20% damage, which for a
+     * thrown area weapon is the least interesting axis there is — you already
+     * had one crater, it just got hotter. A second canister changes where you
+     * can throw.
+     */
+    private canisterCount(): number {
+        const base = 1 + Math.floor((this.level - 1) / 2);
+        return this.evolved ? base + 2 : base;
+    }
+
+    /**
+     * Damage share of a single canister, `1/sqrt(count)`.
+     *
+     * A cluster must not be a straight multiplication of the single throw, or
+     * every extra canister is a free damage upgrade on top of the coverage.
+     * The square root means total output grows as sqrt(count) — 1 → 1.41 → 1.73
+     * → 2.24 — so more canisters is mostly more *reach*.
+     */
+    private canisterPower(count: number): number {
+        return 1 / Math.sqrt(count);
+    }
+
     update(dt: number) {
         this.cooldown -= dt;
         if (this.cooldown > 0) return;
@@ -61,13 +91,18 @@ export class PlasmaGrenadeWeapon extends Weapon {
         if (!target) return;
 
         const flight = this.duration * this.owner.stats.duration;
+        const count = this.canisterCount();
+        const power = this.canisterPower(count);
 
-        if (this.evolved) {
-            // Cluster: one on target, two fanned out around it
+        if (count === 1) {
+            this.throwGrenade({ x: target.pos.x, y: target.pos.y }, flight, 0, power);
+        } else {
+            // One on the target, the rest fanned around it and staggered by a
+            // few frames so the blasts roll instead of landing in one frame
             const spread = this.area * this.owner.stats.area * 1.1;
             const base = Math.random() * Math.PI * 2;
-            for (let i = 0; i < 3; i++) {
-                const angle = base + (i / 3) * Math.PI * 2;
+            for (let i = 0; i < count; i++) {
+                const angle = base + (i / count) * Math.PI * 2;
                 const offset = i === 0
                     ? { x: 0, y: 0 }
                     : { x: Math.cos(angle) * spread, y: Math.sin(angle) * spread };
@@ -75,14 +110,14 @@ export class PlasmaGrenadeWeapon extends Weapon {
                     { x: target.pos.x + offset.x, y: target.pos.y + offset.y },
                     flight + i * 0.06,
                     i * 0.08,
-                    0.6
+                    power,
                 );
             }
-        } else {
-            this.throwGrenade({ x: target.pos.x, y: target.pos.y }, flight, 0, 1);
         }
 
-        this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
+        // Five canisters and a field of burning ground is worth waiting for
+        const cdMultiplier = this.evolved ? 1.5 : 1.0;
+        this.cooldown = this.baseCooldown * this.owner.stats.cooldown * cdMultiplier;
     }
 
     private throwGrenade(target: { x: number, y: number }, flight: number, delay: number, power: number) {
@@ -95,7 +130,9 @@ export class PlasmaGrenadeWeapon extends Weapon {
         );
         lob.height = 80;
         lob.delay = delay;
-        lob.color = this.evolved ? '#ffb03c' : '#3ddc6e';
+        lob.kind = 'grenade';
+        // Violet plasma canister; the evolved cluster runs hot orange
+        lob.color = this.evolved ? '#ffb03c' : '#b06cff';
         lob.onLand = (x, y) => this.createExplosion(x, y, power);
         this.onSpawn(lob);
     }
@@ -123,6 +160,21 @@ export class PlasmaGrenadeWeapon extends Weapon {
             if (distance({ x, y }, enemy.pos) > explosionRadius) continue;
             // A boss that can be perma-stunned by a 2.5s cooldown is not a boss
             status.stun(enemy, enemy.isBoss ? stun * 0.25 : stun);
+        }
+
+        // Evolved: every crater keeps burning. Five small fires laid across the
+        // pack is what makes the Cluster Bomb area denial rather than five
+        // copies of the same explosion.
+        if (this.evolved) {
+            const fire = new BurningTrailZone(
+                x, y,
+                explosionRadius * 0.7,
+                2.2 * this.owner.stats.duration,
+                this.damage * power * 0.12,
+            );
+            fire.burnDps = this.damage * power * 0.3;
+            fire.source = this;
+            this.onSpawn(fire);
         }
 
         // Evolved: a few secondary blasts, spread over the next third of a

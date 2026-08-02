@@ -115,7 +115,6 @@ export const RU: Record<string, string> = {
     'bonus.maxHp': 'к макс. HP',
     'bonus.armor': 'к броне',
     'bonus.regen': 'HP/с',
-    'bonus.tick': 'с к тику зон',
     'bonus.discharge': 'заряд',
     'bonus.reroll': 'переброс',
 
@@ -196,17 +195,17 @@ export const RU: Record<string, string> = {
 
     // ---------------------------------------------------------------- classes
     'class.void_walker.name': 'Странник Пустоты',
-    'class.void_walker.bonus': 'Скорость +10% · +1% урона за уровень',
+    'class.void_walker.bonus': 'Урон +10% · +1% урона за уровень',
     'class.cyber_samurai.name': 'Кибер-Самурай',
-    'class.cyber_samurai.bonus': 'Крит 15% · +1% крит. урона за уровень',
+    'class.cyber_samurai.bonus': 'Шанс крита 15% · +1% крит. урона за уровень',
     'class.exo_marine.name': 'Экзо-Пехотинец',
     'class.exo_marine.bonus': 'Броня +2 · +1% макс. HP за уровень',
     'class.astro_biologist.name': 'Астробиолог',
-    'class.astro_biologist.bonus': 'Реген +0.25 · +1% площади за уровень',
+    'class.astro_biologist.bonus': 'Реген +0.25/с, Площадь +10% · +1% площади за уровень',
     'class.storm_mage.name': 'Маг Бури',
-    'class.storm_mage.bonus': 'Сила +15% · −1% перезарядки за уровень',
+    'class.storm_mage.bonus': 'Урон +15% · −1% перезарядки за уровень',
     'class.berserker.name': 'Берсерк',
-    'class.berserker.bonus': 'HP +50%, Броня −2, Адреналин · +1% крита за уровень',
+    'class.berserker.bonus': 'HP +50%, Урон +10%, Броня −2 · Адреналин: сильнее и быстрее ниже 35% HP · +1% шанса крита за уровень',
 
     // --------------------------------------------------------------- powerups
     'powerup.nano_repair.name': 'Наноремонт',
@@ -216,7 +215,7 @@ export const RU: Record<string, string> = {
     'powerup.plasma_core.name': 'Плазменное Ядро',
     'powerup.plasma_core.desc': 'Чистое усиление урона',
     'powerup.cooling_system.name': 'Система Охлаждения',
-    'powerup.cooling_system.desc': 'Оружие стреляет чаще',
+    'powerup.cooling_system.desc': 'Оружие стреляет чаще, зоны тикают чаще',
     'powerup.gravity_well.name': 'Гравитационный Колодец',
     'powerup.gravity_well.desc': 'Кристаллы летят к тебе издалека',
     'powerup.chain_reaction.name': 'Цепная Реакция',
@@ -231,8 +230,6 @@ export const RU: Record<string, string> = {
     'powerup.barrier_field.desc': 'Усиленная обшивка корпуса',
     'powerup.phase_shift.name': 'Фазовый Сдвиг',
     'powerup.phase_shift.desc': 'Двигаешься быстрее',
-    'powerup.rapid_tick.name': 'Частый Тик',
-    'powerup.rapid_tick.desc': 'Зоны наносят урон чаще',
     'powerup.void_shield.name': 'Щит Пустоты',
     'powerup.void_shield.desc': 'Плоское снижение получаемого урона',
 

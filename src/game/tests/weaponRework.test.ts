@@ -83,9 +83,9 @@ describe('OrbitalStrikeWeapon', () => {
         weapon.cooldown = 0;
         weapon.update(0.016);
 
-        // Three shells plus the heavy finisher. Six read as visual spam — the
+        // Four shells plus the heavy finisher. Six read as visual spam — the
         // finisher that is meant to be the payoff was lost among the reticles.
-        expect(spawned.length).toBe(4);
+        expect(spawned.length).toBe(5);
         const delays = spawned.map((z: any) => z.delay);
         // Fuses are staggered, so the salvo rolls across the field
         expect(new Set(delays).size).toBe(delays.length);
@@ -107,7 +107,24 @@ describe('OrbitalStrikeWeapon', () => {
         weapon.evolved = true;
         weapon.cooldown = 0;
         weapon.update(0.016);
-        expect(weapon.cooldown).toBeGreaterThan(weapon.baseCooldown * 3);
+        expect(weapon.cooldown).toBeGreaterThan(weapon.baseCooldown * 2);
+    });
+
+    it('walks the salvo across the crowd, not across the player', () => {
+        // The shells used to be laid along a 420px line centred on the player
+        // with 90px of jitter, so they landed a screen apart on empty floor
+        const crowd = [makeEnemy(600, 0), makeEnemy(640, 30), makeEnemy(620, -20)];
+        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue(crowd as any);
+        weapon.evolved = true;
+        weapon.cooldown = 0;
+        weapon.update(0.016);
+
+        const heavy = spawned.find((z: any) => z.heavy)!;
+        // Every shell lands within a couple of blast radii of the crowd centre
+        for (const shell of spawned) {
+            const offset = Math.hypot(shell.pos.x - heavy.pos.x, shell.pos.y - heavy.pos.y);
+            expect(offset).toBeLessThan(heavy.radius * 2);
+        }
     });
 
     it('uses the lean impact burst, not the nuclear one', () => {

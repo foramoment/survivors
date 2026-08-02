@@ -19,6 +19,49 @@ import { CHARACTER_SPRITES, FALLBACK_SPRITE_ID } from '../data/CharacterSprites'
 /** Whole-silhouette recolour applied to an enemy sprite */
 export type EnemyTint = 'none' | 'hit' | 'corroded';
 
+/** What a lobbed projectile actually is — see getThrownSprite */
+export type ThrownKind = 'grenade' | 'flask' | 'cryo';
+
+/**
+ * Pixel grids for thrown objects, 8 wide. Digits index the palette in
+ * getThrownSprite; `.` is empty and gets an automatic outline.
+ */
+const THROWN_SHAPES: Record<ThrownKind, string[]> = {
+    // Squat canister with a lit fuse poking out of the top
+    grenade: [
+        '.....4..',
+        '....54..',
+        '..5555..',
+        '.322223.',
+        '32222223',
+        '32222223',
+        '.322223.',
+        '..3333..',
+    ],
+    // Corked conical flask, heavy liquid pooled in the bottom
+    flask: [
+        '..5555..',
+        '...55...',
+        '...22...',
+        '..3223..',
+        '.322223.',
+        '32222223',
+        '32222223',
+        '.333333.',
+    ],
+    // Narrow cryo vial with a frosted cap
+    cryo: [
+        '..5555..',
+        '..3223..',
+        '..2442..',
+        '..2222..',
+        '..3223..',
+        '..2222..',
+        '..3223..',
+        '..3333..',
+    ],
+};
+
 type Palette = {
     dark: string;
     mid: string;
@@ -319,28 +362,32 @@ export class SpriteFactory {
      * Lobbed grenade: a chunky canister you can actually see arcing through
      * the air (it used to render as a generic projectile orb).
      */
-    getGrenadeSprite(color: string = '#3ddc6e'): HTMLCanvasElement {
-        const key = `grenade:${color}`;
+    /**
+     * Something thrown on an arc. Every lobbed weapon used to share one round
+     * canister recoloured — so a grenade and a flask of acid were the same
+     * object in two tints, and the throw told you nothing about what was about
+     * to land. Each kind now has its own silhouette:
+     *
+     *   grenade — squat canister with a fuse, the classic bomb read
+     *   flask   — corked conical flask, liquid sloshing in the bottom
+     *   cryo    — a cylindrical cryo vial, tall and narrow
+     *
+     * `2` is the body colour, `3` its shade, `4` a highlight, `5` a dark cap.
+     */
+    getThrownSprite(kind: ThrownKind = 'grenade', color: string = '#3ddc6e'): HTMLCanvasElement {
+        const key = `thrown:${kind}:${color}`;
         let sprite = this.cache.get(key);
-        if (!sprite) {
-            const rows = [
-                '...44...',
-                '..3223..',
-                '.322223.',
-                '32222223',
-                '32222223',
-                '.322223.',
-                '..3223..',
-                '...33...',
-            ];
-            const grid = rows.map(r => [...r].map(ch => (ch === '.' ? 0 : Number(ch))));
-            sprite = this.renderGrid(grid, {
-                2: color,
-                3: this.shade(color, 0.55),
-                4: '#ffe9a0',
-            }, this.shade(color, 0.35), false);
-            this.cache.set(key, sprite);
-        }
+        if (sprite) return sprite;
+
+        const rows = THROWN_SHAPES[kind] ?? THROWN_SHAPES.grenade;
+        const grid = rows.map(r => [...r].map(ch => (ch === '.' ? 0 : Number(ch))));
+        sprite = this.renderGrid(grid, {
+            2: color,
+            3: this.shade(color, 0.55),
+            4: '#ffe9a0',
+            5: '#4a4a58',
+        }, this.shade(color, 0.35), false);
+        this.cache.set(key, sprite);
         return sprite;
     }
 
