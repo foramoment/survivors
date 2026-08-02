@@ -35,6 +35,7 @@ import { screenManager } from './ui/ScreenManager';
 
 import { createSettingsPanel } from './ui/components/SettingsPanel';
 import { i18n, t } from './core/I18n';
+import { AUTHOR_CREDIT } from './core/Credits';
 import {
     weaponName, weaponDesc, weaponEvoName, weaponEvoDesc,
     powerupName, powerupDesc, stageName,
@@ -1552,6 +1553,11 @@ export class GameManager {
         buttons.appendChild(again);
         buttons.appendChild(menu);
         screen.appendChild(buttons);
+
+        const credit = document.createElement('div');
+        credit.className = 'menu-credit';
+        credit.textContent = AUTHOR_CREDIT;
+        screen.appendChild(credit);
 
         this.uiLayer.appendChild(screen);
     }

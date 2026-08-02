@@ -118,3 +118,68 @@ describe('StatusSystem — stun', () => {
         expect(enemy.stunTimer).toBe(2);
     });
 });
+
+describe('stun diminishing returns', () => {
+    const status = new StatusSystem();
+    const freshEnemy = () => makeEnemy();
+
+    it('a stun cannot be re-applied until the target recovers', () => {
+        const enemy = freshEnemy();
+        status.stun(enemy, 1);
+        expect(enemy.stunTimer).toBeCloseTo(1);
+
+        // Run the stun out
+        enemy.update(1.1);
+        expect(enemy.stunTimer).toBeLessThanOrEqual(0);
+
+        // Immediately restunning it is what let a duration build lock the arena
+        status.stun(enemy, 1);
+        expect(enemy.stunTimer).toBeLessThanOrEqual(0);
+    });
+
+    it('recovers after the immunity window and can be stunned again', () => {
+        const enemy = freshEnemy();
+        status.stun(enemy, 1);
+        enemy.update(1.1);
+
+        // Recovery only ticks while the enemy is free to move
+        for (let i = 0; i < 30; i++) status.update(0.1, [enemy]);
+
+        status.stun(enemy, 1);
+        expect(enemy.stunTimer).toBeGreaterThan(0);
+    });
+
+    it('caps stun uptime at a third however hard a build spams it', () => {
+        const enemy = freshEnemy();
+        const STEP = 0.05;
+        let stunned = 0;
+
+        for (let i = 0; i < 400; i++) {
+            // A field that refreshes the freeze every single frame
+            status.stun(enemy, 0.6);
+            if (enemy.stunTimer > 0) stunned++;
+            enemy.update(STEP);
+            status.update(STEP, [enemy]);
+        }
+
+        expect(stunned / 400).toBeLessThan(0.4);
+    });
+
+    it('a stun in progress cannot be topped back up', () => {
+        // This is the exact shape of the exploit: a field re-applying its
+        // freeze every frame would otherwise hold the timer at full forever
+        const enemy = freshEnemy();
+        status.stun(enemy, 0.5);
+        enemy.update(0.2);
+        status.stun(enemy, 2);
+        expect(enemy.stunTimer).toBeLessThan(0.5);
+    });
+
+    it('clear resets the immunity too', () => {
+        const enemy = freshEnemy();
+        status.stun(enemy, 1);
+        status.clear([enemy]);
+        expect(enemy.stunTimer).toBe(0);
+        expect(enemy.stunImmunity).toBe(0);
+    });
+});

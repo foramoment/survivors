@@ -11,6 +11,7 @@ import { BaseScreen } from '../BaseScreen';
 import { screenManager } from '../ScreenManager';
 import { drawPixelText, measurePixelText, PIXEL_GLYPH_HEIGHT } from '../../core/PixelFont';
 import { t } from '../../core/I18n';
+import { AUTHOR_CREDIT } from '../../core/Credits';
 
 export class MainMenuScreen extends BaseScreen {
     private time: number = 0;
@@ -136,6 +137,13 @@ export class MainMenuScreen extends BaseScreen {
         footer.className = 'menu-footer';
         footer.textContent = t('menu.hint');
         screen.appendChild(footer);
+
+        // Travels with any copy of the build — removing it is a deliberate act
+        // rather than a Ctrl+C, and it works for recognition even off a mirror
+        const credit = document.createElement('div');
+        credit.className = 'menu-credit';
+        credit.textContent = AUTHOR_CREDIT;
+        screen.appendChild(credit);
 
         this.uiLayer.appendChild(screen);
     }

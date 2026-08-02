@@ -32,6 +32,12 @@ import type { Enemy } from '../entities/Enemy';
 const TICK = 0.6;
 /** How many times a contagious infection may jump before it burns out */
 const MAX_GENERATIONS = 3;
+/**
+ * Immunity after a stun, as a multiple of that stun's length. At 2 an enemy can
+ * be frozen at most a third of the time no matter how many stun sources or how
+ * much duration a build stacks.
+ */
+export const STUN_RECOVERY_RATIO = 2;
 
 /** Purely cosmetic — picks the colour of the orbiting motes on the enemy */
 export type InfectionKind = 'spore' | 'acid' | 'burn';
@@ -120,15 +126,43 @@ export class StatusSystem {
         return 1 + (enemy.corrosion?.amp ?? 0);
     }
 
-    /** Freeze an enemy in place for `seconds` (longest wins) */
+    /**
+     * Freeze an enemy in place for `seconds`.
+     *
+     * Every stun leaves the target briefly **immune** to being stunned again.
+     * Without it, hard crowd control had no ceiling: Absolute Zero refreshes the
+     * freeze every frame anything stands in its field, and duration, area and
+     * cooldown are all stackable, so a build with enough of them locked the
+     * whole arena in place permanently — the run stopped being a game.
+     *
+     * The immunity only counts down once the stun has ended, so the ratio holds
+     * whatever the source: an enemy can be frozen at most
+     * `1 / (1 + STUN_RECOVERY_RATIO)` of the time — a third, as it stands. Stuns
+     * stay a real tool for buying space; they stop being an off switch.
+     */
     stun(enemy: Enemy, seconds: number) {
-        enemy.stunTimer = Math.max(enemy.stunTimer, seconds);
+        if (seconds <= 0) return;
+        // Already frozen, or still shaking the last one off. A stun in progress
+        // is deliberately NOT refreshable: Absolute Zero re-applies its freeze
+        // every single frame anything stands in the field, so `max(current,
+        // seconds)` would top the timer straight back up and the lock would
+        // never end. One stun, then recovery — a rule with no way around it.
+        if (enemy.stunTimer > 0 || enemy.stunImmunity > 0) return;
+
+        enemy.stunTimer = seconds;
+        enemy.stunImmunity = seconds * STUN_RECOVERY_RATIO;
     }
 
-    /** Tick infections and corrosion. Stun counts down inside Enemy.update. */
+    /** Tick infections, corrosion and stun recovery. Stun itself counts down inside Enemy.update. */
     update(dt: number, enemies: Enemy[]) {
         for (const enemy of enemies) {
             if (enemy.isDead) continue;
+
+            // Recovery only runs once the enemy is moving again, which is what
+            // keeps the uptime ratio fixed regardless of how long the stun was
+            if (enemy.stunTimer <= 0 && enemy.stunImmunity > 0) {
+                enemy.stunImmunity -= dt;
+            }
 
             const corrosion = enemy.corrosion;
             if (corrosion) {
@@ -191,6 +225,7 @@ export class StatusSystem {
             enemy.infection = null;
             enemy.corrosion = null;
             enemy.stunTimer = 0;
+            enemy.stunImmunity = 0;
         }
     }
 }

@@ -39,6 +39,8 @@ export class Enemy extends Entity {
     corrosion: Corrosion | null = null;
     /** Seconds of stun left; while > 0 the enemy cannot move */
     stunTimer: number = 0;
+    /** Seconds before this enemy can be stunned again (see StatusEffects.stun) */
+    stunImmunity: number = 0;
 
     constructor(x: number, y: number, type: EnemyType, isElite: boolean = false) {
         super(x, y, 12);

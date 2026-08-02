@@ -275,6 +275,16 @@ h2.lucky {
   font-family: var(--font-pixel);
 }
 
+.menu-credit {
+  margin-top: 10px;
+  font-size: 0.6em;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--c-dim);
+  opacity: 0.6;
+  text-align: center;
+}
+
 .menu-footer {
   margin-top: 22px;
   font-size: 0.7em;
