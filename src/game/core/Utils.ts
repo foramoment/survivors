@@ -18,6 +18,13 @@ export const checkCollision = (
 export const randomRange = (min: number, max: number): number =>
     Math.random() * (max - min) + min;
 
+/** Seconds as MM:SS. Used by the HUD, the pause panel and the result screen. */
+export const formatTime = (seconds: number): string => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+};
+
 /**
  * Shortest signed angle from `b` to `a`, in (-PI, PI].
  * Plain subtraction wraps wrong across the ±PI seam, which is exactly where a

@@ -2,8 +2,8 @@ import { Player } from './entities/Player';
 import { Enemy } from './entities/Enemy';
 import { XPCrystal } from './entities/XPCrystal';
 import { Entity } from './Entity';
-import { CLASSES, POWERUPS, ENEMIES, WEAPONS } from './data/GameData';
-import { checkCollision, type Vector2, distance } from './core/Utils';
+import { CLASSES, ENEMIES, WEAPONS } from './data/GameData';
+import { checkCollision, type Vector2, distance, formatTime } from './core/Utils';
 import { Projectile, Zone } from './weapons/base';
 import { levelSpatialHash } from './core/SpatialHash';
 import { particles } from './core/ParticleSystem';
@@ -21,9 +21,9 @@ import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
 import { drawPixelText } from './core/PixelFont';
-import { buildUpgradeOptions, getPowerupValue, formatPowerupBonus, formatStatPreview, POWERUP_STACK_CAP } from './core/UpgradePool';
+import { getPowerupValue, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { contactDamagePerSecond } from './core/ContactDamage';
-import { computeScore, submitScore, formatScore } from './core/Score';
+import { computeScore, submitScore } from './core/Score';
 import { RunStatsTracker } from './core/RunStats';
 import { achievements, type RunSnapshot } from './core/Achievements';
 import { RepairCell } from './entities/RepairCell';
@@ -32,14 +32,12 @@ import {
     KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE, KILL_ECHO_BOSS_RESIST,
 } from './core/Tactics';
 import { screenManager } from './ui/ScreenManager';
+import { LevelUpOverlay } from './ui/screens/LevelUpOverlay';
+import { showRunSummary } from './ui/screens/RunSummaryOverlay';
+import { PauseOverlay } from './ui/screens/PauseOverlay';
 
-import { createSettingsPanel } from './ui/components/SettingsPanel';
-import { i18n, t } from './core/I18n';
-import { AUTHOR_CREDIT } from './core/Credits';
-import {
-    weaponName, weaponDesc, weaponEvoName, weaponEvoDesc,
-    powerupName, powerupDesc, stageName,
-} from './core/Labels';
+import { t } from './core/I18n';
+import { stageName } from './core/Labels';
 
 /**
  * Contact hurt cue: play at most this often, and only once this share of max
@@ -119,21 +117,20 @@ export class GameManager {
     /** Countdown to the next distant-crystal merge pass */
     private crystalMergeTimer: number = 1;
     repairCells: RepairCell[] = [];
-    private pauseOverlay: HTMLElement | null = null;
-    /** Survives a pause-overlay rebuild so a language switch keeps the panel open */
-    private pauseSettingsOpen: boolean = false;
-    private pauseI18nUnsub: (() => void) | null = null;
-    /** Level-up keyboard cursor */
-    private upgradeCards: HTMLElement[] = [];
-    private focusedCard: number = 0;
-    private upgradeKeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
+    /**
+     * The level-up card panel. It takes `this` as its host rather than a copy of
+     * the run state, because `player` is replaced on every new run.
+     */
+    private levelUp = new LevelUpOverlay(this);
+    private pause: PauseOverlay;
 
 
     constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
         this.canvas = canvas;
         this.ctx = ctx;
         this.uiLayer = document.getElementById('ui-layer')!;
+        this.pause = new PauseOverlay(this.uiLayer);
 
         // Connect DamageSystem to damage number display
         damageSystem.setDamageNumberCallback((pos, amount, isCrit, source) => {
@@ -155,9 +152,10 @@ export class GameManager {
         propField.reset();
         arenaEvents.reset();
         stageBackdrop.blackout = 0;
-        this.pauseOverlay?.remove();
-        this.pauseOverlay = null;
-        this.detachUpgradeKeys();
+        // Also drops the i18n subscription — the old inline version removed the
+        // node but left the listener attached
+        this.pause.close();
+        this.levelUp.detach();
         this.finalBoss = null;
         this.finalBossSpawned = false;
         // Nothing from the last run may survive into this one, least of all in
@@ -184,7 +182,7 @@ export class GameManager {
         Object.assign(this.player.stats, cls.stats);
 
         this.player.baseMaxHp = cls.hp;
-        this.player.onLevelUp = () => this.showLevelUp();
+        this.player.onLevelUp = () => this.levelUp.show();
         this.player.onHeal = amount => this.runStats.recordHeal(amount);
 
         // Add starting weapon
@@ -340,55 +338,6 @@ export class GameManager {
     }
 
     /**
-     * Cracked-glass overlay for the level-up slam.
-     * Cracks are generated per level-up (random impact point + branching
-     * fractures), so the break never looks the same twice.
-     */
-    private createImpactOverlay(): HTMLElement {
-        const svgNS = 'http://www.w3.org/2000/svg';
-        const svg = document.createElementNS(svgNS, 'svg');
-        svg.setAttribute('class', 'crack-overlay');
-        svg.setAttribute('viewBox', '0 0 100 100');
-        svg.setAttribute('preserveAspectRatio', 'none');
-
-        const ox = 30 + Math.random() * 40;
-        const oy = 30 + Math.random() * 40;
-        const spokes = 7 + Math.floor(Math.random() * 5);
-
-        for (let i = 0; i < spokes; i++) {
-            const baseAngle = (i / spokes) * Math.PI * 2 + Math.random() * 0.4;
-            let x = ox;
-            let y = oy;
-            let points = `${x},${y}`;
-            const segments = 3 + Math.floor(Math.random() * 3);
-            for (let s = 0; s < segments; s++) {
-                const len = 8 + Math.random() * 22;
-                const angle = baseAngle + (Math.random() - 0.5) * 0.7;
-                x += Math.cos(angle) * len;
-                y += Math.sin(angle) * len;
-                points += ` ${x.toFixed(1)},${y.toFixed(1)}`;
-            }
-            const line = document.createElementNS(svgNS, 'polyline');
-            line.setAttribute('points', points);
-            line.setAttribute('class', 'crack-line');
-            line.style.animationDelay = `${(Math.random() * 0.08).toFixed(3)}s`;
-            svg.appendChild(line);
-        }
-
-        // A couple of concentric fracture rings around the impact
-        for (let r = 1; r <= 2; r++) {
-            const ring = document.createElementNS(svgNS, 'circle');
-            ring.setAttribute('cx', ox.toFixed(1));
-            ring.setAttribute('cy', oy.toFixed(1));
-            ring.setAttribute('r', String(r * 7 + Math.random() * 4));
-            ring.setAttribute('class', 'crack-ring');
-            svg.appendChild(ring);
-        }
-
-        return svg as unknown as HTMLElement;
-    }
-
-    /**
      * Escape / pause button. Only PLAYING ↔ PAUSED — a level-up or the game
      * over panel is already a modal state and must not be interruptible.
      */
@@ -400,70 +349,26 @@ export class GameManager {
     private pauseGame() {
         this.state = 'PAUSED';
         audio.pauseMusic();
-        this.buildPauseOverlay();
-
-        // Switching language from the pause panel relabels the whole overlay.
-        // Rebuilding it is simpler (and cheaper, once) than tracking every node.
-        this.pauseI18nUnsub = i18n.onChange(() => {
-            if (this.state !== 'PAUSED') return;
-            this.pauseOverlay?.remove();
-            this.buildPauseOverlay();
-        });
-    }
-
-    private buildPauseOverlay() {
-        const screen = document.createElement('div');
-        screen.className = 'screen pause-screen';
-        this.pauseOverlay = screen;
-
-        const heading = document.createElement('h2');
-        heading.textContent = t('pause.title');
-        screen.appendChild(heading);
-
-        const info = document.createElement('p');
-        info.className = 'pause-hint';
-        info.textContent = t('pause.status', {
-            stage: stageName(this.currentStage),
-            time: this.formatTime(this.gameTime),
-            kills: this.killCount,
-        });
-        screen.appendChild(info);
-
-        const actions = document.createElement('div');
-        actions.className = 'pause-actions';
-        actions.appendChild(this.createPauseButton(t('pause.resume'), 'primary', () => this.resumeGame()));
-
-        // Settings fold out in place. Routing to the Options screen would tear
-        // down the game screen (and the run with it), so the same panel is
-        // mounted here instead.
-        const settings = createSettingsPanel(true);
-        settings.hidden = !this.pauseSettingsOpen;
-
-        const label = () => t('pause.settings') + (settings.hidden ? '' : ' ▴');
-        const settingsBtn = this.createPauseButton(label(), 'ghost', () => {
-            settings.hidden = !settings.hidden;
-            this.pauseSettingsOpen = !settings.hidden;
-            settingsBtn.textContent = label();
-        });
-        actions.appendChild(settingsBtn);
-        actions.appendChild(settings);
-
-        actions.appendChild(this.createPauseButton(t('pause.quit'), 'danger', () => {
-            this.resumeGame();
-            audio.stopMusic();
-            this.state = 'MENU';
-            screenManager.goto('main_menu');
-        }));
-        screen.appendChild(actions);
-
-        this.uiLayer.appendChild(screen);
+        this.pause.open(
+            () => ({
+                stage: stageName(this.currentStage),
+                time: formatTime(this.gameTime),
+                kills: this.killCount,
+            }),
+            {
+                onResume: () => this.resumeGame(),
+                onQuit: () => {
+                    this.resumeGame();
+                    audio.stopMusic();
+                    this.state = 'MENU';
+                    screenManager.goto('main_menu');
+                },
+            },
+        );
     }
 
     private resumeGame() {
-        this.pauseI18nUnsub?.();
-        this.pauseI18nUnsub = null;
-        this.pauseOverlay?.remove();
-        this.pauseOverlay = null;
+        this.pause.close();
         if (this.state === 'PAUSED') this.state = 'PLAYING';
         audio.resumeMusic();
     }
@@ -593,425 +498,6 @@ export class GameManager {
                 kind: 'burn',
             });
         }
-    }
-
-    /** Same look and blips as the menu buttons, without the screen base class */
-    private createPauseButton(text: string, variant: string, onClick: () => void): HTMLButtonElement {
-        const btn = document.createElement('button');
-        btn.className = `pixel-btn pixel-btn--${variant} interactive`;
-        btn.textContent = text;
-        btn.addEventListener('pointerenter', () => audio.play('uiHover'));
-        btn.addEventListener('click', () => {
-            audio.play('uiSelect');
-            onClick();
-        });
-        return btn;
-    }
-
-    private formatTime(seconds: number): string {
-        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-        const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
-    }
-
-    showLevelUp() {
-        this.state = 'LEVEL_UP';
-        audio.play('levelup');
-        audio.play('crash');
-
-        // The panel smashes through the screen: flash, freeze, zoom, shake
-        juice.flash('#ffffff', 0.6, 0.35);
-        juice.addTrauma(0.6);
-        juice.zoomPunch(0.8);
-        juice.hitStop(0.08);
-        if (this.player) {
-            juice.shockwave(this.player.pos.x, this.player.pos.y, 260, '#66f7ff', 0.5, 6);
-        }
-
-        const screen = document.createElement('div');
-        screen.className = 'screen level-up-screen crash-in';
-        screen.appendChild(this.createImpactOverlay());
-
-        // Heading is appended (not innerHTML) so the crack overlay survives
-        const heading = document.createElement('h2');
-        screen.appendChild(heading);
-
-        // Developer Mode with Tabs
-        if (this.devMode) {
-            heading.textContent = t('levelup.devMode');
-
-            // Create tabs
-            const tabs = document.createElement('div');
-            tabs.className = 'dev-tabs interactive';
-
-            const tabData = [
-                { id: 'powerups', label: t('levelup.tabPowerups') },
-                { id: 'weapons', label: t('levelup.tabWeapons') },
-                { id: 'evolved', label: t('levelup.tabEvolved') }
-            ];
-
-            tabData.forEach((tab, index) => {
-                const tabBtn = document.createElement('button');
-                tabBtn.className = 'dev-tab' + (index === 0 ? ' active' : '');
-                tabBtn.textContent = tab.label;
-                tabBtn.dataset.tab = tab.id;
-                tabBtn.onclick = () => this.switchDevTab(tab.id, screen);
-                tabs.appendChild(tabBtn);
-            });
-
-            screen.appendChild(tabs);
-
-            // Create grid container
-            const grid = document.createElement('div');
-            grid.className = 'dev-upgrade-grid';
-            grid.id = 'dev-grid';
-            screen.appendChild(grid);
-
-            this.uiLayer.appendChild(screen);
-
-            // Populate initial tab (powerups)
-            this.switchDevTab('powerups', screen);
-            return;
-        }
-
-        // Normal mode: weighted pool biased toward owned weapons (see UpgradePool)
-        const isLucky = Math.random() < 0.1;
-        const upgradeCount = isLucky ? 6 : 3;
-
-        heading.textContent = isLucky ? t('levelup.lucky') : t('levelup.title');
-        if (isLucky) heading.classList.add('lucky');
-
-        const grid = document.createElement('div');
-        grid.className = isLucky ? 'upgrade-grid-6' : 'upgrade-grid';
-        screen.appendChild(grid);
-
-        // One free reroll every level-up, plus one per Spare Cartridge stack.
-        //
-        // Three random cards with no way to say "not these" is a lottery, not a
-        // decision — and the pool already guarantees an owned weapon in every
-        // draw, so a reroll cannot lock you out of your evolution.
-        let rerollsLeft = 1 + (this.player?.stats.reroll ?? 0);
-
-        const reroll = document.createElement('button');
-        reroll.className = 'reroll-btn interactive';
-        const renderReroll = () => {
-            reroll.disabled = rerollsLeft <= 0;
-            reroll.innerHTML = `<span class="reroll-icon">⟳</span><span class="reroll-count">${rerollsLeft}</span>`;
-            reroll.title = t('levelup.reroll');
-        };
-        reroll.onclick = () => {
-            if (rerollsLeft <= 0) return;
-            rerollsLeft--;
-            audio.play('uiSelect');
-            renderReroll();
-            this.fillUpgradeGrid(grid, screen, upgradeCount);
-        };
-        reroll.addEventListener('pointerenter', () => audio.play('uiHover'));
-        renderReroll();
-
-        this.fillUpgradeGrid(grid, screen, upgradeCount);
-        // Six cards wrap into two rows of three, so vertical steps move by 3
-        this.attachUpgradeKeys(isLucky ? 3 : upgradeCount);
-        screen.appendChild(reroll);
-        this.uiLayer.appendChild(screen);
-    }
-
-    /** (Re)draw the level-up offers into `grid` */
-    private fillUpgradeGrid(grid: HTMLElement, screen: HTMLElement, count: number) {
-        grid.innerHTML = '';
-        const cards: HTMLElement[] = [];
-
-        const options = buildUpgradeOptions({
-            weaponLevels: this.weaponLevels,
-            powerupLevels: this.powerupLevels,
-            classId: this.player?.classId,
-            count,
-        });
-
-        options.forEach((opt, index) => {
-            const card = document.createElement('div');
-            card.className = 'upgrade-card interactive';
-            // Staggered slam-in: each card lands just after the panel impact
-            card.style.animationDelay = `${(0.12 + index * 0.06).toFixed(2)}s`;
-            card.addEventListener('pointerenter', () => audio.play('uiHover'));
-            card.addEventListener('click', () => audio.play('uiSelect'), { capture: true });
-
-            if (opt.type === 'weapon') {
-                const weaponData = opt.data;
-                const currentLevel = this.weaponLevels.get(weaponData.id) || 0;
-                const canEvolve = currentLevel === 5;
-                const newLevel = currentLevel + 1;
-
-                if (canEvolve) {
-                    card.classList.add('evolution-ready');
-                }
-
-                const emoji = canEvolve ? weaponData.evolution.emoji : weaponData.emoji;
-                const name = canEvolve ? weaponEvoName(weaponData) : weaponName(weaponData);
-                const desc = canEvolve ? weaponEvoDesc(weaponData) : weaponDesc(weaponData);
-                const levelText = canEvolve
-                    ? t('levelup.evolve')
-                    : (currentLevel > 0 ? t('levelup.level', { from: currentLevel, to: newLevel }) : t('common.new'));
-
-                card.innerHTML = `
-                <div style="font-size: 3em">${emoji}</div>
-                <h3>${name}</h3>
-                <div class="level-indicator">${levelText}</div>
-                <p>${desc}</p>
-                ${this.weaponPreview(weaponData, currentLevel, canEvolve)}
-              `;
-
-                this.bindPick(card, screen, () => this.addWeapon(weaponData.id));
-            } else {
-                const powerup = opt.data;
-                const stack = this.powerupLevels.get(powerup.name) ?? 0;
-                const value = getPowerupValue(powerup.value, stack, powerup.stackGrowth);
-                const bonus = formatPowerupBonus(powerup.type, value);
-                const stackText = stack > 0
-                    ? t('levelup.level', { from: stack, to: stack + 1 })
-                    : t('common.new');
-                card.innerHTML = `
-                <div style="font-size: 3em">${powerup.emoji}</div>
-                <h3>${powerupName(powerup)}</h3>
-                <div class="level-indicator">${stackText} · ${bonus}</div>
-                <p>${powerupDesc(powerup)}</p>
-                ${this.powerupPreview(powerup, value)}
-              `;
-                this.bindPick(card, screen, () => this.applyPowerup(powerup));
-            }
-
-            card.addEventListener('pointerenter', () => this.focusCard(cards.indexOf(card)));
-            cards.push(card);
-            grid.appendChild(card);
-        });
-
-        // Start on the middle card: the reroll button is directly below it, and
-        // a centred cursor is one keypress from either edge
-        this.upgradeCards = cards;
-        this.focusCard(Math.floor(cards.length / 2));
-    }
-
-    /**
-     * Committing a pick.
-     *
-     * The upgrade used to apply on the same frame as the click, so a level-up
-     * was a card vanishing — nothing confirmed that *this* one was the one you
-     * took. A brief flash on the chosen card plus a chime gives the choice a
-     * moment of weight, and the world is frozen during LEVEL_UP so the delay
-     * costs nothing.
-     */
-    private bindPick(card: HTMLElement, screen: HTMLElement, apply: () => void) {
-        let taken = false;
-        card.onclick = () => {
-            if (taken) return;
-            taken = true;
-            card.classList.add('upgrade-card--picked');
-            audio.play('evolve');
-            juice.flash('#ffffff', 0.18, 0.16);
-
-            setTimeout(() => {
-                this.detachUpgradeKeys();
-                apply();
-                screen.remove();
-                this.state = 'PLAYING';
-            }, 160);
-        };
-    }
-
-    /** Move the keyboard cursor; clamped, never wraps */
-    private focusCard(index: number) {
-        if (this.upgradeCards.length === 0) return;
-        const clamped = Math.max(0, Math.min(this.upgradeCards.length - 1, index));
-        if (clamped === this.focusedCard && this.upgradeCards[clamped].classList.contains('upgrade-card--focused')) return;
-
-        this.upgradeCards.forEach(c => c.classList.remove('upgrade-card--focused'));
-        this.upgradeCards[clamped].classList.add('upgrade-card--focused');
-        this.focusedCard = clamped;
-    }
-
-    /**
-     * WASD / arrows to move, space or enter to take it.
-     *
-     * Three cards is one row, six is two rows of three — so W/S step by the row
-     * width rather than by one, which is what "up" means on a grid.
-     */
-    private attachUpgradeKeys(columns: number) {
-        this.detachUpgradeKeys();
-
-        const onKey = (e: KeyboardEvent) => {
-            if (this.state !== 'LEVEL_UP' || this.upgradeCards.length === 0) return;
-
-            let moved = true;
-            switch (e.code) {
-                case 'KeyA': case 'ArrowLeft': this.focusCard(this.focusedCard - 1); break;
-                case 'KeyD': case 'ArrowRight': this.focusCard(this.focusedCard + 1); break;
-                case 'KeyW': case 'ArrowUp': this.focusCard(this.focusedCard - columns); break;
-                case 'KeyS': case 'ArrowDown': this.focusCard(this.focusedCard + columns); break;
-                case 'Space': case 'Enter':
-                    e.preventDefault();
-                    this.upgradeCards[this.focusedCard]?.click();
-                    return;
-                default: moved = false;
-            }
-
-            if (moved) {
-                e.preventDefault();
-                audio.play('uiHover');
-            }
-        };
-
-        window.addEventListener('keydown', onKey);
-        this.upgradeKeyHandler = onKey;
-    }
-
-    private detachUpgradeKeys() {
-        if (!this.upgradeKeyHandler) return;
-        window.removeEventListener('keydown', this.upgradeKeyHandler);
-        this.upgradeKeyHandler = null;
-        this.upgradeCards = [];
-    }
-
-    /**
-     * "124% → 132%" under the flavour text.
-     *
-     * The description says what a powerup *is*; this says what taking it does to
-     * the number you already have, which is what actually decides the pick.
-     */
-    private powerupPreview(powerup: any, value: number): string {
-        if (!this.player) return '';
-
-        const stats = this.player.stats as Record<string, number>;
-        const current = powerup.type === 'maxHp' ? this.player.maxHp : (stats[powerup.type] ?? 0);
-        return `<div class="stat-preview">${formatStatPreview(powerup.type, current, current + value)}</div>`;
-    }
-
-    /** Damage before → after for a weapon card */
-    private weaponPreview(weaponData: any, currentLevel: number, canEvolve: boolean): string {
-        if (currentLevel === 0 || !this.player) return '';
-
-        const weapon = this.player.weapons.find((w: any) => w.weaponId === weaponData.id);
-        if (!weapon) return '';
-
-        // Upgrades scale damage by 1.2; evolving doubles it (see Weapon.upgrade)
-        const next = canEvolve ? weapon.damage * 2 : weapon.damage * 1.2;
-
-        // Shown through `might`, because that is the number that lands. Crit and
-        // adrenaline are deliberately left out: both are situational, and a
-        // preview that changes with the player's current HP is noise. With
-        // GLOBAL_DAMAGE gone, this is now the whole of the calculation.
-        const might = this.player.stats.might;
-        return `<div class="stat-preview">${t('levelup.damage')} ${Math.round(weapon.damage * might)} → ${Math.round(next * might)}</div>`;
-    }
-
-    switchDevTab(tabId: string, screen: HTMLElement) {
-        // Update active tab
-        const tabs = screen.querySelectorAll('.dev-tab');
-        tabs.forEach(tab => {
-            tab.classList.toggle('active', (tab as HTMLElement).dataset.tab === tabId);
-        });
-
-        // Get grid
-        const grid = document.getElementById('dev-grid');
-        if (!grid) return;
-        grid.innerHTML = '';
-
-        if (tabId === 'powerups') {
-            // Show all powerups
-            POWERUPS.forEach(powerup => {
-                const card = this.createDevCard(
-                    powerup.emoji,
-                    powerupName(powerup),
-                    powerupDesc(powerup),
-                    '',
-                    () => {
-                        this.applyPowerup(powerup);
-                        screen.remove();
-                        this.state = 'PLAYING';
-                    }
-                );
-                grid.appendChild(card);
-            });
-        } else if (tabId === 'weapons') {
-            // Show all base weapons
-            WEAPONS.forEach(weaponData => {
-                const currentLevel = this.weaponLevels.get(weaponData.id) || 0;
-                const isEvolved = currentLevel >= 6;
-
-                if (isEvolved) return; // Skip fully evolved weapons
-
-                const canEvolve = currentLevel === 5;
-                const newLevel = currentLevel + 1;
-                const levelText = canEvolve
-                    ? t('levelup.evolve')
-                    : (currentLevel > 0 ? t('levelup.level', { from: currentLevel, to: newLevel }) : t('common.new'));
-
-                const emoji = canEvolve ? weaponData.evolution.emoji : weaponData.emoji;
-                const name = canEvolve ? weaponEvoName(weaponData) : weaponName(weaponData);
-                const desc = canEvolve ? weaponEvoDesc(weaponData) : weaponDesc(weaponData);
-
-                const card = this.createDevCard(
-                    emoji,
-                    name,
-                    desc,
-                    levelText,
-                    () => {
-                        this.addWeapon(weaponData.id);
-                        screen.remove();
-                        this.state = 'PLAYING';
-                    },
-                    canEvolve
-                );
-                grid.appendChild(card);
-            });
-        } else if (tabId === 'evolved') {
-            // Show evolved weapons (only those not yet evolved)
-            WEAPONS.forEach(weaponData => {
-                const currentLevel = this.weaponLevels.get(weaponData.id) || 0;
-
-                // Skip if weapon is already evolved
-                if (currentLevel >= 6) return;
-
-                const card = this.createDevCard(
-                    weaponData.evolution.emoji,
-                    weaponEvoName(weaponData),
-                    weaponEvoDesc(weaponData),
-                    t('levelup.instantEvolve'),
-                    () => {
-                        this.addEvolvedWeapon(weaponData.id);
-                        screen.remove();
-                        this.state = 'PLAYING';
-                    },
-                    true // isEvolutionReady - use evolution-ready styling
-                );
-                grid.appendChild(card);
-            });
-        }
-    }
-
-    createDevCard(
-        emoji: string,
-        name: string,
-        description: string,
-        levelText: string,
-        onClick: () => void,
-        isEvolutionReady: boolean = false
-    ): HTMLElement {
-        const card = document.createElement('div');
-        card.className = 'upgrade-card interactive';
-
-        if (isEvolutionReady) {
-            card.classList.add('evolution-ready');
-        }
-
-        card.innerHTML = `
-            <div style="font-size: 3em">${emoji}</div>
-            <h3>${name}</h3>
-            ${levelText ? `<div class="level-indicator">${levelText}</div>` : ''}
-            <p>${description}</p>
-        `;
-
-        card.onclick = onClick;
-        return card;
     }
 
     addEvolvedWeapon(weaponId: string) {
@@ -1475,170 +961,28 @@ export class GameManager {
     }
 
     /**
-     * The three "what happened" numbers, as opposed to the "how far did you
-     * get" ones above them. These are the parts of a run people retell.
+     * Close the run out: award achievements, settle the score, and hand a
+     * snapshot to the result panel. The panel itself is pure presentation and
+     * lives in ui/screens/RunSummaryOverlay — everything that *changes* state
+     * has to happen here, before it is handed over.
      */
-    private createHighlights(): HTMLElement {
-        const stats = this.runStats.stats;
-        const box = document.createElement('div');
-        box.className = 'result-highlights';
-
-        const rows: string[] = [];
-
-        if (stats.bestHit > 0) {
-            const weapon = WEAPONS.find(w => w.id === stats.bestHitWeaponId);
-            const evolved = weapon && (this.weaponLevels.get(weapon.id) ?? 0) >= 6;
-            const via = weapon
-                ? `${evolved ? weapon.evolution.emoji : weapon.emoji} ${evolved ? weaponEvoName(weapon) : weaponName(weapon)}`
-                : '';
-            rows.push(`
-                <div class="highlight">
-                    <span>${stats.bestHitCrit ? t('result.bestCrit') : t('result.bestHit')}</span>
-                    <strong>${formatScore(Math.round(stats.bestHit))}</strong>
-                    <em>${via}</em>
-                </div>`);
-        }
-
-        rows.push(`
-            <div class="highlight">
-                <span>${t('result.untouched')}</span>
-                <strong>${this.formatTime(stats.longestUntouched)}</strong>
-            </div>`);
-
-        if (stats.bestMultikill > 1) {
-            rows.push(`
-                <div class="highlight">
-                    <span>${t('result.multikill')}</span>
-                    <strong>×${stats.bestMultikill}</strong>
-                </div>`);
-        }
-
-        rows.push(`
-            <div class="highlight">
-                <span>${t('result.totalDamage')}</span>
-                <strong>${formatScore(Math.round(stats.totalDamage))}</strong>
-            </div>`);
-
-        // Shown even at zero, on purpose: "you healed nothing all run" is a
-        // fact about the build, and one the player can act on next time
-        rows.push(`
-            <div class="highlight">
-                <span>${t('result.healed')}</span>
-                <strong>${formatScore(Math.round(stats.totalHealed))}</strong>
-            </div>`);
-
-        box.innerHTML = rows.join('');
-        return box;
-    }
-
-    /**
-     * What you actually built, spelled out — the same icons the in-run panel
-     * shows, so the end screen answers "what was that run" rather than making
-     * you remember. Deliberately no per-weapon damage: ranking your own weapons
-     * would turn build variety into a solved problem.
-     */
-    private createBuildSummary(): HTMLElement {
-        const box = document.createElement('div');
-        box.className = 'result-build';
-
-        const slots: string[] = [];
-        for (const [id, level] of this.weaponLevels) {
-            const weapon = WEAPONS.find(w => w.id === id);
-            if (!weapon) continue;
-            const evolved = level >= 6;
-            slots.push(`
-                <div class="build-slot${evolved ? ' build-slot--evolved' : ''}" title="${evolved ? weaponEvoName(weapon) : weaponName(weapon)}">
-                    <span class="build-icon">${evolved ? weapon.evolution.emoji : weapon.emoji}</span>
-                    <span class="build-badge">${evolved ? '★' : level}</span>
-                </div>`);
-        }
-        for (const [name, stacks] of this.powerupLevels) {
-            const powerup = POWERUPS.find(p => p.name === name);
-            if (!powerup) continue;
-            slots.push(`
-                <div class="build-slot" title="${powerupName(powerup)}">
-                    <span class="build-icon">${powerup.emoji}</span>
-                    <span class="build-badge">${stacks}</span>
-                </div>`);
-        }
-
-        box.innerHTML = `<span class="result-build-label">${t('result.build')}</span>
-            <div class="result-build-row">${slots.join('')}</div>`;
-        return box;
-    }
-
-    /** Shared end-of-run panel for both defeat and victory */
-    private showRunSummary(opts: { title: string; subtitle: string; variant: 'defeat' | 'victory' }) {
-        const mins = Math.floor(this.gameTime / 60).toString().padStart(2, '0');
-        const secs = Math.floor(this.gameTime % 60).toString().padStart(2, '0');
-
-        const screen = document.createElement('div');
-        screen.className = `screen result-screen result-screen--${opts.variant}`;
-
-        const title = document.createElement('h1');
-        title.textContent = opts.title;
-        screen.appendChild(title);
-
-        const subtitle = document.createElement('p');
-        subtitle.className = 'result-subtitle';
-        subtitle.textContent = opts.subtitle;
-        screen.appendChild(subtitle);
-
-        // Score is the headline: it is the only number that makes two runs
-        // comparable, so it gets its own panel above the breakdown
+    private endRun(variant: 'defeat' | 'victory', title: string, subtitle: string) {
         achievements.check(this.runSnapshot());
-        const { score, rank } = this.submitRunScore(opts.variant === 'victory');
-        const scoreBox = document.createElement('div');
-        scoreBox.className = 'result-score';
-        scoreBox.innerHTML = `
-            <span>${t('result.score')}</span>
-            <strong>${formatScore(score)}</strong>
-            ${rank > 0 ? `<em class="result-rank">${t('result.newRecord', { rank })}</em>` : ''}
-        `;
-        screen.appendChild(scoreBox);
+        const { score, rank } = this.submitRunScore(variant === 'victory');
 
-        const stats = document.createElement('div');
-        stats.className = 'result-stats';
-        stats.innerHTML = `
-            <div class="result-stat"><span>${t('result.time')}</span><strong>${mins}:${secs}</strong></div>
-            <div class="result-stat"><span>${t('result.kills')}</span><strong>${this.killCount}</strong></div>
-            <div class="result-stat"><span>${t('result.level')}</span><strong>${this.player?.level ?? 1}</strong></div>
-        `;
-        screen.appendChild(stats);
-        screen.appendChild(this.createHighlights());
-        screen.appendChild(this.createBuildSummary());
-
-        const buttons = document.createElement('div');
-        buttons.className = 'menu-buttons menu-buttons--row';
-
-        const again = document.createElement('button');
-        again.className = 'pixel-btn pixel-btn--primary interactive';
-        again.textContent = t('result.again');
-        again.addEventListener('pointerenter', () => audio.play('uiHover'));
-        again.onclick = () => {
-            audio.play('uiSelect');
-            screenManager.goto('class_selection');
-        };
-
-        const menu = document.createElement('button');
-        menu.className = 'pixel-btn interactive';
-        menu.textContent = t('result.menu');
-        menu.addEventListener('pointerenter', () => audio.play('uiHover'));
-        menu.onclick = () => {
-            audio.play('uiBack');
-            screenManager.goto('main_menu');
-        };
-
-        buttons.appendChild(again);
-        buttons.appendChild(menu);
-        screen.appendChild(buttons);
-
-        const credit = document.createElement('div');
-        credit.className = 'menu-credit';
-        credit.textContent = AUTHOR_CREDIT;
-        screen.appendChild(credit);
-
-        this.uiLayer.appendChild(screen);
+        showRunSummary(this.uiLayer, {
+            title,
+            subtitle,
+            variant,
+            seconds: this.gameTime,
+            kills: this.killCount,
+            level: this.player?.level ?? 1,
+            score,
+            rank,
+            stats: this.runStats.stats,
+            weaponLevels: this.weaponLevels,
+            powerupLevels: this.powerupLevels,
+        });
     }
 
     showGameOver() {
@@ -1650,11 +994,11 @@ export class GameManager {
         if (this.player) {
             particles.emitExplosion(this.player.pos.x, this.player.pos.y, 90, ['#ff3344', '#ffffff', '#661122']);
         }
-        this.showRunSummary({
-            title: t('result.gameOver'),
-            subtitle: t('result.defeatSubtitle', { stage: stageName(this.currentStage) }),
-            variant: 'defeat',
-        });
+        this.endRun(
+            'defeat',
+            t('result.gameOver'),
+            t('result.defeatSubtitle', { stage: stageName(this.currentStage) }),
+        );
     }
 
     showVictory() {
@@ -1663,11 +1007,11 @@ export class GameManager {
         juice.flash('#ffffff', 0.6, 0.9);
         juice.zoomPunch(0.8);
         juice.slowMo(0.3, 1);
-        this.showRunSummary({
-            title: t('result.victory'),
-            subtitle: t('result.victorySubtitle', { stage: stageName(this.currentStage) }),
-            variant: 'victory',
-        });
+        this.endRun(
+            'victory',
+            t('result.victory'),
+            t('result.victorySubtitle', { stage: stageName(this.currentStage) }),
+        );
     }
 
     spawnEnemy(options: { boss?: boolean; final?: boolean; angle?: number; at?: Vector2 } = {}) {
