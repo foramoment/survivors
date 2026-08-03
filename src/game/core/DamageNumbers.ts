@@ -47,6 +47,8 @@ interface DamageNumber {
     isCrit: boolean;
     /** How many hits this number is the sum of */
     hits: number;
+    /** How much of `amount` came from critical hits — decides the crit styling */
+    critAmount: number;
     /** Seconds this entry still accepts merges. Never refreshed. */
     openFor: number;
     /** Punch-in timer, restarted on every merge so growth is visible */
@@ -54,17 +56,43 @@ interface DamageNumber {
 }
 
 /**
- * Cap on how many digits may be on screen. Late-game AoE can produce hundreds
- * per second, and past this many the screen is unreadable anyway.
+ * Cap on how many digits may be on screen.
+ *
+ * This was 90, with a comment admitting the screen is unreadable well before
+ * that. It was — a screenshot of a zone build was a solid wall of orange with
+ * no arena visible behind it. The dynamic merge radius below is what actually
+ * keeps the count down; this is only the backstop.
  */
-const MAX_ON_SCREEN = 90;
+const MAX_ON_SCREEN = 28;
 
 /** Minimum real seconds between crit hit-stops, so a volley cannot stutter */
 const CRIT_STOP_GAP = 0.35;
 
-/** How long a number accepts merges, and how far away a hit may be to merge */
+/** How long a number accepts merges */
 const MERGE_WINDOW = 0.22;
-const MERGE_RADIUS = 38;
+
+/**
+ * How far a hit may be from an open number to fold into it — and it **grows
+ * with how busy the screen already is**.
+ *
+ * A fixed 38px was the single biggest reason merging did not work. A zone
+ * weapon covers 300-400px, so one tick landed twenty hits that were all too far
+ * apart to merge and printed twenty separate numbers; a screen-filling build
+ * printed a wall of them and hid the arena completely.
+ *
+ * Making it a constant big enough for a zone would throw away locality when the
+ * screen is quiet, which is when locality is worth something. So it scales:
+ * a few numbers on screen and merging stays tight and precise, a crowded screen
+ * and it widens until new hits nearly always fold into an existing total. The
+ * display degrades from "what each hit did" to "how much is happening here",
+ * which is the right thing to know at each of those moments, and the count
+ * bounds itself without a hard cap doing the work.
+ */
+const MERGE_RADIUS_CALM = 40;
+const MERGE_RADIUS_BUSY = 220;
+
+/** Number of live entries at which the merge radius reaches its maximum */
+const CROWDED_AT = 6;
 
 /**
  * Damage *taken* gathers for much longer than damage dealt.
@@ -155,10 +183,11 @@ export class DamageNumbers {
         const taken = kind === 'taken';
         const life = taken ? 0.7 : (isCrit ? 0.8 : 0.55);
         this.items.push({
-            // Enemy hits get wide horizontal jitter so simultaneous ones do not
-            // stack into a pile. Taken damage is always at the same spot, so
-            // jitter would only smear it around the player's head instead.
-            x: taken ? pos.x : pos.x + (Math.random() - 0.5) * 28,
+            // A little horizontal jitter so two simultaneous hits that failed to
+            // merge do not sit exactly on top of each other. Kept small — it
+            // pushes hits apart *before* they get a chance to merge, so it works
+            // against the thing that actually keeps the screen readable.
+            x: taken ? pos.x : pos.x + (Math.random() - 0.5) * 14,
             y: pos.y,
             // Arc upward and outward so overlapping hits stay readable
             vx: taken ? 0 : (Math.random() - 0.5) * 60,
@@ -170,9 +199,16 @@ export class DamageNumbers {
             isCrit,
             kind,
             hits: 1,
+            critAmount: isCrit ? amount : 0,
             openFor: taken ? TAKEN_MERGE_WINDOW : MERGE_WINDOW,
             pop: POP_TIME,
         });
+    }
+
+    /** Merge reach right now — see MERGE_RADIUS_CALM */
+    private get mergeRadius(): number {
+        const busy = Math.min(this.items.length / CROWDED_AT, 1);
+        return MERGE_RADIUS_CALM + busy * (MERGE_RADIUS_BUSY - MERGE_RADIUS_CALM);
     }
 
     /**
@@ -181,21 +217,37 @@ export class DamageNumbers {
      * in one frame.
      */
     private mergeInto(pos: Vector2, amount: number, isCrit: boolean, kind: DamageKind): boolean {
+        const radius = this.mergeRadius;
+
         for (let i = this.items.length - 1; i >= 0; i--) {
             const dn = this.items[i];
             if (dn.kind !== kind) continue; // never fold your damage into theirs
             if (dn.openFor <= 0) continue;
-            if (Math.abs(dn.x - pos.x) > MERGE_RADIUS) continue;
-            if (Math.abs(dn.y - pos.y) > MERGE_RADIUS) continue;
+            if (Math.abs(dn.x - pos.x) > radius) continue;
+            if (Math.abs(dn.y - pos.y) > radius) continue;
 
             dn.amount += amount;
             dn.hits++;
+            if (isCrit) dn.critAmount += amount;
             dn.text = Math.max(1, Math.round(dn.amount)).toString();
-            // One crit in the group makes the whole total read as a crit: the
-            // colour is about "something big happened here", and it did
-            if (isCrit && !dn.isCrit) {
-                dn.isCrit = true;
-                dn.maxLife = 0.8;
+
+            // Crit styling follows where the DAMAGE came from, not whether any
+            // single hit crit.
+            //
+            // The rule used to be "one crit anywhere makes the whole group read
+            // as a crit", and at merge sizes that is the same as "always": with
+            // a 20% crit chance and sixteen folded hits it fires 97% of the
+            // time. Every number on screen came out big and orange, which is
+            // what a play-test read as "there are way too many crits" when the
+            // crit rate had not changed at all.
+            //
+            // Weighting by damage keeps the case that matters — one real crit
+            // among a few chip hits still dominates its total and still reads as
+            // a crit — while a sweep that happened to contain one stays plain.
+            const critHeavy = dn.critAmount * 2 >= dn.amount;
+            if (critHeavy !== dn.isCrit) {
+                dn.isCrit = critHeavy;
+                dn.maxLife = critHeavy ? 0.8 : 0.55;
             }
             // Hold it in place while it is still gathering, then let it fly
             dn.life = dn.maxLife;
@@ -256,11 +308,17 @@ export class DamageNumbers {
         ctx.imageSmoothingEnabled = false;
         for (const dn of this.items) {
             const t = 1 - dn.life / dn.maxLife;
-            // Punch-in on spawn and on every merge, so a total visibly grows
+            // Punch-in on spawn and on every merge, so a total visibly grows.
+            //
+            // Both the peak and the bases came down a notch. `pop` restarts on
+            // every merge, so a number gathering over a crowd sat at its maximum
+            // the entire time it was open — and the maximum was round(3.4 * 1.6)
+            // = a 5x pixel font. Combined with nearly everything rendering as a
+            // crit, the arena disappeared behind its own damage numbers.
             const pop = dn.pop > 0
-                ? 1.15 + (dn.pop / POP_TIME) * 0.45
-                : Math.max(0.9, 1.15 - t * 0.15);
-            const base = dn.isCrit ? 3.4 : (dn.kind === 'taken' ? 2.6 : 2.2);
+                ? 1 + (dn.pop / POP_TIME) * 0.3
+                : Math.max(0.85, 1 - t * 0.15);
+            const base = dn.isCrit ? 2.8 : (dn.kind === 'taken' ? 2.6 : 2.0);
             const scale = Math.max(1, Math.round(base * pop));
 
             const sx = dn.x - camera.x;
