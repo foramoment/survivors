@@ -185,8 +185,11 @@ export class ArenaEventSystem {
     private impact(m: Meteor, ctx: ArenaContext) {
         m.afterglow = 0.45;
 
-        // Enemy damage grows with run time so the hazard stays relevant
-        const damage = 80 * (1 + ctx.gameTime / 180);
+        // Enemy damage grows with run time so the hazard stays relevant.
+        // Halved with enemy health when GLOBAL_DAMAGE went away: this is one of
+        // only two `skipModifiers` sources in the game, so it never received the
+        // old doubling and would otherwise have come out twice as strong.
+        const damage = 40 * (1 + ctx.gameTime / 180);
         for (const enemy of levelSpatialHash.getNearby({ x: m.x, y: m.y }, m.radius)) {
             if (distance(enemy.pos, { x: m.x, y: m.y }) <= m.radius + enemy.radius) {
                 // Environmental damage: no weapon, so no crit/might modifiers

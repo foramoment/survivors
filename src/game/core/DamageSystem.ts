@@ -26,16 +26,24 @@ export interface DamageParams {
 }
 
 /**
- * Flat multiplier on every modified hit.
+ * There is no global damage multiplier, and there must never be one again.
  *
- * History: the crit branch used to read `isCrit ? critDamage : 2`, so *normal*
- * hits were doubled and a default 1.5x crit landed for LESS than a normal hit.
- * The whole game was balanced around that doubling, so the fix keeps it — as an
- * explicit global multiplier — and lets the crit multiplier stack on top of it
- * instead of replacing it. Non-crit damage is unchanged; a crit is now
- * genuinely critDamage times stronger than a normal hit.
+ * There used to be `GLOBAL_DAMAGE = 2` here — the fossil of an older bug where
+ * the crit branch read `isCrit ? critDamage : 2`, doubling every *normal* hit.
+ * Removing the doubling would have halved the game, so it was kept as an
+ * explicit constant. That was the right call at the time and the wrong thing to
+ * live with: it meant every number the UI could show was half of what the
+ * player saw. A weapon card promising "36 damage" landed for 95, and no amount
+ * of honest UI work could fix that, because the lie was in the damage pipeline.
+ *
+ * It is gone, and enemy health was rebased by the same factor in the same
+ * commit, so time-to-kill did not move — only the size of the digits.
+ *
+ * **The invariant this buys: one point of weapon damage is one point of enemy
+ * health.** Anything a weapon, perk or class advertises is what lands. If a
+ * future change ever wants "everything hits harder", it belongs in the weapon
+ * table or in `might`, where it is visible — not in a constant here.
  */
-export const GLOBAL_DAMAGE = 2;
 
 export interface DamageResult {
     finalDamage: number;
@@ -71,7 +79,7 @@ class DamageSystemClass {
         // `stats.might` is the fallback for the mock owners used in tests
         const might = player.effectiveMight ?? player.stats.might;
         const opener = 1 + this.openerBonus(player, target);
-        const finalDamage = baseDamage * might * GLOBAL_DAMAGE * critMultiplier * opener;
+        const finalDamage = baseDamage * might * critMultiplier * opener;
 
         return this.applyDamage(finalDamage, target, position, isCrit, source);
     }
@@ -135,7 +143,7 @@ class DamageSystemClass {
     calculateDamage(baseDamage: number, player: any): { damage: number, isCrit: boolean } {
         const isCrit = Math.random() < player.stats.critChance;
         const critMultiplier = isCrit ? player.stats.critDamage : 1;
-        const damage = baseDamage * player.stats.might * GLOBAL_DAMAGE * critMultiplier;
+        const damage = baseDamage * player.stats.might * critMultiplier;
         return { damage, isCrit };
     }
 

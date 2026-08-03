@@ -76,8 +76,10 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
     {
         id: 'overkill', emoji: '💥',
-        name: 'Overkill', description: 'Land a single hit for 5000',
-        check: r => r.bestHit >= 5000,
+        // 2500, not 5000: hits are written in the same units as enemy health
+        // now, and both were halved together when GLOBAL_DAMAGE was removed
+        name: 'Overkill', description: 'Land a single hit for 2500',
+        check: r => r.bestHit >= 2500,
     },
     {
         id: 'reaper', emoji: '☠️',

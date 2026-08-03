@@ -404,7 +404,12 @@ export const WEAPONS = [
 //   5, 6, 7, 9, 11, 13, 16, 20, 24, 30, 36
 // Поверх ложится масштаб времени/сложности (DifficultyDirector) и стейджа.
 export const ENEMY_CONFIG = {
-    baseHp: 10,           // Базовое HP первого врага
+    // Rebased from 10 when GLOBAL_DAMAGE was deleted from DamageSystem. Every
+    // point of player damage used to be silently doubled, so enemy health was
+    // written in half-points; halving it here keeps every time-to-kill in the
+    // game exactly where it was and makes the numbers on screen mean what the
+    // weapon cards say. Do not "restore" this without reading DamageSystem.
+    baseHp: 5,            // Базовое HP первого врага
     hpMultiplier: 2,      // Множитель HP для каждого следующего (x2)
     baseDamage: 5,        // Контактный урон в секунду у первого врага
     damageMultiplier: 1.22, // Множитель урона для каждого следующего

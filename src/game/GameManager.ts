@@ -316,10 +316,26 @@ export class GameManager {
         }
     }
 
+    /** Types already reported as dropped, so one bad weapon can't spam the log */
+    private droppedEntityTypes = new Set<string>();
+
     spawnEntity(entity: Entity) {
         if (entity instanceof Projectile || entity instanceof Zone) {
             this.projectiles.push(entity as any);
             audio.play('shoot');
+            return;
+        }
+
+        // The arena only ever iterates `projectiles`, so anything else lands
+        // nowhere: never updated, never drawn. Blood Cleaver's swing arc
+        // extended Entity directly and shipped like that — the weapon dealt
+        // full damage while being completely invisible, which reads as "this
+        // weapon does nothing" rather than as a bug. Silence was the whole
+        // problem, so say something.
+        const kind = entity.constructor.name;
+        if (!this.droppedEntityTypes.has(kind)) {
+            this.droppedEntityTypes.add(kind);
+            console.warn(`[GameManager] ${kind} was dropped: onSpawn only accepts Projectile or Zone.`);
         }
     }
 
@@ -878,7 +894,13 @@ export class GameManager {
 
         // Upgrades scale damage by 1.2; evolving doubles it (see Weapon.upgrade)
         const next = canEvolve ? weapon.damage * 2 : weapon.damage * 1.2;
-        return `<div class="stat-preview">${t('levelup.damage')} ${Math.round(weapon.damage)} → ${Math.round(next)}</div>`;
+
+        // Shown through `might`, because that is the number that lands. Crit and
+        // adrenaline are deliberately left out: both are situational, and a
+        // preview that changes with the player's current HP is noise. With
+        // GLOBAL_DAMAGE gone, this is now the whole of the calculation.
+        const might = this.player.stats.might;
+        return `<div class="stat-preview">${t('levelup.damage')} ${Math.round(weapon.damage * might)} → ${Math.round(next * might)}</div>`;
     }
 
     switchDevTab(tabId: string, screen: HTMLElement) {

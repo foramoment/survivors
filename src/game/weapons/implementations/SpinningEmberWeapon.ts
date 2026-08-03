@@ -23,8 +23,8 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import { BurningTrailZone } from '../base';
-import { Entity } from '../../Entity';
+import { BurningTrailZone, Projectile } from '../base';
+import type { Entity } from '../../Entity';
 import { type Vector2, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
@@ -50,22 +50,38 @@ const MISSING_HP_SCALE = 1.6;
 /**
  * A crescent sweeping around the player. Baked as one arc and animated by
  * angle and alpha only, so a swing costs two strokes however wide it is.
+ *
+ * It extends Projectile (collision disabled) rather than Entity because
+ * `GameManager.spawnEntity` only keeps Projectiles and Zones — anything else is
+ * dropped on the floor without a word. That is exactly how this weapon shipped
+ * invisible: the damage landed, the particles fired, and the swing itself was
+ * never added to the world at all.
+ *
+ * The arc rides the player instead of standing where the swing started: at
+ * 190 px/s you walk most of a reach away inside its 0.26s life, and a crescent
+ * left behind reads as something you dropped rather than something you swung.
  */
-export class CleaveArc extends Entity {
+export class CleaveArc extends Projectile {
     private age: number = 0;
     private readonly life: number = 0.26;
     private readonly reach: number;
     private readonly hot: number;
+    private readonly anchor: Entity;
 
-    constructor(x: number, y: number, reach: number, hot: number) {
-        super(x, y, reach);
+    constructor(anchor: Entity, reach: number, hot: number) {
+        super(anchor.pos.x, anchor.pos.y, { x: 0, y: 0 }, 0.26, 0, 0, '');
+        this.canCollide = false;
+        this.radius = reach;
+        this.anchor = anchor;
         this.reach = reach;
         this.hot = hot;
     }
 
     update(dt: number) {
+        this.pos.x = this.anchor.pos.x;
+        this.pos.y = this.anchor.pos.y;
         this.age += dt;
-        if (this.age >= this.life) this.isDead = true;
+        if (this.age >= this.life) this.kill();
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
@@ -79,7 +95,10 @@ export class CleaveArc extends Entity {
         // The crescent travels the full circle over the swing
         const head = t * Math.PI * 2.2;
         const tail = Math.max(0, head - 2.1);
-        const r = this.reach * (0.7 + 0.3 * t);
+        // Sized so the *outer* edge of the band lands on `reach` at the end of
+        // the swing — the blur has to stop where the damage stops, or the swing
+        // keeps missing things it visibly covered
+        const r = this.reach * (0.55 + 0.28 * t);
 
         // Hotter the more wounded the swing was — the read is "this one hurt"
         const glow = `rgba(255, ${Math.round(120 - 70 * this.hot)}, ${Math.round(90 - 60 * this.hot)}, `;
@@ -139,6 +158,15 @@ export class SpinningEmberWeapon extends Weapon {
     /** Seconds until Ruin's follow-up lands; <= 0 means nothing pending */
     private pendingSecond: number = 0;
 
+    /** Is there anything alive close enough to be worth a swing? */
+    private anyoneInReach(): boolean {
+        const reach = this.reach();
+        for (const enemy of levelSpatialHash.getWithinRadius(this.owner.pos, reach)) {
+            if (!enemy.isDead && distance(this.owner.pos, enemy.pos) <= reach) return true;
+        }
+        return false;
+    }
+
     update(dt: number) {
         // Ruin's follow-up runs on its own countdown, before the cooldown gate,
         // so it lands whether or not the next swing is ready
@@ -149,6 +177,12 @@ export class SpinningEmberWeapon extends Weapon {
 
         this.cooldown -= dt;
         if (this.cooldown > 0) return;
+
+        // A cleaver swings at bodies, not at empty air. The swing is *held*
+        // rather than spent, so the first thing to walk into reach eats it on
+        // the spot — same rule Phantom Slash uses, and the reason melee feels
+        // like melee instead of a metronome.
+        if (!this.anyoneInReach()) return;
 
         this.swing(this.wounded());
         if (this.evolved) {
@@ -164,7 +198,7 @@ export class SpinningEmberWeapon extends Weapon {
         const reach = this.reach();
         const multiplier = (1 + hot * MISSING_HP_SCALE) * scale;
 
-        const arc = new CleaveArc(this.owner.pos.x, this.owner.pos.y, reach, hot);
+        const arc = new CleaveArc(this.owner, reach, hot);
         this.onSpawn(arc);
         particles.emitShrapnel(this.owner.pos.x, this.owner.pos.y, reach * 0.5,
             ['#ffdccc', '#ff6b35', '#b32020'], 5);

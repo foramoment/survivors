@@ -99,7 +99,7 @@ export const RU: Record<string, string> = {
     'achievement.apex.name': 'Высший Хищник',
     'achievement.apex.desc': 'Развить три оружия за один забег',
     'achievement.overkill.name': 'Оверкилл',
-    'achievement.overkill.desc': 'Нанести 5000 одним ударом',
+    'achievement.overkill.desc': 'Нанести 2500 одним ударом',
     'achievement.reaper.name': 'Жнец',
     'achievement.reaper.desc': 'Убить 15 врагов в одно мгновение',
     'achievement.specialist.name': 'Специалист',

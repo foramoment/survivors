@@ -18,7 +18,7 @@ import { damageSystem } from '../core/DamageSystem';
 import { AcidPoolWeapon, CorrosivePool } from '../weapons/implementations/AcidPoolWeapon';
 import { FrostNovaWeapon, AbsoluteZeroZone } from '../weapons/implementations/FrostNovaWeapon';
 import { SpinningEmberWeapon } from '../weapons/implementations/SpinningEmberWeapon';
-import { BurningTrailZone } from '../weapons/base';
+import { BurningTrailZone, Projectile, Zone } from '../weapons/base';
 import { PhantomSlashWeapon } from '../weapons/implementations/PhantomSlashWeapon';
 import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWeapon';
 import { SporeCloudWeapon } from '../weapons/implementations/SporeCloudWeapon';
@@ -264,6 +264,37 @@ describe('Blood Cleaver', () => {
 
         weapon.update(0.1);
         expect(Math.hypot(enemy.knockback.x, enemy.knockback.y)).toBeGreaterThan(0);
+    });
+
+    it('spawns a swing the arena will actually keep and draw', () => {
+        // The arc used to extend Entity directly, and GameManager.spawnEntity
+        // silently drops anything that is not a Projectile or a Zone. Result:
+        // full damage, zero visuals — the weapon looked like it did nothing.
+        const player = new Player(0, 0);
+        const weapon = new SpinningEmberWeapon(player);
+        const spawned: Entity[] = [];
+        weapon.onSpawn = e => spawned.push(e);
+        placeEnemies([makeEnemy(30, 0)]);
+
+        weapon.update(0.1);
+        expect(spawned.length).toBeGreaterThan(0);
+        expect(spawned.every(e => e instanceof Projectile || e instanceof Zone)).toBe(true);
+    });
+
+    it('holds the swing when nothing is in reach, and spends it the moment something is', () => {
+        const player = new Player(0, 0);
+        const weapon = new SpinningEmberWeapon(player);
+        const spawned: Entity[] = [];
+        weapon.onSpawn = e => spawned.push(e);
+
+        placeEnemies([]);
+        weapon.update(2);
+        expect(spawned).toHaveLength(0);
+
+        // Cooldown was never spent, so the first body to walk in eats it now
+        placeEnemies([makeEnemy(30, 0)]);
+        weapon.update(0.016);
+        expect(spawned.length).toBeGreaterThan(0);
     });
 
     it('evolved scorches the ground and sets what it cuts alight', () => {

@@ -95,7 +95,8 @@ describe('Damage Refactor Verification', () => {
             target: enemy,
             position: { x: 0, y: 0 }
         });
-        expect(enemy.takeDamage).toHaveBeenLastCalledWith(20); // 10 * might 1.0 * GLOBAL_DAMAGE 2
+        // Weapon damage is enemy health, one to one — no hidden multiplier
+        expect(enemy.takeDamage).toHaveBeenLastCalledWith(10); // 10 * might 1.0
 
         // 2. Increase player might
         player.stats.might = 2.0;
@@ -108,8 +109,8 @@ describe('Damage Refactor Verification', () => {
             position: { x: 0, y: 0 }
         });
 
-        // Should be 40 now (10 * might 2.0 * GLOBAL_DAMAGE 2)
-        expect(enemy.takeDamage).toHaveBeenLastCalledWith(40);
+        // Should be 20 now (10 * might 2.0)
+        expect(enemy.takeDamage).toHaveBeenLastCalledWith(20);
     });
 
     it('should apply critical hits based on player crit chance', () => {
@@ -128,10 +129,10 @@ describe('Damage Refactor Verification', () => {
             position: { x: 0, y: 0 }
         });
 
-        // 10 * might 1.0 * GLOBAL_DAMAGE 2 * critDamage 2.0
-        expect(result.finalDamage).toBe(40);
+        // 10 * might 1.0 * critDamage 2.0
+        expect(result.finalDamage).toBe(20);
         expect(result.isCrit).toBe(true);
-        expect(enemy.takeDamage).toHaveBeenLastCalledWith(40);
+        expect(enemy.takeDamage).toHaveBeenLastCalledWith(20);
     });
 
     it('crits always hit harder than normal hits', () => {
@@ -171,7 +172,10 @@ describe('Damage Refactor Verification', () => {
             position: { x: 0, y: 0 }
         });
 
-        expect(result.finalDamage).toBe(100); // 10 * 5.0 might * 2.0 critDamage
+        // 10 * 5.0 might. The old expectation was 100 and the comment blamed
+        // "2.0 critDamage" — there is no crit here, that factor was the hidden
+        // GLOBAL_DAMAGE. Even the tests had stopped being able to explain it.
+        expect(result.finalDamage).toBe(50);
     });
 
     it('should properly track source chain Projectile -> Weapon -> Player', () => {
@@ -187,7 +191,7 @@ describe('Damage Refactor Verification', () => {
             position: { x: 0, y: 0 }
         });
 
-        expect(result.finalDamage).toBe(60); // 10 * 3.0 might * 2.0 critDamage
+        expect(result.finalDamage).toBe(30); // 10 * 3.0 might
     });
 
     it('should fallback to raw damage if source is missing', () => {
@@ -204,5 +208,26 @@ describe('Damage Refactor Verification', () => {
         });
 
         expect(result.finalDamage).toBe(10);
+    });
+
+    it('lands exactly the number the weapon advertises, with no hidden factor', () => {
+        // The invariant that replaced GLOBAL_DAMAGE: one point of weapon damage
+        // is one point of enemy health. Every UI promise in the game — weapon
+        // cards, level-up previews, tooltips — rests on this line. If it ever
+        // fails, some multiplier crept back into the pipeline where the player
+        // cannot see it.
+        const zone = new Zone(0, 0, 10, 1, 10, 1, '');
+        zone.source = weapon;
+        player.stats.might = 1.0;
+        player.stats.critChance = 0;
+
+        const result = damageSystem.dealDamage({
+            baseDamage: 37,
+            source: zone,
+            target: enemy,
+            position: { x: 0, y: 0 }
+        });
+
+        expect(result.finalDamage).toBe(37);
     });
 });

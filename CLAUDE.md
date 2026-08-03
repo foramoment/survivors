@@ -138,16 +138,28 @@ damageSystem.dealDamage({ baseDamage: 50, source: null, target: enemy, position:
 
 **Формула урона:**
 ```
-finalDamage = baseDamage × might × GLOBAL_DAMAGE × (крит ? critDamage : 1)
-GLOBAL_DAMAGE = 2      // см. комментарий в DamageSystem
-critChance    = player.stats.critChance (default 5%)
-critDamage    = player.stats.critDamage (default 1.5x)
+finalDamage = baseDamage × might × (крит ? critDamage : 1) × (1 + firstStrike)
+critChance  = player.stats.critChance
+critDamage  = player.stats.critDamage (default 2.0x)
 ```
 
-> ⚠️ Раньше здесь было `isCrit ? critDamage : 2` — обычный удар удваивался, а
-> крит на дефолтных 1.5× бил **слабее** обычного. Удвоение вынесено в явную
-> константу `GLOBAL_DAMAGE`, крит умножается сверху: не-крит урон не изменился,
-> ребаланс не потребовался.
+> **Единица урона = единица HP врага. Глобального множителя нет и быть не должно.**
+>
+> Здесь жил `GLOBAL_DAMAGE = 2` — окаменелость старого бага (`isCrit ?
+> critDamage : 2`, из-за которого обычный удар удваивался, а крит на 1.5× бил
+> *слабее*). Удвоение тогда сохранили как явную константу, чтобы не
+> ребалансить. Цена оказалась выше: **любое число, которое UI мог показать,
+> было вдвое меньше того, что видел игрок.** Карточка обещала «урон 36», в
+> экран летело 95, и починить это на стороне UI было нельзя — врал сам
+> конвейер урона.
+>
+> Константа удалена, `ENEMY_CONFIG.baseHp` понижен с 10 до 5 тем же коммитом:
+> time-to-kill не сдвинулся, изменился только размер цифр. Заодно
+> вдвое урезаны два числа на пути `skipModifiers` (метеорит в `ArenaEvents`,
+> порог ачивки Overkill) — они старого удвоения не получали.
+>
+> Если когда-нибудь захочется «чтобы всё било сильнее» — это правится в таблице
+> оружий или в `might`, где игрок это видит.
 
 ### ContactDamage
 **Файл:** `core/ContactDamage.ts`
