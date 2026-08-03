@@ -43,13 +43,35 @@
  *
  * ## The model
  *
- *     drain per second = SUM(touching enemies) x armour x ramp
+ *     drain per second = strongest toucher x sqrt(count) x armour x ramp
  *
- * **No crowd cap and no falloff.** Both existed only to tame a big number.
- * Geometry already caps the crowd: 6-9 bodies physically fit against the
- * player, and `touching` is built from real overlap, so the sum is bounded by
- * the arena rather than by a constant. Capping it again was a rule about
- * nothing.
+ * ## Why the crowd is a square root and not a sum
+ *
+ * It was a plain sum for one version, and it produced the complaint that one
+ * enemy felt like nothing while a crowd took an incomparable amount: linear
+ * stacking is x6 at a ring of six and x20 at a pile of twenty, so no single
+ * value of the base can make both ends feel right at once. Whatever makes the
+ * lone chaser worth respecting makes the pile instant death.
+ *
+ * **The ramp already does the job the sum was hired for.** When crowd stacking
+ * went in, crowd size was the only thing that could make being surrounded
+ * dangerous. It is not any more: what is actually dangerous about a crowd is
+ * that you cannot leave it, and `contactRamp` measures exactly that. Charging
+ * for the count on top of that was billing twice for the same danger.
+ *
+ * It is compressed rather than deleted, though, and that part matters. With no
+ * count term at all a wall of twenty would cost what brushing one costs, the
+ * ramp would cap at the same 2.5 for both, and parking inside a pile while your
+ * weapons chew it would be free — which is the i-frame bug from the very first
+ * version wearing a different hat. A square root keeps a crowd worse (x2.45 at
+ * six, x4.5 at twenty) without letting it be the whole game.
+ *
+ * The **strongest** toucher sets the rate rather than the average, so a Doom
+ * Harbinger leaning on you reads as a Doom Harbinger leaning on you, and the
+ * three bats that came with it do not dilute it.
+ *
+ * **No cap on the count.** Geometry is the cap: 6-9 bodies physically fit
+ * against the player, and `touching` is built from real overlap.
  */
 
 /**
@@ -132,8 +154,8 @@ export function contactRamp(contactTime: number): number {
 export function contactDamagePerSecond(damages: number[], armor: number, ramp: number): number {
     if (damages.length === 0) return 0;
 
-    let total = 0;
-    for (const d of damages) total += d;
+    let strongest = 0;
+    for (const d of damages) if (d > strongest) strongest = d;
 
-    return total * armorMultiplier(armor) * ramp;
+    return strongest * Math.sqrt(damages.length) * armorMultiplier(armor) * ramp;
 }

@@ -89,16 +89,32 @@ describe('the standing-still ramp', () => {
 });
 
 describe('crowd scaling', () => {
-    it('stacks linearly with no cap — geometry is the only limit', () => {
-        // Both the old CROWD_CAP and the old 1/sqrt(k) falloff existed to tame a
-        // number that was 33x too big. With that fixed at the source, capping
-        // again would be the bug that made a hundred enemies cost what four did.
+    it('compresses the crowd instead of summing it', () => {
+        // Linear stacking is what produced "one enemy feels like nothing and a
+        // crowd takes an incomparable amount": x6 at six bodies, x20 at twenty.
+        // No value of baseDamage can serve both ends of that.
         const one = contactDamagePerSecond([10], 0, 1);
-        const four = contactDamagePerSecond([10, 10, 10, 10], 0, 1);
-        const forty = contactDamagePerSecond(Array(40).fill(10), 0, 1);
 
-        expect(four).toBeCloseTo(one * 4);
-        expect(forty).toBeCloseTo(one * 40);
+        expect(contactDamagePerSecond(Array(4).fill(10), 0, 1) / one).toBeCloseTo(2);
+        expect(contactDamagePerSecond(Array(9).fill(10), 0, 1) / one).toBeCloseTo(3);
+        expect(contactDamagePerSecond(Array(36).fill(10), 0, 1) / one).toBeCloseTo(6);
+    });
+
+    it('still makes a crowd worse — it is compressed, not deleted', () => {
+        // Removing the count term entirely would make a wall of twenty cost what
+        // brushing one costs, with the ramp capping at the same 2.5 for both.
+        // That is the original i-frame bug in a new hat.
+        const one = contactDamagePerSecond([10], 0, 1);
+        const many = contactDamagePerSecond(Array(20).fill(10), 0, 1);
+        expect(many).toBeGreaterThan(one * 3);
+    });
+
+    it('the strongest toucher sets the rate, not the average', () => {
+        // A Doom Harbinger leaning on you should read as a Doom Harbinger, and
+        // the bats that came with it must not dilute it.
+        const alone = contactDamagePerSecond([50], 0, 1);
+        const escorted = contactDamagePerSecond([50, 1, 1, 1], 0, 1);
+        expect(escorted).toBeGreaterThan(alone);
     });
 
     it('nothing touching costs nothing', () => {
@@ -116,11 +132,16 @@ describe('balance: the WORST case the game can produce', () => {
         // tier and then got multiplied again by time, intensity and stage.
         const weakest = Math.min(...ENEMIES.map(e => e.damage));
         expect(WORST / weakest).toBeLessThan(3);
-        expect(WORST).toBeLessThan(4);
+        expect(WORST).toBeLessThan(6);
     });
 
-    it('grazing one enemy while kiting is almost free', () => {
-        expect(POOL / ring(1, 1)).toBeGreaterThan(30);
+    it('one enemy on you is a real cost, not a rounding error', () => {
+        // Both bounds matter. Too cheap and the play report is "a single enemy
+        // feels like nothing"; too dear and kiting past one body is a punishment
+        // for moving, which is the whole game.
+        const seconds = POOL / ring(1, 1);
+        expect(seconds).toBeGreaterThan(15);
+        expect(seconds).toBeLessThan(40);
     });
 
     it('running through a full crowd costs little', () => {

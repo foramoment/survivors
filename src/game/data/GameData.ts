@@ -441,24 +441,22 @@ export const ENEMY_CONFIG = {
     // core/ContactDamage for the argument, and do not "restore" these numbers
     // without reading it.
     //
-    // Health is a budget for the entire run. At 1.5-3.2 HP/s per enemy a full
-    // ring is ~19 HP/s, which the standing-still ramp takes to ~49 — lethal in
-    // 2.4s if you camp, and nearly free if you run through. Late game escalates
-    // through enemy count and health instead (hpMultiplier, hpScale, spawn
-    // rate), which is what DifficultyDirector was always documented as doing.
+    // Health is a budget for the entire run. Late game escalates through enemy
+    // count and health (hpMultiplier, hpScale, spawn rate), which is what
+    // DifficultyDirector was always documented as doing.
     //
     // **This is the one dial for how scary contact is.** Nothing else multiplies
-    // it any more, which is the entire point of the rework — so if the game
-    // feels soft, this number goes up and everything follows. The first cut
-    // used 1, which play-tested as "I am not afraid of the enemies at all":
-    // early-game crowds came out 2-4x weaker than the model it replaced, and
-    // brushing a lone enemy took the best part of a minute to matter. 1.5 puts
-    // the early game back on par with the old numbers at the ramp ceiling.
+    // it, which is the entire point of the rework — if the game feels soft, this
+    // number goes up and everything follows.
     //
-    // The binding constraint going higher is the 75 HP Storm Mage, who must
-    // survive a full ring at full ramp long enough to walk out of it — see
-    // contactDamage.test.ts, which fails around 1.8.
-    baseDamage: 1.5,      // Контактный урон в секунду у первого врага
+    // It went 1 ("I am not afraid of the enemies at all") -> 1.5 -> 2.2, and the
+    // last step came with the crowd term changing from a sum to a square root.
+    // Those two belong together: under linear stacking there was no value that
+    // worked, because anything that made a lone enemy worth respecting made a
+    // pile of twenty instant death. Compressing the crowd is what freed this
+    // number to be big enough for one body to matter. Do not raise one without
+    // looking at the other.
+    baseDamage: 2.2,      // Контактный урон в секунду у первого врага
     damageMultiplier: 1.08, // Множитель урона для каждого следующего
     baseXp: 1,            // Базовый XP первого врага
     xpMultiplier: 1.5,    // Множитель XP для каждого следующего (x1.5)
