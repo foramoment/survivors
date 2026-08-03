@@ -11,6 +11,14 @@ import { REPAIR_HEAL, REPAIR_LIFETIME } from '../core/Tactics';
  * does not pull it, so topping up always means moving through the fight.
  * Flat HP on purpose, so it fades in relevance as max HP grows.
  */
+/**
+ * How close you must get before a cell starts drifting to you, and how fast it
+ * comes. Compare the XP magnet, which starts at 100 and is upgradable to 250 —
+ * this is deliberately smaller and cannot be upgraded at all.
+ */
+const PULL_RADIUS = 95;
+const PULL_SPEED = 150;
+
 export class RepairCell extends Entity {
     heal: number = REPAIR_HEAL;
     lifetime: number = REPAIR_LIFETIME;
@@ -26,12 +34,18 @@ export class RepairCell extends Entity {
         this.pulse += dt * 5;
 
         // A short final drift so a cell that expires next to you is not simply
-        // lost — but nothing like the XP magnet's reach
+        // lost — but nothing like the XP magnet's reach.
+        //
+        // Widened from 60 once bites made contact genuinely lethal: the cell is
+        // the only healing you can go and get, and having to thread a pixel-
+        // perfect line through a crowd to reach one turned a good decision
+        // ("break out, grab it, come back") into a dexterity test. Still short
+        // enough that you have to *commit* to the trip.
         if (playerPos) {
             const dist = distance(this.pos, playerPos);
-            if (dist < 60) {
+            if (dist < PULL_RADIUS) {
                 const dir = normalize({ x: playerPos.x - this.pos.x, y: playerPos.y - this.pos.y });
-                const pull = 120 * (1 - dist / 60);
+                const pull = PULL_SPEED * (1 - dist / PULL_RADIUS);
                 this.pos.x += dir.x * pull * dt;
                 this.pos.y += dir.y * pull * dt;
             }

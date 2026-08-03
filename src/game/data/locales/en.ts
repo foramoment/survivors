@@ -69,6 +69,8 @@ export const EN: Record<string, string> = {
     'result.multikill': 'BEST MULTIKILL',
     'result.totalDamage': 'DAMAGE DEALT',
     'result.healed': 'HP RESTORED',
+    'result.damageTaken': 'DAMAGE TAKEN',
+    'result.inBites': 'in {n} bites',
     'result.build': 'YOUR BUILD',
     'result.again': '↻ PLAY AGAIN',
     'result.copyStats': 'Copy run stats',

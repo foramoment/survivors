@@ -73,6 +73,8 @@ export const RU: Record<string, string> = {
     'result.multikill': 'ЛУЧШАЯ СЕРИЯ',
     'result.totalDamage': 'УРОНА НАНЕСЕНО',
     'result.healed': 'HP ВОССТАНОВЛЕНО',
+    'result.damageTaken': 'УРОНА ПОЛУЧЕНО',
+    'result.inBites': 'за {n} укусов',
     'result.build': 'ТВОЙ БИЛД',
     'result.again': '↻ ЕЩЁ РАЗ',
     'result.copyStats': '📋 СКОПИРОВАТЬ СТАТЫ',

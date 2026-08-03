@@ -81,6 +81,9 @@ function runAsText(d: RunSummaryData): string {
         `damage       ${Math.round(d.stats.totalDamage)}  (${perSecond(d.stats.totalDamage)}/s)`,
         `best hit     ${Math.round(d.stats.bestHit)}${d.stats.bestHitCrit ? ' (crit)' : ''}`,
         `healed       ${Math.round(d.stats.totalHealed)}  (${perSecond(d.stats.totalHealed)}/s)`,
+        `taken        ${Math.round(d.stats.damageTaken)}  (${perSecond(d.stats.damageTaken)}/s)`,
+        `bites        ${d.stats.bitesTaken}  (avg ${d.stats.bitesTaken ? (d.stats.damageTaken / d.stats.bitesTaken).toFixed(1) : 0} each)`,
+        `worst pile   ${d.stats.worstPileUp} enemies at once`,
         `untouched    ${formatTime(d.stats.longestUntouched)}`,
         `best combo   x${d.stats.bestMultikill}`,
         '',
@@ -146,6 +149,14 @@ function createHighlights(data: RunSummaryData): HTMLElement {
         <div class="highlight">
             <span>${t('result.healed')}</span>
             <strong>${formatScore(Math.round(stats.totalHealed))}</strong>
+        </div>`);
+
+    // Healing means nothing without what it was healing against
+    rows.push(`
+        <div class="highlight">
+            <span>${t('result.damageTaken')}</span>
+            <strong>${formatScore(Math.round(stats.damageTaken))}</strong>
+            <em>${t('result.inBites', { n: stats.bitesTaken })}</em>
         </div>`);
 
     box.innerHTML = rows.join('');

@@ -412,6 +412,7 @@ export class GameManager {
         if (!this.player || touching.length === 0) return;
 
         const player = this.player;
+        this.runStats.recordPileUp(touching.length);
         if (touching.length > 1) {
             touching.sort((a, b) => distance(player.pos, a.pos) - distance(player.pos, b.pos));
         }
@@ -422,7 +423,9 @@ export class GameManager {
             if (enemy.biteTimer > 0) continue;
             enemy.biteTimer = BITE_INTERVAL;
             this.biteBudget -= 1;
-            dealt += biteDamage(enemy.damage, player.stats.armor);
+            const bite = biteDamage(enemy.damage, player.stats.armor);
+            this.runStats.recordBite(bite);
+            dealt += bite;
         }
 
         // Being *in* contact is what breaks the untouched streak, not landing a
@@ -1055,7 +1058,10 @@ export class GameManager {
         const before = this.player.hp;
         this.player.takeDamage(this.player.maxHp * fraction);
         // i-frames can swallow the hit entirely — only a real one breaks the streak
-        if (this.player.hp < before) this.runStats.onPlayerHurt();
+        if (this.player.hp < before) {
+            this.runStats.onPlayerHurt();
+            this.runStats.recordHazard(before - this.player.hp);
+        }
         audio.play('hurt');
         juice.addTrauma(0.35);
         juice.flash('#ff5a1e', 0.2, 0.25);
