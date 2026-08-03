@@ -48,6 +48,9 @@ export class Zone extends Entity {
 
     constructor(x: number, y: number, radius: number, duration: number, damage: number, interval: number, emoji: string, slowEffect: number = 0) {
         super(x, y, radius);
+        // Zones lie on the floor: they draw beneath the crystals, the enemies
+        // and the player, so a puddle never hides what is standing in it
+        this.layer = 'ground';
         this.baseRadius = radius;
         this.lifetime = Math.max(0.0001, duration);
         this.duration = duration;

@@ -1,10 +1,10 @@
 import { Player } from './entities/Player';
 import { Enemy } from './entities/Enemy';
-import { XPCrystal } from './entities/XPCrystal';
+import { CrystalField } from './entities/CrystalField';
+import { DamageNumbers } from './core/DamageNumbers';
 import { Entity } from './Entity';
 import { CLASSES, ENEMIES, WEAPONS } from './data/GameData';
 import { checkCollision, type Vector2, distance, formatTime } from './core/Utils';
-import { Projectile, Zone } from './weapons/base';
 import { levelSpatialHash } from './core/SpatialHash';
 import { particles } from './core/ParticleSystem';
 import { stateMachine, type GameState } from './core/StateMachine';
@@ -20,7 +20,6 @@ import { status } from './core/StatusEffects';
 import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
-import { drawPixelText } from './core/PixelFont';
 import { getPowerupValue, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { contactDamagePerSecond } from './core/ContactDamage';
 import { computeScore, submitScore } from './core/Score';
@@ -48,15 +47,6 @@ import { stageName } from './core/Labels';
 const CONTACT_SOUND_MIN_GAP = 0.75;
 const CONTACT_SOUND_HP_SHARE = 0.05;
 
-/**
- * XP crystal housekeeping. Crystals are permanent, so the cost is capped by
- * ignoring the ones nobody can see and merging the ones far behind you.
- */
-const CRYSTAL_ACTIVE_MARGIN = 120;
-const CRYSTAL_SOFT_CAP = 900;
-const CRYSTAL_MERGE_DISTANCE = 1400;
-const CRYSTAL_MERGE_CELL = 190;
-
 /** Knockback on contact: the player barely moves, the enemy is shoved aside */
 const PLAYER_SHOVE_BACK = 55;
 const ENEMY_SHOVE = 190;
@@ -75,14 +65,19 @@ export class GameManager {
 
     player: Player | null = null;
     enemies: Enemy[] = [];
-    projectiles: (Projectile | Zone)[] = [];
-    xpCrystals: XPCrystal[] = [];
-    damageNumbers: { x: number, y: number, vx: number, vy: number, text: string, life: number, maxLife: number, isCrit?: boolean }[] = [];
+    /**
+     * Everything the weapons spawn into the world: projectiles, zones, and the
+     * purely visual entities that are neither. One list, because the previous
+     * split by class silently dropped anything that matched no branch — see
+     * Entity.DrawLayer.
+     */
+    entities: Entity[] = [];
+    /** Every XP crystal on the floor, with its own culling and merge rules */
+    crystals: CrystalField = new CrystalField();
+    /** The digits that pop off a hit, and the hit feedback that goes with them */
+    damageNumbers: DamageNumbers = new DamageNumbers();
 
     camera: Vector2 = { x: 0, y: 0 };
-
-    /** Real time of the last crit hit-stop, to rate-limit the effect */
-    private lastCritStop: number = 0;
 
     backgroundTheme: string = 'Asteroid Fields';
 
@@ -114,8 +109,6 @@ export class GameManager {
     private contactDamageBank: number = 0;
     /** Absorbed damage banked toward the next Static Discharge */
     private capacitorCharge: number = 0;
-    /** Countdown to the next distant-crystal merge pass */
-    private crystalMergeTimer: number = 1;
     repairCells: RepairCell[] = [];
 
     /**
@@ -134,7 +127,7 @@ export class GameManager {
 
         // Connect DamageSystem to damage number display
         damageSystem.setDamageNumberCallback((pos, amount, isCrit, source) => {
-            this.spawnDamageNumber(pos, amount, isCrit);
+            this.damageNumbers.spawn(pos, amount, isCrit);
             // The weapon id lives on the weapon, but the hit may come from a
             // projectile or a zone it spawned — hence the two hops
             const weaponId = source?.weaponId ?? source?.source?.weaponId ?? null;
@@ -189,11 +182,11 @@ export class GameManager {
         this.addWeapon(cls.weaponId);
 
         this.enemies = [];
-        this.projectiles = [];
-        this.xpCrystals = [];
+        this.entities = [];
+        this.crystals.clear();
         this.repairCells = [];
         this.capacitorCharge = 0;
-        this.damageNumbers = [];
+        this.damageNumbers.clear();
         this.killCount = 0;
         this.killScore = 0;
         this.runStats.reset();
@@ -314,27 +307,10 @@ export class GameManager {
         }
     }
 
-    /** Types already reported as dropped, so one bad weapon can't spam the log */
-    private droppedEntityTypes = new Set<string>();
-
+    /** Anything a weapon spawns lands here — no class test, nothing to fall through */
     spawnEntity(entity: Entity) {
-        if (entity instanceof Projectile || entity instanceof Zone) {
-            this.projectiles.push(entity as any);
-            audio.play('shoot');
-            return;
-        }
-
-        // The arena only ever iterates `projectiles`, so anything else lands
-        // nowhere: never updated, never drawn. Blood Cleaver's swing arc
-        // extended Entity directly and shipped like that — the weapon dealt
-        // full damage while being completely invisible, which reads as "this
-        // weapon does nothing" rather than as a bug. Silence was the whole
-        // problem, so say something.
-        const kind = entity.constructor.name;
-        if (!this.droppedEntityTypes.has(kind)) {
-            this.droppedEntityTypes.add(kind);
-            console.warn(`[GameManager] ${kind} was dropped: onSpawn only accepts Projectile or Zone.`);
-        }
+        this.entities.push(entity);
+        audio.play('shoot');
     }
 
     /**
@@ -573,7 +549,7 @@ export class GameManager {
         debugOverlay.setStats({
             enemies: this.enemies.length,
             particles: particles.getParticleCount(),
-            projectiles: this.projectiles.length
+            projectiles: this.entities.length
         });
 
         this.gameTime += dt;
@@ -674,16 +650,16 @@ export class GameManager {
             }
         }
 
-        for (let i = this.projectiles.length - 1; i >= 0; i--) {
-            const p = this.projectiles[i];
-            p.update(dt);
-            if (p.isDead) {
-                this.projectiles.splice(i, 1);
+        for (let i = this.entities.length - 1; i >= 0; i--) {
+            const e = this.entities[i];
+            e.update(dt);
+            if (e.isDead) {
+                this.entities.splice(i, 1);
             }
         }
 
         // Collisions - delegated to CollisionSystem
-        collisionSystem.processProjectileCollisions(this.projectiles);
+        collisionSystem.processEntityCollisions(this.entities);
 
         // Damage over time / stuns tick before movement so a lethal tick doesn't
         // let the enemy take one more step
@@ -776,7 +752,7 @@ export class GameManager {
 
                 // Drop XP crystals instead of giving XP directly
                 const crystalValue = enemy.xpValue;
-                this.spawnXPCrystal(enemy.pos.x, enemy.pos.y, crystalValue);
+                this.crystals.spawn(enemy.pos.x, enemy.pos.y, crystalValue);
                 this.enemies.splice(i, 1);
                 this.killCount++;
                 this.killScore += enemy.xpValue;
@@ -799,7 +775,7 @@ export class GameManager {
             }
         }
 
-        this.updateCrystals(dt);
+        this.crystals.update(dt, this.player, this.canvas.width, this.canvas.height);
 
         if (this.player.isDead) {
             this.state = 'GAME_OVER';
@@ -816,84 +792,9 @@ export class GameManager {
         this.camera.x += (targetX - this.camera.x) * followSpeed;
         this.camera.y += (targetY - this.camera.y) * followSpeed;
 
-        this.updateDamageNumbers(dt);
+        this.damageNumbers.update(dt);
         this.updateParticles(dt);
         this.updateHUD();
-    }
-
-    /**
-     * XP crystals never expire — clearing a pack, kiting out and coming back
-     * for the drops is the loop the game is built on, and a 30s timer punished
-     * exactly that.
-     *
-     * The cost of keeping them is bounded here rather than by deleting them:
-     * a crystal off screen does not move (nothing but the magnet moves one) and
-     * nobody can see it bob, so it is skipped entirely. Iterating the array is
-     * a couple of thousand cheap distance checks; *drawing* is what costs.
-     */
-    private updateCrystals(dt: number) {
-        if (!this.player) return;
-
-        const magnet = this.player.stats.magnet;
-        const halfW = this.canvas.width / 2 + CRYSTAL_ACTIVE_MARGIN;
-        const halfH = this.canvas.height / 2 + CRYSTAL_ACTIVE_MARGIN;
-        const px = this.player.pos.x;
-        const py = this.player.pos.y;
-
-        for (let i = this.xpCrystals.length - 1; i >= 0; i--) {
-            const crystal = this.xpCrystals[i];
-            if (Math.abs(crystal.pos.x - px) > halfW || Math.abs(crystal.pos.y - py) > halfH) continue;
-
-            crystal.update(dt, this.player.pos, magnet);
-
-            if (checkCollision(crystal, this.player)) {
-                this.player.gainXp(crystal.value);
-                audio.play('pickup');
-                this.xpCrystals.splice(i, 1);
-            }
-        }
-
-        this.crystalMergeTimer -= dt;
-        if (this.crystalMergeTimer <= 0) {
-            this.crystalMergeTimer = 1;
-            this.consolidateCrystals();
-        }
-    }
-
-    /**
-     * Safety valve for a very long run: once the field is crowded, distant
-     * crystals are merged cell by cell into one bigger crystal carrying the
-     * combined XP. Nothing is lost, and the array cannot grow without bound.
-     * Only crystals well away from the player are touched, so this never
-     * rearranges anything you are looking at.
-     */
-    private consolidateCrystals() {
-        if (!this.player || this.xpCrystals.length <= CRYSTAL_SOFT_CAP) return;
-
-        const px = this.player.pos.x;
-        const py = this.player.pos.y;
-        const buckets = new Map<string, XPCrystal>();
-        const kept: XPCrystal[] = [];
-
-        for (const crystal of this.xpCrystals) {
-            const dx = crystal.pos.x - px;
-            const dy = crystal.pos.y - py;
-            if (dx * dx + dy * dy < CRYSTAL_MERGE_DISTANCE * CRYSTAL_MERGE_DISTANCE) {
-                kept.push(crystal);
-                continue;
-            }
-
-            const key = `${Math.floor(crystal.pos.x / CRYSTAL_MERGE_CELL)}:${Math.floor(crystal.pos.y / CRYSTAL_MERGE_CELL)}`;
-            const existing = buckets.get(key);
-            if (existing) {
-                existing.setValue(existing.value + crystal.value);
-            } else {
-                buckets.set(key, crystal);
-                kept.push(crystal);
-            }
-        }
-
-        this.xpCrystals = kept;
     }
 
     /** Everything the achievement conditions are allowed to see */
@@ -1108,58 +1009,6 @@ export class GameManager {
         return { x: this.camera.x + offset.x, y: this.camera.y + offset.y };
     }
 
-    spawnDamageNumber(pos: Vector2, amount: number, isCrit: boolean = false) {
-        // Cap the on-screen count — late-game AoE can produce hundreds per second
-        if (this.damageNumbers.length > 90) this.damageNumbers.shift();
-
-        const life = isCrit ? 0.8 : 0.55;
-        this.damageNumbers.push({
-            // Wide horizontal jitter so simultaneous hits don't stack into an
-            // unreadable pile of digits
-            x: pos.x + (Math.random() - 0.5) * 28,
-            y: pos.y,
-            // Arc upward and outward so overlapping hits stay readable
-            vx: (Math.random() - 0.5) * 60,
-            vy: isCrit ? -160 : -110,
-            text: Math.floor(amount).toString(),
-            life,
-            maxLife: life,
-            isCrit,
-        });
-
-        if (!isCrit) {
-            audio.play('hit');
-        } else {
-            audio.play('crit');
-            // Micro freeze on crits, at most a few times a second
-            const now = performance.now() / 1000;
-            if (now - this.lastCritStop > 0.35) {
-                this.lastCritStop = now;
-                juice.hitStop(0.035);
-                juice.addTrauma(0.06);
-            }
-        }
-    }
-
-    private updateDamageNumbers(dt: number) {
-        for (let i = this.damageNumbers.length - 1; i >= 0; i--) {
-            const dn = this.damageNumbers[i];
-            dn.life -= dt;
-            if (dn.life <= 0) {
-                this.damageNumbers.splice(i, 1);
-                continue;
-            }
-            dn.x += dn.vx * dt;
-            dn.y += dn.vy * dt;
-            dn.vy += 260 * dt;  // gravity — the numbers arc and settle
-            dn.vx *= 0.94;
-        }
-    }
-
-    spawnXPCrystal(x: number, y: number, value: number) {
-        this.xpCrystals.push(new XPCrystal(x, y, value));
-    }
-
     draw(ctx: CanvasRenderingContext2D) {
         // GAME_OVER keeps rendering so the result panel sits on a freeze-frame
         // of the battlefield instead of a black void.
@@ -1190,30 +1039,22 @@ export class GameManager {
         propField.draw(ctx, camera, this.canvas.width, this.canvas.height);
         arenaEvents.drawWorld(ctx, camera);
 
-        this.projectiles.forEach(p => {
-            if (p instanceof Zone) p.draw(ctx, camera);
-        });
-
-        // Draw XP crystals
-        // Same screen-bounds cull as the update: drawing is the expensive part,
-        // and a run can leave thousands of crystals lying around the arena
-        const cullW = this.canvas.width + CRYSTAL_ACTIVE_MARGIN;
-        const cullH = this.canvas.height + CRYSTAL_ACTIVE_MARGIN;
-        for (const crystal of this.xpCrystals) {
-            const sx = crystal.pos.x - camera.x;
-            const sy = crystal.pos.y - camera.y;
-            if (sx < -CRYSTAL_ACTIVE_MARGIN || sy < -CRYSTAL_ACTIVE_MARGIN || sx > cullW || sy > cullH) continue;
-            crystal.draw(ctx, camera);
+        // Ground layer: zones and anything else that lies on the floor
+        for (const e of this.entities) {
+            if (e.layer === 'ground') e.draw(ctx, camera);
         }
+
+        this.crystals.draw(ctx, camera, this.canvas.width, this.canvas.height);
         this.repairCells.forEach(c => c.draw(ctx, camera));
 
         this.enemies.forEach(e => e.draw(ctx, camera));
 
         this.player?.draw(ctx, camera);
 
-        this.projectiles.forEach(p => {
-            if (p instanceof Projectile) p.draw(ctx, camera);
-        });
+        // Air layer: projectiles, swings and trails, over the player
+        for (const e of this.entities) {
+            if (e.layer === 'air') e.draw(ctx, camera);
+        }
 
         // Draw particles
         particles.draw(ctx, camera);
@@ -1221,7 +1062,7 @@ export class GameManager {
         // Shockwave rings (explosions, boss deaths)
         juice.drawWorld(ctx, camera);
 
-        this.drawDamageNumbers(ctx, camera);
+        this.damageNumbers.draw(ctx, camera);
 
         if (transformed) ctx.restore();
 
@@ -1231,32 +1072,6 @@ export class GameManager {
 
         // Draw debug overlay (FPS, stats)
         debugOverlay.draw(ctx);
-    }
-
-    /** Pixel-font damage numbers: crits pop bigger, brighter and outlined */
-    private drawDamageNumbers(ctx: CanvasRenderingContext2D, camera: Vector2) {
-        if (this.damageNumbers.length === 0) return;
-
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        for (const dn of this.damageNumbers) {
-            const t = 1 - dn.life / dn.maxLife;
-            // Punch-in scale for the first 15% of the lifetime
-            const pop = t < 0.15 ? 0.6 + (t / 0.15) * 0.55 : 1.15 - (t - 0.15) * 0.15;
-            const base = dn.isCrit ? 3.4 : 2.2;
-            const scale = Math.max(1, Math.round(base * pop));
-
-            ctx.globalAlpha = t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
-            drawPixelText(ctx, dn.text, dn.x - camera.x, dn.y - camera.y, {
-                scale,
-                align: 'center',
-                spacing: 1,
-                shadow: 1,
-                color: dn.isCrit ? '#ffe14d' : '#ffffff',
-                outline: dn.isCrit ? '#ff4400' : undefined,
-            });
-        }
-        ctx.restore();
     }
 
     drawBackground(ctx: CanvasRenderingContext2D, camera: Vector2) {

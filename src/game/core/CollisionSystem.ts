@@ -35,16 +35,22 @@ export function checkCollision(a: Entity, b: Entity): boolean {
 
 export class CollisionSystem {
     /**
-     * Process all projectile-enemy collisions
-     * @param projectiles All active projectiles and zones
-     * @param enemies All active enemies (already in levelSpatialHash)
+     * Process every entity that can hit an enemy.
+     *
+     * The list is all weapon-spawned entities, not just the damaging ones:
+     * purely visual entities (swing arcs, trails) simply match neither branch
+     * and are skipped. That is the right place for the `instanceof` — deciding
+     * *how* something collides. It used to also decide whether an entity was
+     * kept and drawn at all, which is how an invisible weapon happened.
+     *
+     * Enemies are already in levelSpatialHash by this point.
      */
-    processProjectileCollisions(projectiles: (Projectile | Zone)[]): void {
-        for (const p of projectiles) {
-            if (p instanceof Projectile) {
-                this.processProjectile(p);
-            } else if (p instanceof Zone) {
-                this.processZone(p);
+    processEntityCollisions(entities: Entity[]): void {
+        for (const e of entities) {
+            if (e instanceof Projectile) {
+                this.processProjectile(e);
+            } else if (e instanceof Zone) {
+                this.processZone(e);
             }
         }
     }

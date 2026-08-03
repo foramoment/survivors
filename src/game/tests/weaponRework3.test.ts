@@ -17,8 +17,8 @@ import { status } from '../core/StatusEffects';
 import { damageSystem } from '../core/DamageSystem';
 import { AcidPoolWeapon, CorrosivePool } from '../weapons/implementations/AcidPoolWeapon';
 import { FrostNovaWeapon, AbsoluteZeroZone } from '../weapons/implementations/FrostNovaWeapon';
-import { SpinningEmberWeapon } from '../weapons/implementations/SpinningEmberWeapon';
-import { BurningTrailZone, Projectile, Zone } from '../weapons/base';
+import { SpinningEmberWeapon, CleaveArc } from '../weapons/implementations/SpinningEmberWeapon';
+import { BurningTrailZone } from '../weapons/base';
 import { PhantomSlashWeapon } from '../weapons/implementations/PhantomSlashWeapon';
 import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWeapon';
 import { SporeCloudWeapon } from '../weapons/implementations/SporeCloudWeapon';
@@ -266,10 +266,12 @@ describe('Blood Cleaver', () => {
         expect(Math.hypot(enemy.knockback.x, enemy.knockback.y)).toBeGreaterThan(0);
     });
 
-    it('spawns a swing the arena will actually keep and draw', () => {
-        // The arc used to extend Entity directly, and GameManager.spawnEntity
-        // silently drops anything that is not a Projectile or a Zone. Result:
-        // full damage, zero visuals — the weapon looked like it did nothing.
+    it('spawns a visible swing that rides the player', () => {
+        // This weapon shipped invisible: the arc was spawned but GameManager
+        // kept only Projectiles and Zones and dropped it. The arena holds one
+        // entity list now, so the remaining thing worth pinning is that a swing
+        // is emitted at all — and that it follows the body swinging it, rather
+        // than staying where the swing began.
         const player = new Player(0, 0);
         const weapon = new SpinningEmberWeapon(player);
         const spawned: Entity[] = [];
@@ -277,8 +279,12 @@ describe('Blood Cleaver', () => {
         placeEnemies([makeEnemy(30, 0)]);
 
         weapon.update(0.1);
-        expect(spawned.length).toBeGreaterThan(0);
-        expect(spawned.every(e => e instanceof Projectile || e instanceof Zone)).toBe(true);
+        const arc = spawned.find(e => e instanceof CleaveArc);
+        expect(arc).toBeDefined();
+
+        player.pos.x += 120;
+        arc!.update(0.016);
+        expect(arc!.pos.x).toBe(player.pos.x);
     });
 
     it('holds the swing when nothing is in reach, and spends it the moment something is', () => {

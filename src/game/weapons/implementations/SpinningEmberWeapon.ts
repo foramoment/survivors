@@ -23,8 +23,8 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import { BurningTrailZone, Projectile } from '../base';
-import type { Entity } from '../../Entity';
+import { BurningTrailZone } from '../base';
+import { Entity } from '../../Entity';
 import { type Vector2, distance } from '../../core/Utils';
 import { particles } from '../../core/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
@@ -51,17 +51,18 @@ const MISSING_HP_SCALE = 1.6;
  * A crescent sweeping around the player. Baked as one arc and animated by
  * angle and alpha only, so a swing costs two strokes however wide it is.
  *
- * It extends Projectile (collision disabled) rather than Entity because
- * `GameManager.spawnEntity` only keeps Projectiles and Zones — anything else is
- * dropped on the floor without a word. That is exactly how this weapon shipped
- * invisible: the damage landed, the particles fired, and the swing itself was
- * never added to the world at all.
+ * A plain Entity that deals no damage — the damage is applied by the weapon in
+ * the same frame; this is only the picture of it. That used to be impossible:
+ * `GameManager` kept a list of Projectiles and Zones and dropped anything else,
+ * so this weapon shipped dealing full damage while being completely invisible.
+ * The arena now holds one entity list with a draw layer, so "just a visual" is
+ * a thing an entity is allowed to be.
  *
  * The arc rides the player instead of standing where the swing started: at
  * 190 px/s you walk most of a reach away inside its 0.26s life, and a crescent
  * left behind reads as something you dropped rather than something you swung.
  */
-export class CleaveArc extends Projectile {
+export class CleaveArc extends Entity {
     private age: number = 0;
     private readonly life: number = 0.26;
     private readonly reach: number;
@@ -69,9 +70,7 @@ export class CleaveArc extends Projectile {
     private readonly anchor: Entity;
 
     constructor(anchor: Entity, reach: number, hot: number) {
-        super(anchor.pos.x, anchor.pos.y, { x: 0, y: 0 }, 0.26, 0, 0, '');
-        this.canCollide = false;
-        this.radius = reach;
+        super(anchor.pos.x, anchor.pos.y, reach);
         this.anchor = anchor;
         this.reach = reach;
         this.hot = hot;
@@ -81,7 +80,7 @@ export class CleaveArc extends Projectile {
         this.pos.x = this.anchor.pos.x;
         this.pos.y = this.anchor.pos.y;
         this.age += dt;
-        if (this.age >= this.life) this.kill();
+        if (this.age >= this.life) this.isDead = true;
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
