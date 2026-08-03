@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { PROGRESSIONS, SECTIONS, FORM } from '../../engine/AudioSystem';
+import { PROGRESSIONS, SECTIONS, FORM, MODES } from '../../engine/AudioSystem';
+import { STAGES, STAGE_MUSIC } from '../data/StageData';
+
 
 /**
  * The tracker reads drum patterns by index, so a 15- or 17-character string
@@ -60,5 +62,47 @@ describe('music patterns', () => {
 
     it('the form uses more than one section', () => {
         expect(new Set(FORM).size).toBeGreaterThan(3);
+    });
+});
+
+describe('Stage music profiles', () => {
+    it('gives every stage its own profile', () => {
+        for (const stage of STAGES) {
+            expect(STAGE_MUSIC[stage.theme], `no music for ${stage.theme}`).toBeDefined();
+        }
+    });
+
+    it('gives each place a different mode, tempo band and room', () => {
+        const profiles = Object.values(STAGE_MUSIC);
+        const modes = new Set(profiles.map(p => p.mode));
+        // Mode is what actually makes a place sound like itself; two arenas
+        // sharing one is two arenas sharing an identity
+        expect(modes.size).toBe(profiles.length);
+
+        const rooms = new Set(profiles.map(p => `${p.delay[0]}/${p.delay[1]}/${p.drive}`));
+        expect(rooms.size).toBe(profiles.length);
+
+        const tempos = new Set(profiles.map(p => p.bpm[0]));
+        expect(tempos.size).toBe(profiles.length);
+    });
+
+    it('every mode a profile names actually exists', () => {
+        for (const profile of Object.values(STAGE_MUSIC)) {
+            expect(MODES[profile.mode], `unknown mode ${profile.mode}`).toBeDefined();
+        }
+    });
+
+    it('keeps the three tracks of a stage inside its own band', () => {
+        for (const profile of Object.values(STAGE_MUSIC)) {
+            const [low, high] = profile.bpm;
+            expect(high).toBeGreaterThan(low);
+            // A band wide enough to be felt, narrow enough to stay one place
+            expect(high - low).toBeGreaterThanOrEqual(8);
+            expect(high - low).toBeLessThanOrEqual(30);
+            expect(profile.progressions.length).toBeGreaterThan(0);
+            for (const index of profile.progressions) {
+                expect(PROGRESSIONS[index], `bad progression ${index}`).toBeDefined();
+            }
+        }
     });
 });

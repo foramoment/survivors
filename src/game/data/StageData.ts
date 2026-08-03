@@ -1,3 +1,4 @@
+import { audio, type MusicProfile } from '../../engine/AudioSystem';
 /**
  * Stage (level) configuration.
  *
@@ -155,3 +156,72 @@ export const STAGES: StageConfig[] = [
         damageScale: 1.5,
     },
 ];
+
+/**
+ * How each arena SOUNDS.
+ *
+ * These live here, next to the stage they belong to, and are handed to the
+ * engine at boot (see registerStageMusic). `engine/AudioSystem` ships no
+ * profiles of its own — "Derelict Station is industrial" is a fact about this
+ * game, and the engine is not allowed to know any of those.
+ *
+ * Each stage gets three tracks. They are siblings, not strangers: same mode,
+ * same tempo band, same room, transposed to related keys, drawing hooks and
+ * progressions from the same pool. The point is variety across a session
+ * without the arena changing character halfway through a run.
+ *
+ * The mode does most of the work. Aeolian is the minor everyone hears as
+ * heroic-sad; dorian's raised sixth takes the sorrow out and leaves something
+ * wary and mechanical; phrygian's flattened second is one semitone away from
+ * aeolian and turns "sad" into "wrong".
+ */
+export const STAGE_MUSIC: Record<string, MusicProfile> = {
+    // Open space, forward motion, a fight you can win. Bright and driving, with
+    // enough echo to sound like somewhere with no walls.
+    'Asteroid Fields': {
+        mode: 'aeolian',
+        bpm: [126, 138],
+        root: 45,               // A2
+        progressions: [0, 1],   // heroic, driving
+        leadDuties: [0.25, 0.5],
+        delay: [0.34, 0.23],
+        drive: 5,
+        brightness: 9500,
+    },
+
+    // Corridors, failing power, something moving one room over. Slower and
+    // dirtier: heavy drive for the grind of machinery, a SHORT slapback because
+    // a small metal room has no long tail, and a hard lowpass ceiling so it
+    // never opens up the way the asteroid belt does.
+    'Derelict Station': {
+        mode: 'dorian',
+        bpm: [108, 120],
+        root: 43,               // G2 — lower, heavier
+        progressions: [2, 3],   // descending, wistful
+        leadDuties: [0.125, 0.25],
+        delay: [0.22, 0.11],
+        drive: 11,
+        brightness: 5200,
+    },
+
+    // Not a place. Fast, cold and thin, with a long echo that never quite
+    // resolves — phrygian throughout, so even the calm sections sit a semitone
+    // away from comfortable.
+    'Void Nexus': {
+        mode: 'phrygian',
+        bpm: [138, 152],
+        root: 47,               // B2 — thinner, more strung-out
+        progressions: [2, 3],
+        leadDuties: [0.125],
+        delay: [0.42, 0.33],
+        drive: 4,
+        brightness: 11000,
+    },
+};
+
+/** Hand the arena music profiles to the engine. Called once, at boot. */
+export function registerStageMusic() {
+    for (const [theme, profile] of Object.entries(STAGE_MUSIC)) {
+        audio.registerMusicProfile(theme, profile);
+    }
+}

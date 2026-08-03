@@ -62,8 +62,62 @@ function noteFreq(midi: number): number {
     return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
-/** Semitone offsets of the natural minor scale */
-const MINOR_SCALE = [0, 2, 3, 5, 7, 8, 10];
+/**
+ * Modes, because a mode is the cheapest way to give a place its own feeling.
+ *
+ * Aeolian is the default minor everyone hears as "heroic sad". Dorian raises
+ * the sixth, which takes the sorrow out and leaves something wary and
+ * mechanical. Phrygian flattens the second, and that one semitone is the whole
+ * difference between "sad" and "wrong" — it is the sound of somewhere you
+ * should not be.
+ */
+export const MODES: Record<string, number[]> = {
+    aeolian: [0, 2, 3, 5, 7, 8, 10],
+    dorian: [0, 2, 3, 5, 7, 9, 10],
+    phrygian: [0, 1, 3, 5, 7, 8, 10],
+};
+
+/**
+ * The musical character of one place. The GAME registers these by theme name
+ * (see registerMusicProfile) — the engine has no idea what an Asteroid Field is.
+ *
+ * Every field is a *range* or a *pool* rather than a value, because a stage
+ * gets three tracks, not one, and they have to sound like siblings: same mode,
+ * same tempo band, same room, different tune.
+ */
+export interface MusicProfile {
+    mode: keyof typeof MODES | string;
+    /** Tempo band, inclusive */
+    bpm: [number, number];
+    /** Root MIDI note the variants are transposed around */
+    root: number;
+    /** Which PROGRESSIONS indices suit this place */
+    progressions: number[];
+    /** Lead pulse duties this place is allowed to use */
+    leadDuties: number[];
+    /** Echo: wet level 0..1 and time in seconds */
+    delay: [number, number];
+    /** Waveshaper drive — grit */
+    drive: number;
+    /** Lowpass ceiling in Hz: how bright this place is allowed to get */
+    brightness: number;
+}
+
+const DEFAULT_PROFILE: MusicProfile = {
+    mode: 'aeolian',
+    bpm: [124, 142],
+    root: 45,
+    progressions: [0, 1, 2, 3],
+    leadDuties: [0.125, 0.25, 0.5],
+    delay: [0.3, 0.21],
+    drive: 6,
+    brightness: 6000,
+};
+
+/** How many distinct tracks each theme gets */
+export const TRACKS_PER_THEME = 3;
+
+const LAST_TRACK_KEY = 'survivors.lastTrack';
 
 /**
  * Chord degrees (scale steps), eight bars per cycle.
@@ -182,6 +236,8 @@ interface Song {
     /** Duty cycle of the lead pulse: 0.125 / 0.25 / 0.5 */
     leadDuty: number;
     arpDuty: number;
+    /** Semitone offsets of this track's mode */
+    scale: number[];
 }
 
 export class AudioSystem {
@@ -217,6 +273,14 @@ export class AudioSystem {
     private musicStep: number = 0;
     private musicRng: () => number = mulberry32(1);
     private song: Song | null = null;
+    /** Theme name -> how that place sounds. Filled by the game, never here. */
+    private musicProfiles: Map<string, MusicProfile> = new Map();
+    /** Live handles on the music bus, so a stage can change the room */
+    private musicDelay: DelayNode | null = null;
+    private musicDelayMix: GainNode | null = null;
+    private musicDrive: WaveShaperNode | null = null;
+    /** Lowpass ceiling for the current place — see MusicProfile.brightness */
+    private musicBrightness: number = 6000;
     /** 0..1 — drives tempo, section choice, filter opening and lead busyness */
     private musicIntensity: number = 0;
     /** Last lowpass target, so per-frame intensity updates don't spam automation */
@@ -303,6 +367,7 @@ export class AudioSystem {
         drive.curve = AudioSystem.makeDriveCurve(6);
         drive.oversample = '2x';
         drive.connect(this.musicFilter);
+        this.musicDrive = drive;
 
         const delay = ctx.createDelay(1);
         delay.delayTime.value = 0.21;
@@ -310,6 +375,8 @@ export class AudioSystem {
         feedback.gain.value = 0.32;
         const delayMix = ctx.createGain();
         delayMix.gain.value = 0.3;
+        this.musicDelay = delay;
+        this.musicDelayMix = delayMix;
         delay.connect(feedback);
         feedback.connect(delay);
         delay.connect(delayMix);
@@ -585,31 +652,105 @@ export class AudioSystem {
 
         // Classic filter-opening buildup. This is called every frame, so only
         // re-arm the automation when the target actually moved.
-        const target = 1500 + 9000 * this.musicIntensity;
+        // The ceiling is the stage's, not a constant: a place that is supposed
+        // to sound muffled must stay muffled even at full intensity
+        const target = 1500 + (this.musicBrightness - 1500) * this.musicIntensity;
         if (Math.abs(target - this.filterTarget) < 120) return;
         this.filterTarget = target;
         this.musicFilter.frequency.setTargetAtTime(target, this.ctx.currentTime, 0.6);
+    }
+
+    /**
+     * Re-tune the shared music chain for a place.
+     *
+     * The room is as much of the identity as the notes are — the same tune
+     * through a long echo and through a short gritty slapback is two different
+     * places. Applied when a track starts, so the chain itself is still built
+     * once and shared by every voice.
+     */
+    private applyRoom(profile: MusicProfile) {
+        this.musicBrightness = profile.brightness;
+        this.filterTarget = -1; // force the next intensity update to re-arm
+
+        const [wet, time] = profile.delay;
+        if (this.musicDelayMix) this.musicDelayMix.gain.value = wet;
+        if (this.musicDelay) this.musicDelay.delayTime.value = time;
+        if (this.musicDrive) this.musicDrive.curve = AudioSystem.makeDriveCurve(profile.drive);
+    }
+
+    /**
+     * Teach the engine what a place sounds like.
+     *
+     * Keyed by the same theme string `startMusic` takes. The engine ships no
+     * profiles at all — "Derelict Station sounds industrial" is a fact about
+     * the game, and src/engine is not allowed to know any of those.
+     */
+    registerMusicProfile(theme: string, profile: MusicProfile) {
+        this.musicProfiles.set(theme, profile);
+    }
+
+    /**
+     * Which of this theme's tracks to play, avoiding the one that played last.
+     *
+     * Pure random repeats about a third of the time, and a repeat is exactly
+     * the case the player notices — "it's the same music again" is the whole
+     * complaint this feature answers. Excluding the previous pick costs one
+     * localStorage read and makes back-to-back repeats impossible.
+     */
+    private pickTrack(theme: string): number {
+        let last = -1;
+        try {
+            last = Number(localStorage.getItem(`${LAST_TRACK_KEY}.${theme}`) ?? -1);
+        } catch {
+            // Storage unavailable — fall back to plain random
+        }
+
+        const choices: number[] = [];
+        for (let i = 0; i < TRACKS_PER_THEME; i++) if (i !== last) choices.push(i);
+        const picked = choices[Math.floor(Math.random() * choices.length)];
+
+        try {
+            localStorage.setItem(`${LAST_TRACK_KEY}.${theme}`, String(picked));
+        } catch {
+            // Nothing to do; the next run just gets another free choice
+        }
+        return picked;
     }
 
     startMusic(theme: string) {
         if (!this.ensureContext()) return;
         this.stopMusic();
 
-        const seed = hashString(theme);
-        this.musicRng = mulberry32(seed);
+        const profile = this.musicProfiles.get(theme) ?? DEFAULT_PROFILE;
+        const track = this.pickTrack(theme);
+
+        // Seeded by theme AND track, so a stage's three tunes are different
+        // pieces — but they all draw from the same profile, so they are
+        // siblings rather than strangers
+        this.musicRng = mulberry32(hashString(`${theme}#${track}`));
         const rng = this.musicRng;
 
-        // The theme decides key, tempo, progression and hooks — deterministically
+        const [bpmLow, bpmHigh] = profile.bpm;
+        const scale = MODES[profile.mode] ?? MODES.aeolian;
+        // Related keys, not arbitrary ones: the tonic, its minor third and its
+        // fifth. Three tracks in wildly different keys stop being one place.
+        const transpose = [0, 3, 7][track % 3];
         const motif = this.makeMotif(rng);
+
         this.song = {
-            root: 45 + Math.floor(rng() * 5),      // A2..D3
-            bpm: 124 + Math.floor(rng() * 18),
-            progression: PROGRESSIONS[Math.floor(rng() * PROGRESSIONS.length)],
+            root: profile.root + transpose,
+            bpm: bpmLow + Math.floor(rng() * (bpmHigh - bpmLow + 1)),
+            progression: PROGRESSIONS[
+                profile.progressions[Math.floor(rng() * profile.progressions.length)]
+            ],
             motif,
             motifB: this.makeAnswer(motif, rng),
-            leadDuty: [0.125, 0.25, 0.5][Math.floor(rng() * 3)],
+            leadDuty: profile.leadDuties[Math.floor(rng() * profile.leadDuties.length)],
             arpDuty: 0.125,
+            scale,
         };
+
+        this.applyRoom(profile);
 
         this.musicStep = 0;
         this.musicIntensity = 0;
@@ -692,10 +833,11 @@ export class AudioSystem {
 
     /** Scale degree (can be negative / above an octave) → MIDI note */
     private degreeToMidi(root: number, degree: number): number {
-        const octave = Math.floor(degree / MINOR_SCALE.length);
-        let idx = degree % MINOR_SCALE.length;
-        if (idx < 0) idx += MINOR_SCALE.length;
-        return root + octave * 12 + MINOR_SCALE[idx];
+        const scale = this.song?.scale ?? MODES.aeolian;
+        const octave = Math.floor(degree / scale.length);
+        let idx = degree % scale.length;
+        if (idx < 0) idx += scale.length;
+        return root + octave * 12 + scale[idx];
     }
 
     /**

@@ -9,6 +9,7 @@
  */
 
 import { GameManager } from '../GameManager';
+import { registerStageMusic } from '../data/StageData';
 import { screenManager } from '../../engine/ui/ScreenManager';
 import { MainMenuScreen } from '../ui/screens/MainMenuScreen';
 import { ClassSelectionScreen } from '../ui/screens/ClassSelectionScreen';
@@ -34,6 +35,10 @@ export class Engine {
         this.ctx = this.canvas.getContext('2d')!;
         this.resize();
         window.addEventListener('resize', () => this.resize());
+
+        // The engine's audio system knows how to play a place, not which places
+        // exist — the game tells it (see STAGE_MUSIC)
+        registerStageMusic();
 
         // Create GameManager (without auto-showing class selection)
         this.gameManager = new GameManager(this.canvas, this.ctx);
