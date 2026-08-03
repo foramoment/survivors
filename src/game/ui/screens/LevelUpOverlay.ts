@@ -16,6 +16,7 @@ import type { GameState } from '../../core/StateMachine';
 import { POWERUPS, WEAPONS } from '../../data/GameData';
 import {
     buildUpgradeOptions, getPowerupValue, formatPowerupBonus, formatStatPreview,
+    effectivePowerup,
 } from '../../core/UpgradePool';
 import { audio } from '../../core/AudioSystem';
 import { juice } from '../../core/JuiceSystem';
@@ -228,8 +229,12 @@ export class LevelUpOverlay {
             } else {
                 const powerup = opt.data;
                 const stack = this.host.powerupLevels.get(powerup.name) ?? 0;
-                const value = getPowerupValue(powerup.value, stack, powerup.stackGrowth);
-                const bonus = formatPowerupBonus(powerup.type, value);
+                const raw = getPowerupValue(powerup.value, stack, powerup.stackGrowth);
+                // What the pick is worth to THIS player — crit chance past 100%
+                // is paid out as crit damage instead (see effectivePowerup)
+                const eff = effectivePowerup(powerup.type, raw, this.host.player?.stats as any);
+                const value = eff.value;
+                const bonus = formatPowerupBonus(eff.type, value);
                 const stackText = stack > 0
                     ? t('levelup.level', { from: stack, to: stack + 1 })
                     : t('common.new');
@@ -238,7 +243,7 @@ export class LevelUpOverlay {
                 <h3>${powerupName(powerup)}</h3>
                 <div class="level-indicator">${stackText} · ${bonus}</div>
                 <p>${powerupDesc(powerup)}</p>
-                ${this.powerupPreview(powerup, value)}
+                ${this.powerupPreview(eff.type, value)}
               `;
                 this.bindPick(card, screen, () => this.host.applyPowerup(powerup));
             }
@@ -340,13 +345,13 @@ export class LevelUpOverlay {
      * The description says what a powerup *is*; this says what taking it does to
      * the number you already have, which is what actually decides the pick.
      */
-    private powerupPreview(powerup: any, value: number): string {
+    private powerupPreview(type: string, value: number): string {
         const player = this.host.player;
         if (!player) return '';
 
         const stats = player.stats as Record<string, number>;
-        const current = powerup.type === 'maxHp' ? player.maxHp : (stats[powerup.type] ?? 0);
-        return `<div class="stat-preview">${formatStatPreview(powerup.type, current, current + value)}</div>`;
+        const current = type === 'maxHp' ? player.maxHp : (stats[type] ?? 0);
+        return `<div class="stat-preview">${formatStatPreview(type, current, current + value)}</div>`;
     }
 
     /** Damage before → after for a weapon card */

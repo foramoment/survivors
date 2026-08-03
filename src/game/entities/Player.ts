@@ -5,7 +5,7 @@ import { Weapon } from '../Weapon';
 import { sprites } from '../core/SpriteFactory';
 import { adrenalineMultiplier } from '../core/Tactics';
 import type { ClassPerLevel } from '../data/GameData';
-import { clampStats } from '../core/PlayerStats';
+import { addStat } from '../core/PlayerStats';
 
 export class Player extends Entity {
     /**
@@ -299,10 +299,11 @@ export class Player extends Entity {
 
         const stats = this.stats as Record<string, number>;
         if (this.perLevel.stat in stats) {
-            stats[this.perLevel.stat] += this.perLevel.value;
+            // Shared with the powerup path: limits and the crit-overflow
+            // conversion live in one place, so a Berserker past 100% crit keeps
+            // gaining something instead of gaining nothing
+            addStat(stats, this.perLevel.stat, this.perLevel.value);
         }
-        // Cooldown must not go degenerate, crit chance must not exceed certainty
-        clampStats(stats);
     }
 
     gainXp(amount: number) {

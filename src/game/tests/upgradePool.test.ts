@@ -15,6 +15,7 @@ import {
     formatPowerupBonus,
     formatStatValue,
     formatStatPreview,
+    effectivePowerup,
     WEAPON_SLOT_CAP,
     POWERUP_STACK_CAP,
     SIGNATURE_WEAPONS,
@@ -23,6 +24,7 @@ import {
 import { CLASSES, WEAPONS, POWERUPS } from '../data/GameData';
 import { i18n } from '../core/I18n';
 import { Player } from '../entities/Player';
+import { addStat } from '../core/PlayerStats';
 
 function mulberry32(seed: number): () => number {
     let a = seed;
@@ -302,22 +304,22 @@ describe('Stat ceilings', () => {
         expect(player.stats.critChance).toBe(1);
     });
 
-    it('stops offering a perk whose stat is already maxed', () => {
-        const atCap = buildUpgradeOptions({
-            weaponLevels: new Map(),
-            powerupLevels: new Map(),
-            stats: { critChance: 1 },
-            count: 40,
-        });
-        expect(atCap.some(o => o.type === 'powerup' && o.data.type === 'critChance')).toBe(false);
+    it('pays crit chance out as crit damage once it is capped', () => {
+        // Yasuo's rule: overflow crit chance becomes damage rather than nothing
+        const below = effectivePowerup('critChance', 0.05, { critChance: 0.5 });
+        expect(below.type).toBe('critChance');
+        expect(below.value).toBe(0.05);
 
-        // ...and still offers it below the cap, so the filter is not a blanket
-        const below = buildUpgradeOptions({
-            weaponLevels: new Map(),
-            powerupLevels: new Map(),
-            stats: { critChance: 0.9 },
-            count: 40,
-        });
-        expect(below.some(o => o.type === 'powerup' && o.data.type === 'critChance')).toBe(true);
+        const capped = effectivePowerup('critChance', 0.05, { critChance: 1 });
+        expect(capped.type).toBe('critDamage');
+        expect(capped.value).toBeGreaterThan(0);
+    });
+
+    it('converts on the way in, so a capped pick is never wasted', () => {
+        const stats: Record<string, number> = { critChance: 0.98, critDamage: 2 };
+        addStat(stats, 'critChance', 0.05);
+        expect(stats.critChance).toBe(1);
+        // 0.03 of the pick overflowed and landed on crit damage instead
+        expect(stats.critDamage).toBeGreaterThan(2);
     });
 });

@@ -113,6 +113,17 @@ export class PsiBlastZone extends Zone {
     }
 }
 
+/**
+ * How far the blast may reach for a target.
+ *
+ * Deliberately shorter than the screen. A weapon that fires off-screen is not
+ * "long range", it is a weapon you never see work — and the player is looking
+ * at the pack around them, not at the far corner of the arena. 330px keeps
+ * every detonation inside the part of the screen you are actually watching,
+ * even in a small window.
+ */
+const MIND_BLAST_RANGE = 330;
+
 export class MindBlastWeapon extends Weapon {
     name = "Mind Blast";
     emoji = "🧠";
@@ -155,10 +166,18 @@ export class MindBlastWeapon extends Weapon {
         }
 
         if (this.cooldown <= 0) {
-            const targets = this.findRandomEnemies(1, 600);
-            if (targets.length > 0) {
-                const target = targets[0];
-                this.detonate(target.pos.x, target.pos.y, this.damage, this.evolved ? 3 : 0);
+            // Where the pack is, inside arm's reach — not a random body half a
+            // screen away.
+            //
+            // This used to be `findRandomEnemies(1, 600)`, and both halves were
+            // wrong. 600px is most of a windowed screen, so the blast regularly
+            // went off at the far edge; and *random* meant it actively ignored
+            // the crowd standing on the player to pick a lone straggler. The
+            // weapon looked broken because it was firing somewhere you were not
+            // looking, at nothing in particular.
+            const spot = this.findDensestSpot(MIND_BLAST_RANGE, this.blastRadius());
+            if (spot) {
+                this.detonate(spot.x, spot.y, this.damage, this.evolved ? 3 : 0);
                 juice.addTrauma(0.08);
                 // A cascade is four stunning blasts walking through the pack —
                 // at the base cooldown it kept the whole crowd frozen

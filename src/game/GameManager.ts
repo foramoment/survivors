@@ -21,14 +21,14 @@ import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
 import { getPowerupValue, POWERUP_STACK_CAP } from './core/UpgradePool';
-import { clampStats } from './core/PlayerStats';
+import { addStat } from './core/PlayerStats';
 import { contactDamagePerSecond } from './core/ContactDamage';
 import { computeScore, submitScore } from './core/Score';
 import { RunStatsTracker } from './core/RunStats';
 import { achievements, type RunSnapshot } from './core/Achievements';
 import { RepairCell } from './entities/RepairCell';
 import {
-    dischargeThreshold, DISCHARGE_RADIUS, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
+    dischargeThreshold, dischargeRadius, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
     DISCHARGE_COOLDOWN, DISCHARGE_CHARGE_CAP,
     KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE, KILL_ECHO_BOSS_RESIST,
 } from './core/Tactics';
@@ -413,7 +413,7 @@ export class GameManager {
 
         this.capacitorCharge = 0;
         this.dischargeCooldown = DISCHARGE_COOLDOWN;
-        const radius = DISCHARGE_RADIUS * this.player.stats.area;
+        const radius = dischargeRadius(this.player.stats.discharge) * this.player.stats.area;
         const damage = DISCHARGE_DAMAGE * this.player.stats.discharge;
 
         audio.play('explosion');
@@ -540,15 +540,11 @@ export class GameManager {
         const cap = opt.maxStacks ?? POWERUP_STACK_CAP;
         this.powerupLevels.set(opt.name, Math.min(cap, stack + 1));
 
-        // Apply stat boost
+        // Limits and overflow conversions all live in addStat, shared with the
+        // class's per-level growth
         if (opt.type in this.player.stats) {
-            (this.player.stats as any)[opt.type] += value;
+            addStat(this.player.stats as any, opt.type, value);
         }
-
-        // Backstops only — see STAT_LIMITS. The powerup caps keep cooldown at
-        // 0.60 on their own and only a long Storm Mage run pushes it lower;
-        // crit chance is the one a class can carry past its ceiling by itself.
-        clampStats(this.player.stats as any);
 
         // Special handling for maxHp
         if (opt.type === 'maxHp') {

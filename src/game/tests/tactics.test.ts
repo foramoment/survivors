@@ -11,7 +11,7 @@ vi.mock('../core/Input', () => ({
 
 import { Player } from '../entities/Player';
 import { RepairCell } from '../entities/RepairCell';
-import { adrenalineMultiplier, dischargeThreshold, ADRENALINE_THRESHOLD, REPAIR_LIFETIME } from '../core/Tactics';
+import { adrenalineMultiplier, dischargeThreshold, dischargeRadius, DISCHARGE_COOLDOWN, ADRENALINE_THRESHOLD, REPAIR_LIFETIME } from '../core/Tactics';
 import { POWERUPS } from '../data/GameData';
 import { VALID_PLAYER_STATS } from '../core/PlayerStats';
 
@@ -73,12 +73,20 @@ describe('Adrenal Surge', () => {
 });
 
 describe('Static Discharge', () => {
-    it('needs more absorbed damage per stack', () => {
-        expect(dischargeThreshold(2)).toBeGreaterThan(dischargeThreshold(1));
+    it('costs the same to charge however many stacks you have', () => {
+        // It used to be `26 x stacks`, which made the perk's DPS exactly
+        // constant: bigger blast, proportionally longer wait. Eight picks
+        // bought a lumpier version of one pick.
+        expect(dischargeThreshold(4)).toBe(dischargeThreshold(1));
     });
 
     it('is unreachable at zero stacks', () => {
-        expect(dischargeThreshold(0)).toBe(0);
+        expect(dischargeThreshold(0)).toBe(Infinity);
+    });
+
+    it('every stack is a bigger bang, never a faster one', () => {
+        expect(dischargeRadius(4)).toBeGreaterThan(dischargeRadius(1));
+        expect(DISCHARGE_COOLDOWN).toBeGreaterThan(0);
     });
 });
 

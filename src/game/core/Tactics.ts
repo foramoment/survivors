@@ -18,12 +18,25 @@
  * sits next to the rule it drives.
  */
 
-/** HP/s that must be absorbed per discharge stack before the capacitor fires */
+/**
+ * HP that must be absorbed before the capacitor fires. **Flat**, not per stack.
+ *
+ * It used to be `26 x stacks`, which made the perk's damage-per-second exactly
+ * constant: the blast scaled with stacks and so did the wait, and the two
+ * cancelled. Eight picks bought a lumpier version of one pick. Then the
+ * internal cooldown below arrived and made it worse — with firing rate capped,
+ * a bigger threshold could only ever be a downgrade.
+ *
+ * Flat threshold + scaling blast + a hard rate cap gives the perk one readable
+ * promise: **every stack is a bigger bang, never a faster one.**
+ */
 export const DISCHARGE_CHARGE_COST = 26;
 /** Blast radius, and its damage as a multiple of the stack count */
 export const DISCHARGE_RADIUS = 190;
 export const DISCHARGE_DAMAGE = 34;
 export const DISCHARGE_KNOCKBACK = 420;
+/** Extra blast radius per stack past the first, so the growth is visible */
+export const DISCHARGE_RADIUS_PER_STACK = 0.07;
 
 /**
  * Internal cooldown, in seconds — the capacitor cannot fire again inside this
@@ -105,7 +118,17 @@ export function adrenalineMultiplier(hp: number, maxHp: number, adrenaline: numb
     return 1 + adrenaline;
 }
 
-/** HP/s of absorbed damage needed before the capacitor fires at this stack */
+/**
+ * Absorbed damage needed before the capacitor fires.
+ *
+ * Independent of stack count — see DISCHARGE_CHARGE_COST. Zero stacks is
+ * unreachable, which is what stops the perk firing before it is picked.
+ */
 export function dischargeThreshold(stacks: number): number {
-    return DISCHARGE_CHARGE_COST * stacks;
+    return stacks > 0 ? DISCHARGE_CHARGE_COST : Infinity;
+}
+
+/** Blast radius at this stack count */
+export function dischargeRadius(stacks: number): number {
+    return DISCHARGE_RADIUS * (1 + Math.max(0, stacks - 1) * DISCHARGE_RADIUS_PER_STACK);
 }

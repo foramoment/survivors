@@ -27,6 +27,9 @@ import { drawPixelText } from './PixelFont';
 import { audio } from './AudioSystem';
 import { juice } from './JuiceSystem';
 
+/** Glyph height of the pixel font, for stacking the hit counter above a total */
+const GLYPH_HEIGHT = 7;
+
 interface DamageNumber {
     x: number;
     y: number;
@@ -38,6 +41,8 @@ interface DamageNumber {
     life: number;
     maxLife: number;
     isCrit: boolean;
+    /** How many hits this number is the sum of */
+    hits: number;
     /** Seconds this entry still accepts merges. Never refreshed. */
     openFor: number;
     /** Punch-in timer, restarted on every merge so growth is visible */
@@ -124,6 +129,7 @@ export class DamageNumbers {
             life,
             maxLife: life,
             isCrit,
+            hits: 1,
             openFor: MERGE_WINDOW,
             pop: POP_TIME,
         });
@@ -142,6 +148,7 @@ export class DamageNumbers {
             if (Math.abs(dn.y - pos.y) > MERGE_RADIUS) continue;
 
             dn.amount += amount;
+            dn.hits++;
             dn.text = Math.floor(dn.amount).toString();
             // One crit in the group makes the whole total read as a crit: the
             // colour is about "something big happened here", and it did
@@ -212,8 +219,11 @@ export class DamageNumbers {
             const base = dn.isCrit ? 3.4 : 2.2;
             const scale = Math.max(1, Math.round(base * pop));
 
+            const sx = dn.x - camera.x;
+            const sy = dn.y - camera.y;
+
             ctx.globalAlpha = t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
-            drawPixelText(ctx, dn.text, dn.x - camera.x, dn.y - camera.y, {
+            drawPixelText(ctx, dn.text, sx, sy, {
                 scale,
                 align: 'center',
                 spacing: 1,
@@ -221,6 +231,21 @@ export class DamageNumbers {
                 color: dn.isCrit ? '#ffe14d' : '#ffffff',
                 outline: dn.isCrit ? '#ff4400' : undefined,
             });
+
+            // How many hits this total is. Without it a merged number reads as
+            // one enormous hit — the first thing merging did in play was make
+            // a perk look broken, because ten swings landing at once printed
+            // "600" and nothing said it was ten.
+            if (dn.hits > 1) {
+                const small = Math.max(1, Math.round(scale * 0.55));
+                drawPixelText(ctx, `X${dn.hits}`, sx, sy - GLYPH_HEIGHT * scale - small * 2, {
+                    scale: small,
+                    align: 'center',
+                    spacing: 1,
+                    shadow: 1,
+                    color: '#7fd4ff',
+                });
+            }
         }
         ctx.restore();
     }

@@ -20,7 +20,7 @@
  */
 
 import { CLASSES, POWERUPS, WEAPONS } from '../data/GameData';
-import { STAT_LIMITS } from './PlayerStats';
+import { CRIT_OVERFLOW_TO_DAMAGE } from './PlayerStats';
 import { t } from './I18n';
 
 /**
@@ -73,30 +73,28 @@ export interface OfferContext {
     count: number;
     /** Who is playing — decides which signature weapons may be offered */
     classId?: string;
-    /**
-     * The player's live stats, so a perk that has hit a hard ceiling stops
-     * being offered. Optional: tests and older callers work without it, they
-     * just see the stack cap alone.
-     */
+    /** The player's live stats. Optional; unused by the draw today. */
     stats?: Record<string, number>;
     rng?: () => number;
 }
 
 /**
- * Is this powerup already worthless to the player?
+ * What a powerup is actually worth to *this* player right now.
  *
- * Distinct from `maxStacks`, which counts picks. A stat can hit its ceiling
- * from somewhere else entirely: a Berserker gains +1% crit chance per level, so
- * around level 35 they are at 100% with no Targeting HUD picks at all, and the
- * card was still offered — reading "99% → 104%", promising four points of
- * nothing.
+ * Only crit chance differs from its own card today: past 100% it converts into
+ * crit damage (see CRIT_OVERFLOW_TO_DAMAGE), so a capped Berserker offered
+ * Targeting HUD should be told "crit damage 340% → 352%", not the "99% → 104%"
+ * that started this. The card is otherwise unchanged.
  */
-function isAtCeiling(powerup: any, stats?: Record<string, number>): boolean {
-    if (!stats) return false;
-    const limit = STAT_LIMITS[powerup.type];
-    if (!limit || limit.max === undefined) return false;
-    const current = stats[powerup.type];
-    return current !== undefined && current >= limit.max;
+export function effectivePowerup(
+    type: string,
+    value: number,
+    stats?: Record<string, number>,
+): { type: string; value: number } {
+    if (type === 'critChance' && stats && (stats.critChance ?? 0) >= 1) {
+        return { type: 'critDamage', value: value * CRIT_OVERFLOW_TO_DAMAGE };
+    }
+    return { type, value };
 }
 
 /**
@@ -181,7 +179,6 @@ function buildEntries(ctx: OfferContext): WeightedEntry[] {
     for (const powerup of POWERUPS) {
         const stack = ctx.powerupLevels.get(powerup.name) ?? 0;
         if (stack >= (powerup.maxStacks ?? POWERUP_STACK_CAP)) continue;
-        if (isAtCeiling(powerup, ctx.stats)) continue;
         entries.push({ option: { type: 'powerup', data: powerup, stack }, weight: WEIGHT_POWERUP });
     }
 
