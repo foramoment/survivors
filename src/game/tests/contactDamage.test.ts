@@ -9,73 +9,103 @@ vi.mock('../core/Input', () => ({
     },
 }));
 
-import { contactDamagePerSecond, crowdWeight, ARMOR_FLOOR, CROWD_CAP } from '../core/ContactDamage';
+import {
+    biteDamage, ARMOR_FLOOR, BITE_INTERVAL, BITE_PUNCH, MAX_BITERS,
+} from '../core/ContactDamage';
 import { Player } from '../entities/Player';
+import { Enemy } from '../entities/Enemy';
 import { ENEMIES, ENEMY_CONFIG } from '../data/GameData';
 import { DifficultyDirector } from '../core/DifficultyDirector';
 
-describe('contactDamagePerSecond', () => {
-    it('is zero with nobody touching', () => {
-        expect(contactDamagePerSecond([], 0)).toBe(0);
+/** What a ring of `n` enemies of this DPS costs per second, at the biter cap */
+function crowdDps(dps: number, n: number, armor: number): number {
+    const biters = Math.min(n, MAX_BITERS);
+    return (biteDamage(dps, armor) * biters) / BITE_INTERVAL;
+}
+
+describe('biteDamage', () => {
+    it('lands as a chunk, not a trickle', () => {
+        // The whole reason for the rework: a bite has to be big enough to
+        // register as an event. 0.3 HP per frame is weather, not damage.
+        expect(biteDamage(10, 0)).toBeCloseTo(10 * BITE_INTERVAL * BITE_PUNCH);
+        expect(biteDamage(10, 0)).toBeGreaterThan(5);
     });
 
-    it('a lone enemy deals its own damage', () => {
-        expect(contactDamagePerSecond([10], 0)).toBeCloseTo(10);
-    });
-
-    it('crowds stack — this is the whole point of the rework', () => {
-        const one = contactDamagePerSecond([10], 0);
-        const five = contactDamagePerSecond([10, 10, 10, 10, 10], 0);
-        expect(five).toBeGreaterThan(one * 2);
-    });
-
-    it('stacking has diminishing returns', () => {
-        const two = contactDamagePerSecond([10, 10], 0);
-        expect(two).toBeLessThan(20);
-        expect(two).toBeCloseTo(10 + 10 * crowdWeight(1));
-    });
-
-    it('caps a huge pile relative to the strongest attacker', () => {
-        const pile = contactDamagePerSecond(Array(40).fill(10), 0);
-        expect(pile).toBeCloseTo(10 * CROWD_CAP);
-    });
-
-    it('armor reduces every attacker, so it scales with crowd size', () => {
-        const bare = contactDamagePerSecond([10, 10, 10], 0);
-        const armored = contactDamagePerSecond([10, 10, 10], 4);
-        expect(armored).toBeCloseTo(bare * 0.6);
+    it('armor reduces every bite, so it scales with crowd size', () => {
+        const bare = biteDamage(10, 0);
+        const armored = biteDamage(10, 4);
+        expect(armored).toBeCloseTo(bare - 4);
     });
 
     it('armor never grants immunity', () => {
-        const dps = contactDamagePerSecond([10], 999);
-        expect(dps).toBeCloseTo(10 * ARMOR_FLOOR);
-        expect(dps).toBeGreaterThan(0);
+        const bite = biteDamage(10, 999);
+        expect(bite).toBeCloseTo(10 * BITE_INTERVAL * BITE_PUNCH * ARMOR_FLOOR);
+        expect(bite).toBeGreaterThan(0);
     });
 
     it('negative armor (Berserker) hurts more', () => {
-        expect(contactDamagePerSecond([10], -2)).toBeCloseTo(12);
+        expect(biteDamage(10, -2)).toBeCloseTo(10 * BITE_INTERVAL * BITE_PUNCH + 2);
     });
 });
 
-describe('Player contact damage', () => {
-    it('drains continuously and ignores i-frames', () => {
+describe('crowd scaling', () => {
+    it('crowds stack linearly up to the biter cap', () => {
+        const one = crowdDps(10, 1, 0);
+        const four = crowdDps(10, 4, 0);
+        expect(four).toBeCloseTo(one * 4);
+    });
+
+    it('caps at how many bodies fit against you, not at a damage multiple', () => {
+        const full = crowdDps(10, MAX_BITERS, 0);
+        const pile = crowdDps(10, 40, 0);
+        expect(pile).toBeCloseTo(full);
+    });
+
+    it('being surrounded is far worse than being grazed', () => {
+        // This is the number that failed in play: under the old model a
+        // hundred enemies cost the same as four, and a player stood in the
+        // middle of the arena for ten minutes.
+        expect(crowdDps(10, MAX_BITERS, 0) / crowdDps(10, 1, 0)).toBeCloseTo(MAX_BITERS);
+    });
+});
+
+describe('Enemy bite timer', () => {
+    it('each enemy carries its own, so a crowd is not gated by one clock', () => {
+        const a = new Enemy(0, 0, ENEMIES[0]);
+        const b = new Enemy(0, 0, ENEMIES[0]);
+        a.biteTimer = 0;
+        b.biteTimer = BITE_INTERVAL;
+        expect(a.biteTimer).not.toBe(b.biteTimer);
+    });
+
+    it('ticks down even while stunned, so a stun is not a free bite later', () => {
+        const enemy = new Enemy(0, 0, ENEMIES[0]);
+        enemy.biteTimer = BITE_INTERVAL;
+        enemy.stunTimer = 10;
+        enemy.update(0.5);
+        expect(enemy.biteTimer).toBeCloseTo(BITE_INTERVAL - 0.5);
+    });
+});
+
+describe('Player bites', () => {
+    it('ignores i-frames — that bug is what made crowds free', () => {
         const player = new Player(0, 0);
         player.hp = 100;
 
-        // A discrete hit grants invulnerability...
+        // A discrete hit (a meteor) grants invulnerability...
         player.takeDamage(10);
         expect(player.invulnerabilityTimer).toBeGreaterThan(0);
 
-        // ...which must NOT protect against enemies standing on you
+        // ...which must NOT protect against enemies chewing on you
         const before = player.hp;
-        player.takeContactDamage(20, 0.5);
-        expect(player.hp).toBeCloseTo(before - 10);
+        player.takeBite(12);
+        expect(player.hp).toBeCloseTo(before - 12);
     });
 
     it('kills the player when HP runs out', () => {
         const player = new Player(0, 0);
         player.hp = 5;
-        player.takeContactDamage(20, 1);
+        player.takeBite(20);
         expect(player.hp).toBe(0);
         expect(player.isDead).toBe(true);
     });
@@ -98,31 +128,28 @@ describe('contact damage balance', () => {
     }
 
     it('the enemy damage curve stays inside a survivable band', () => {
-        // The old ×1.5 curve put the last tier past 280 DPS before any
-        // multipliers — one touch would have been instant death.
         const last = ENEMIES[ENEMIES.length - 1].damage;
         expect(ENEMY_CONFIG.damageMultiplier).toBeLessThan(1.3);
         expect(last).toBeLessThan(50);
     });
 
     it('a single early enemy is a scratch, not a threat', () => {
-        const dps = enemyDps(0, 30, 1);
+        const dps = crowdDps(enemyDps(0, 30, 1), 1, 0);
         // A fresh 90-100 HP player survives well over ten seconds of contact
         expect(90 / dps).toBeGreaterThan(10);
     });
 
     it('standing in a late-game crowd kills in seconds', () => {
-        const dps = enemyDps(6, 600, 2);
-        const crowd = contactDamagePerSecond(Array(8).fill(dps), 0);
+        const dps = crowdDps(enemyDps(6, 600, 2), MAX_BITERS, 0);
         const hp = 300; // a player who has taken a few Barrier Field stacks
-        expect(hp / crowd).toBeLessThan(4);
-        expect(hp / crowd).toBeGreaterThan(1); // still time to walk out
+        expect(hp / dps).toBeLessThan(4);
+        expect(hp / dps).toBeGreaterThan(1); // still time to walk out
     });
 
     it('armor is worth taking against a crowd', () => {
         const dps = enemyDps(3, 240, 1.5);
-        const bare = contactDamagePerSecond(Array(5).fill(dps), 0);
-        const armored = contactDamagePerSecond(Array(5).fill(dps), 8);
+        const bare = crowdDps(dps, 5, 0);
+        const armored = crowdDps(dps, 5, 8);
         expect(1 - armored / bare).toBeGreaterThan(0.2);
     });
 });

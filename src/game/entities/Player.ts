@@ -261,17 +261,21 @@ export class Player extends Entity {
     }
 
     /**
-     * Continuous damage from enemies pressed against the player, in HP/second.
-     * No i-frames: they would cap crowd damage at 1/invulnerabilityDuration
-     * regardless of how many enemies are biting, which is what used to make
-     * standing in a swarm free. Armor is already applied by the caller
-     * (core/ContactDamage) per enemy, not here.
+     * One enemy's bite.
+     *
+     * **No i-frames, deliberately.** They would cap crowd damage at
+     * 1/invulnerabilityDuration regardless of how many enemies had their teeth
+     * in you, which is exactly what used to make standing in a swarm free. Each
+     * enemy carries its own cooldown instead (see core/ContactDamage), so
+     * twelve enemies land twelve bites.
+     *
+     * Armor is already applied by the caller, per bite, not here.
      */
-    takeContactDamage(dps: number, dt: number) {
-        if (dps <= 0) return;
+    takeBite(amount: number) {
+        if (amount <= 0) return;
 
-        this.hp -= dps * dt;
-        this.contactTimer = 0.12; // drives the "being chewed" tint in draw()
+        this.hp -= amount;
+        this.contactTimer = 0.16; // drives the "being chewed" tint in draw()
 
         if (this.hp <= 0) {
             this.hp = 0;

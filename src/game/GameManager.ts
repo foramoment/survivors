@@ -22,7 +22,7 @@ import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
 import { getPowerupValue, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { addStat } from './core/PlayerStats';
-import { contactDamagePerSecond } from './core/ContactDamage';
+import { biteDamage, BITE_INTERVAL, MAX_BITERS } from './core/ContactDamage';
 import { computeScore, submitScore } from './core/Score';
 import { RunStatsTracker } from './core/RunStats';
 import { achievements, type RunSnapshot } from './core/Achievements';
@@ -41,13 +41,11 @@ import { t } from './core/I18n';
 import { stageName } from './core/Labels';
 
 /**
- * Contact hurt cue: play at most this often, and only once this share of max
- * HP has actually been lost since the last one. Two gates rather than a timer
- * because the cue has to be rare when you are grazed and frequent when you are
- * being eaten — without ever turning into a machine-gun.
+ * Minimum seconds between hurt cues. Bites are discrete events now, so the
+ * sound wants to fire on each one — but a full ring of six enemies would turn
+ * that into a machine-gun, and the sprite flash already marks every bite.
  */
 const CONTACT_SOUND_MIN_GAP = 0.75;
-const CONTACT_SOUND_HP_SHARE = 0.05;
 
 /** Knockback on contact: the player barely moves, the enemy is shoved aside */
 const PLAYER_SHOVE_BACK = 55;
@@ -107,12 +105,16 @@ export class GameManager {
     private finalBossSpawned: boolean = false;
     /** Cooldown before the next hurt cue may play */
     private contactFxTimer: number = 0;
-    /** Contact damage taken since the last hurt cue */
-    private contactDamageBank: number = 0;
     /** Absorbed damage banked toward the next Static Discharge */
     private capacitorCharge: number = 0;
     /** Internal cooldown left on Static Discharge (see DISCHARGE_COOLDOWN) */
     private dischargeCooldown: number = 0;
+    /**
+     * Token bucket bounding how many bites may land on the player per second.
+     * Refills at MAX_BITERS per BITE_INTERVAL — see resolveBites for why the
+     * per-enemy timers alone were not enough.
+     */
+    private biteBudget: number = MAX_BITERS;
     repairCells: RepairCell[] = [];
 
     /**
@@ -191,6 +193,7 @@ export class GameManager {
         this.repairCells = [];
         this.capacitorCharge = 0;
         this.dischargeCooldown = 0;
+        this.biteBudget = MAX_BITERS;
         this.damageNumbers.clear();
         this.killCount = 0;
         this.killScore = 0;
@@ -355,36 +358,83 @@ export class GameManager {
     }
 
     /**
-     * Hurt feedback while enemies are on the player.
+     * Hurt feedback for a bite.
      *
-     * Getting stuck in a pack is a *sustained state*, not an event, and every
-     * event-shaped cue is wrong for it. Earlier versions fired a beat every
-     * 0.28s carrying camera shake and a hurt blip: buried in a crowd that became
-     * a machine-gun of "tk-tk-tk-tk" with the arena shaking too hard to read —
-     * exactly when the player most needs to see where the gap is.
+     * **Still no camera shake.** A bite is an event now, and events normally
+     * earn shake — but not this one: being surrounded is exactly when the
+     * player most needs to read where the gap is, and an earlier version that
+     * shook on contact made the arena unreadable at the worst possible moment.
      *
-     * So: no camera shake from contact at all, and the sound is gated on damage
-     * actually taken rather than on a clock. A graze beeps rarely; being eaten
-     * beeps often, but never faster than CONTACT_SOUND_MIN_GAP. The continuous
-     * readouts — the HP bar, the edge vignette and the player flashing red —
-     * carry the rest.
+     * The sound is rate-limited rather than played per bite, because a full
+     * ring of six chews through the pack faster than a "tk-tk-tk-tk" machine
+     * gun is bearable. Everything else carries it: the HP bar step, the player
+     * sprite flashing red, and a vignette that deepens as health drops.
      */
-    private emitContactFeedback(dps: number, dt: number) {
-        if (!this.player) return;
+    private emitContactFeedback(damage: number) {
+        if (!this.player || damage <= 0) return;
 
-        this.contactDamageBank += dps * dt;
-        this.contactFxTimer -= dt;
-
-        const beat = this.player.maxHp * CONTACT_SOUND_HP_SHARE;
-        if (this.contactDamageBank < beat || this.contactFxTimer > 0) return;
-
-        this.contactDamageBank = 0;
+        if (this.contactFxTimer > 0) return;
         this.contactFxTimer = CONTACT_SOUND_MIN_GAP;
 
         audio.play('hurt');
         // Edge-only, and it deepens as HP drops — readable without hiding the
         // middle of the screen where the enemies are
         juice.pulseVignette(0.3 + (1 - this.player.hp / this.player.maxHp) * 0.5);
+    }
+
+    /**
+     * Let the enemies pressed against the player take their bites.
+     *
+     * **Two independent limits, and both are needed.**
+     *
+     * Per enemy, `biteTimer` stops one attacker machine-gunning you. That alone
+     * is not enough, and the first cut of this proved it in the first playtest:
+     * a 150 HP Berserker surrounded by 38 enemies died in two seconds. The
+     * intent had been "only the nearest six can reach you", implemented as
+     * *take the six closest each frame* — but a pile is constantly shoving
+     * itself around, so the closest six are a **different** six every frame,
+     * each with a fresh timer. The cap leaked completely.
+     *
+     * So the second limit is a token bucket on the player: `biteBudget` refills
+     * at MAX_BITERS per BITE_INTERVAL and every bite costs one. That bounds
+     * incoming bites at a known rate no matter how the crowd churns.
+     *
+     * This is *not* the i-frame bug returning. I-frames blocked **all** damage
+     * for a fixed window, so one bat and forty Doom Harbingers cost the same.
+     * The budget only bounds the top: crowd size still scales damage linearly
+     * all the way up to MAX_BITERS, which is six times a lone enemy instead of
+     * the old model's effective two and a half.
+     *
+     * Nearest-first, so the bites that do land come from the bodies actually on
+     * top of you rather than from whoever happens to be first in the array.
+     */
+    private resolveBites(touching: Enemy[]) {
+        if (!this.player || touching.length === 0) return;
+
+        const player = this.player;
+        if (touching.length > 1) {
+            touching.sort((a, b) => distance(player.pos, a.pos) - distance(player.pos, b.pos));
+        }
+
+        let dealt = 0;
+        for (const enemy of touching) {
+            if (this.biteBudget < 1) break;
+            if (enemy.biteTimer > 0) continue;
+            enemy.biteTimer = BITE_INTERVAL;
+            this.biteBudget -= 1;
+            dealt += biteDamage(enemy.damage, player.stats.armor);
+        }
+
+        // Being *in* contact is what breaks the untouched streak, not landing a
+        // bite — otherwise standing in a crowd between bites would count as
+        // untouched, which is the opposite of the truth
+        this.runStats.onPlayerHurt();
+
+        if (dealt <= 0) return;
+
+        player.takeBite(dealt);
+        this.emitContactFeedback(dealt);
+        this.chargeCapacitor(dealt);
     }
 
     /**
@@ -397,14 +447,14 @@ export class GameManager {
      * knockback turned into a permanent field holding the arena at arm's
      * length. See DISCHARGE_COOLDOWN.
      */
-    private chargeCapacitor(dps: number, dt: number) {
+    private chargeCapacitor(absorbed: number) {
         if (!this.player || this.player.stats.discharge <= 0) return;
 
         const threshold = dischargeThreshold(this.player.stats.discharge);
         // Charge banks during the cooldown — absorbed damage is never wasted —
         // but not without limit, or the window ends in a burst of discharges
         this.capacitorCharge = Math.min(
-            this.capacitorCharge + dps * dt,
+            this.capacitorCharge + absorbed,
             threshold * DISCHARGE_CHARGE_CAP,
         );
 
@@ -570,6 +620,8 @@ export class GameManager {
         this.gameTime += dt;
         this.runStats.update(dt);
         if (this.dischargeCooldown > 0) this.dischargeCooldown -= dt;
+        if (this.contactFxTimer > 0) this.contactFxTimer -= dt;
+        this.biteBudget = Math.min(MAX_BITERS, this.biteBudget + (MAX_BITERS / BITE_INTERVAL) * dt);
         this.waveTimer += dt;
 
         // Parallax layers drift with the camera (frozen while paused)
@@ -691,15 +743,14 @@ export class GameManager {
         }
 
         // === PLAYER-ENEMY CONTACT ===
-        // Contact damage is continuous (HP/second) and every overlapping enemy
-        // contributes — see core/ContactDamage for why, and for the armor and
-        // crowd-stacking rules. It deliberately does NOT use takeDamage(),
-        // whose i-frames would cap a 40-enemy pile at the same 2 HP/s as one bat.
-        const contactDamages: number[] = [];
+        // Every enemy touching the player bites on its own timer — see
+        // core/ContactDamage. There are no global i-frames anywhere on this
+        // path, so twelve enemies land twelve bites; that is the whole point.
+        const touching: Enemy[] = [];
         for (const e of this.enemies) {
             if (!checkCollision(e, this.player)) continue;
 
-            contactDamages.push(e.damage);
+            touching.push(e);
 
             // Calculate direction from enemy to player
             const dx = this.player.pos.x - e.pos.x;
@@ -724,16 +775,7 @@ export class GameManager {
             }
         }
 
-        if (contactDamages.length > 0) {
-            const dps = contactDamagePerSecond(contactDamages, this.player.stats.armor);
-            this.player.takeContactDamage(dps, dt);
-            this.runStats.onPlayerHurt();
-            this.emitContactFeedback(dps, dt);
-            this.chargeCapacitor(dps, dt);
-        } else {
-            this.contactFxTimer = 0;
-            this.contactDamageBank = 0;
-        }
+        this.resolveBites(touching);
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             if (this.enemies[i].isDead) {

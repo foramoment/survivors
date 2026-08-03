@@ -2,6 +2,7 @@ import { Entity } from '../Entity';
 import { type Vector2, normalize, distance } from '../core/Utils';
 import { sprites, type EnemyTint } from '../core/SpriteFactory';
 import type { Infection, Corrosion, InfectionKind } from '../core/StatusEffects';
+import { BITE_INTERVAL } from '../core/ContactDamage';
 
 /** Mote colour per DoT flavour: [plain, contagious] */
 const INFECTION_COLORS: Record<InfectionKind, [string, string]> = {
@@ -73,6 +74,19 @@ export class Enemy extends Entity {
     speedMultiplier: number = 1;
 
     /**
+     * Seconds until this enemy may bite the player again.
+     *
+     * Per enemy, deliberately — see core/ContactDamage. A single shared timer
+     * on the player is exactly the i-frame bug that made a crowd of forty cost
+     * the same as one bat.
+     *
+     * Randomised at spawn so a wave that arrives together does not land every
+     * bite on the same frame, which reads as one enormous hit instead of a
+     * crowd chewing on you.
+     */
+    biteTimer: number = Math.random() * BITE_INTERVAL;
+
+    /**
      * Promote this enemy to a wave miniboss. Call after time scaling so the
      * multipliers stack on the already-scaled stats.
      */
@@ -130,6 +144,9 @@ export class Enemy extends Entity {
     update(dt: number, playerPos?: Vector2) {
         this.animTimer += dt;
         if (this.hitFlash > 0) this.hitFlash -= dt;
+        // Ticks even while stunned or out of contact: an enemy that grazes you
+        // repeatedly must not get a free bite on every touch
+        if (this.biteTimer > 0) this.biteTimer -= dt;
 
         // Stunned: still animates and takes damage, but goes nowhere. Knockback
         // already in flight is allowed to finish playing out.
