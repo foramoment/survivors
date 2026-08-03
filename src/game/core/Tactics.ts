@@ -120,15 +120,22 @@ export const REPAIR_LIFETIME = 12;
  * Gating on being out of combat makes that **structurally impossible** rather
  * than numerically unlikely — the same move as "an echo can never land a
  * killing blow". Regeneration cannot out-heal a fight it is not allowed to run
- * during, so the number is free to be big enough to feel like something.
+ * during.
  *
- * It also gives the two healing sources genuinely different jobs, which they
- * did not have before: **repair cells work during a fight** (you break out, you
- * go and get one, they are flat and they top you off), **regen works between
- * fights** (automatic, fastest when you are worst hurt, and by its exponential
- * nature never quite finishes).
+ * It also gives the two healing sources genuinely different jobs: **repair
+ * cells work during a fight** (you break out, you go and get one, they are
+ * flat and they top you off), **regen works between fights** (automatic,
+ * fastest when you are worst hurt, and by its exponential nature never quite
+ * finishes).
+ *
+ * **Halved from 3 seconds**, which was long enough to be a permanent lockout
+ * rather than a gate. Measured over a real run: bites landed every ~3.5s
+ * against a 3s delay, so regeneration ran about a fifth of the time and four
+ * picks of Nano-Repair delivered 0.63 HP/s — a card that read as generous and
+ * paid out as nothing. 1.5s leaves a satisfiable window without letting the
+ * trickle run while a crowd is chewing on you.
  */
-export const REGEN_COMBAT_DELAY = 3;
+export const REGEN_COMBAT_DELAY = 1.5;
 
 /**
  * Bonus multiplier from Adrenal Surge — 1 while healthy, 1 + stacks while

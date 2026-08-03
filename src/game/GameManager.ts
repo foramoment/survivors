@@ -22,7 +22,7 @@ import { audio } from '../engine/AudioSystem';
 import { juice } from '../engine/JuiceSystem';
 import { getPowerupValue, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { addStat } from './core/PlayerStats';
-import { biteDamage, BITE_INTERVAL, MAX_BITERS, BITE_BUDGET_CAP, BITE_REACH } from './core/ContactDamage';
+import { contactDamagePerSecond, contactRamp, CONTACT_REACH } from './core/ContactDamage';
 import { computeScore, submitScore } from './core/Score';
 import { RunStatsTracker } from './core/RunStats';
 import { achievements, type RunSnapshot } from './core/Achievements';
@@ -41,11 +41,21 @@ import { t } from './core/I18n';
 import { stageName } from './core/Labels';
 
 /**
- * Minimum seconds between hurt cues. Bites are discrete events now, so the
- * sound wants to fire on each one — but a full ring of six enemies would turn
- * that into a machine-gun, and the sprite flash already marks every bite.
+ * Minimum seconds between hurt cues. The drain is continuous, so without this
+ * the cue would fire every frame; the sprite flash already marks contact
+ * frame by frame, and this gives the ear a beat rather than a buzz.
  */
 const CONTACT_SOUND_MIN_GAP = 0.75;
+
+/**
+ * Seconds between printed contact-damage numbers.
+ *
+ * Slightly under the hurt cue, so the digits lead the sound rather than
+ * doubling it, and well under DamageNumbers' TAKEN_MERGE_WINDOW so consecutive
+ * prints fold into one growing number instead of stacking a column of digits
+ * over the player's head.
+ */
+const CONTACT_NUMBER_INTERVAL = 0.4;
 
 /** Knockback on contact: the player barely moves, the enemy is shoved aside */
 const PLAYER_SHOVE_BACK = 55;
@@ -110,11 +120,15 @@ export class GameManager {
     /** Internal cooldown left on Static Discharge (see DISCHARGE_COOLDOWN) */
     private dischargeCooldown: number = 0;
     /**
-     * Token bucket bounding how many bites may land on the player per second.
-     * Refills at MAX_BITERS per BITE_INTERVAL — see resolveBites for why the
-     * per-enemy timers alone were not enough.
+     * Contact damage banked since the last time a number was printed.
+     *
+     * The drain is continuous, so it cannot spawn a damage number per frame —
+     * that is both unreadable and the reason design 2 felt like nothing was
+     * happening. It accumulates and flushes on a fixed cadence, so a crowd
+     * chewing on you reads as a steady beat of real numbers.
      */
-    private biteBudget: number = BITE_BUDGET_CAP;
+    private contactPending: number = 0;
+    private contactPrintTimer: number = 0;
     repairCells: RepairCell[] = [];
 
     /**
@@ -193,7 +207,8 @@ export class GameManager {
         this.repairCells = [];
         this.capacitorCharge = 0;
         this.dischargeCooldown = 0;
-        this.biteBudget = BITE_BUDGET_CAP;
+        this.contactPending = 0;
+        this.contactPrintTimer = 0;
         this.damageNumbers.clear();
         this.killCount = 0;
         this.killScore = 0;
@@ -383,63 +398,78 @@ export class GameManager {
     }
 
     /**
-     * Let the enemies pressed against the player take their bites.
+     * Drain health for every enemy currently pressed against the player.
      *
-     * **Two independent limits, and both are needed.**
+     * **No caps, no budgets, no per-enemy clocks.** Every one of those existed
+     * to tame a contact number that had grown by a factor of 33 across a run;
+     * with that fixed at the source (see core/ContactDamage and
+     * ENEMY_CONFIG.baseDamage) the honest sum is safe, and geometry bounds it —
+     * only 6-9 bodies physically fit against the player, and `touching` is
+     * built from real overlap rather than from a constant.
      *
-     * Per enemy, `biteTimer` stops one attacker machine-gunning you. That alone
-     * is not enough, and the first cut of this proved it in the first playtest:
-     * a 150 HP Berserker surrounded by 38 enemies died in two seconds. The
-     * intent had been "only the nearest six can reach you", implemented as
-     * *take the six closest each frame* — but a pile is constantly shoving
-     * itself around, so the closest six are a **different** six every frame,
-     * each with a fresh timer. The cap leaked completely.
-     *
-     * So the second limit is a token bucket on the player: `biteBudget` refills
-     * at MAX_BITERS per BITE_INTERVAL and every bite costs one. That bounds
-     * incoming bites at a known rate no matter how the crowd churns.
-     *
-     * This is *not* the i-frame bug returning. I-frames blocked **all** damage
-     * for a fixed window, so one bat and forty Doom Harbingers cost the same.
-     * The budget only bounds the top: crowd size still scales damage linearly
-     * all the way up to MAX_BITERS, which is six times a lone enemy instead of
-     * the old model's effective two and a half.
-     *
-     * Nearest-first, so the bites that do land come from the bodies actually on
-     * top of you rather than from whoever happens to be first in the array.
+     * What makes a crowd lethal is the ramp: the drain grows the longer you
+     * stand in it and sheds when you leave, so running through is nearly free
+     * and camping kills. That single rule replaced the three limiters that came
+     * before it, and it is the one the player can actually see themselves
+     * losing to.
      */
-    private resolveBites(touching: Enemy[]) {
-        if (!this.player || touching.length === 0) return;
+    private resolveContact(touching: Enemy[], dt: number) {
+        if (!this.player) return;
 
         const player = this.player;
+        player.updateContactRamp(touching.length > 0, dt);
+
+        if (touching.length === 0) {
+            this.flushContactNumber(dt);
+            return;
+        }
+
         this.runStats.recordPileUp(touching.length);
-        if (touching.length > 1) {
-            touching.sort((a, b) => distance(player.pos, a.pos) - distance(player.pos, b.pos));
-        }
-
-        let dealt = 0;
-        for (const enemy of touching) {
-            if (this.biteBudget < 1) break;
-            if (enemy.biteTimer > 0) continue;
-            enemy.biteTimer = BITE_INTERVAL;
-            this.biteBudget -= 1;
-            const bite = biteDamage(enemy.damage, player.stats.armor);
-            this.runStats.recordBite(bite);
-            dealt += bite;
-        }
-
-        // Being *in* contact is what breaks the untouched streak, not landing a
-        // bite — otherwise standing in a crowd between bites would count as
-        // untouched, which is the opposite of the truth
+        // Being *in* contact is what breaks the untouched streak, not a
+        // threshold of damage — standing in a crowd is never "untouched"
         this.runStats.onPlayerHurt();
 
-        if (dealt <= 0) return;
+        const ramp = contactRamp(player.contactRampTime);
+        const perSecond = contactDamagePerSecond(
+            touching.map(e => e.damage),
+            player.stats.armor,
+            ramp,
+        );
+        const drain = perSecond * dt;
+        if (drain <= 0) return;
 
-        player.takeBite(dealt);
+        this.runStats.recordContact(drain, dt);
+        player.takeContact(drain);
+        this.emitContactFeedback(drain);
+        this.chargeCapacitor(drain);
+
+        this.contactPending += drain;
+        this.flushContactNumber(dt);
+    }
+
+    /**
+     * Print the banked contact damage on a fixed cadence.
+     *
+     * A per-frame number would be sub-1 digits flickering sixty times a second,
+     * which is exactly the "the HP bar just slides and nothing tells you why"
+     * failure of the continuous model the first time it was tried. Batching to
+     * a beat gives the drain a *voice* without giving it false precision.
+     */
+    private flushContactNumber(dt: number) {
+        if (!this.player) return;
+
+        this.contactPrintTimer -= dt;
+        if (this.contactPrintTimer > 0) return;
+
+        this.contactPrintTimer = CONTACT_NUMBER_INTERVAL;
+        if (this.contactPending < 1) return;
+
         // Above the head, so it does not sit under the crowd standing on you
-        this.damageNumbers.spawnTaken({ x: player.pos.x, y: player.pos.y - player.radius }, dealt);
-        this.emitContactFeedback(dealt);
-        this.chargeCapacitor(dealt);
+        this.damageNumbers.spawnTaken(
+            { x: this.player.pos.x, y: this.player.pos.y - this.player.radius },
+            this.contactPending,
+        );
+        this.contactPending = 0;
     }
 
     /**
@@ -626,7 +656,6 @@ export class GameManager {
         this.runStats.update(dt);
         if (this.dischargeCooldown > 0) this.dischargeCooldown -= dt;
         if (this.contactFxTimer > 0) this.contactFxTimer -= dt;
-        this.biteBudget = Math.min(BITE_BUDGET_CAP, this.biteBudget + (MAX_BITERS / BITE_INTERVAL) * dt);
         this.waveTimer += dt;
 
         // Parallax layers drift with the camera (frozen while paused)
@@ -753,9 +782,9 @@ export class GameManager {
         // path, so twelve enemies land twelve bites; that is the whole point.
         const touching: Enemy[] = [];
         for (const e of this.enemies) {
-            // Bites reach a little past the shove — see BITE_REACH
+            // Contact reaches a little past the shove — see CONTACT_REACH
             const gap = distance(e.pos, this.player.pos) - e.radius - this.player.radius;
-            if (gap > BITE_REACH) continue;
+            if (gap > CONTACT_REACH) continue;
 
             touching.push(e);
             if (gap > 0) continue; // close enough to bite, not close enough to shove
@@ -783,7 +812,7 @@ export class GameManager {
             }
         }
 
-        this.resolveBites(touching);
+        this.resolveContact(touching, dt);
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             if (this.enemies[i].isDead) {
@@ -1025,7 +1054,13 @@ export class GameManager {
         const level = this.player?.level ?? 0;
         enemy.maxHp = enemy.maxHp * difficultyDirector.getHpMultiplier(this.gameTime, level) * this.currentStage.hpScale;
         enemy.hp = enemy.maxHp;
-        enemy.damage *= difficultyDirector.getDamageMultiplier(this.gameTime, level) * this.currentStage.damageScale;
+
+        // `enemy.damage` is NOT scaled. Contact damage is the one number that
+        // stays put across a run — it used to be multiplied here by time,
+        // intensity and stage on top of its tier curve, which is how a bite
+        // reached 87 against a 115 HP pool. Late game escalates through health
+        // and count, both of which are right above this line. See
+        // core/ContactDamage before adding a multiplier back.
 
         if (options.boss) {
             enemy.makeBoss();

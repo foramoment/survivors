@@ -58,20 +58,21 @@ export const CLASSES = [
     },
     {
         id: 'exo_marine', name: "Exo Marine", emoji: "🛡️",
-        bonus: "Armor +2 · +1% max HP per level",
+        bonus: "Armor +4 · +1% max HP per level",
         weaponId: 'orbital_strike', hp: 130,
-        stats: { armor: 2 },
+        // Armour is a curve now, `K / (armour + K)` with K = 25, so the old flat
+        // +2 had to be rescaled or the class would have lost its identity stat.
+        // 4 is ~14% off all contact damage — two Void Shield picks.
+        stats: { armor: 4 },
         perLevel: { stat: 'maxHp', value: 0.01 } as ClassPerLevel,
     },
     {
-        // Regen kept in step with the Nano-Repair stack (1% of missing HP per
-        // pick): a class perk is worth ~1.5 picks. Converted from 0.25 flat
-        // when the stat changed meaning — under the new one that would have
-        // read as 25% of missing health per second.
+        // Regen kept in step with the Nano-Repair stack (0.35% of missing HP
+        // per pick): a class perk is worth ~1.5 picks.
         id: 'astro_biologist', name: "Astro Biologist", emoji: "🧬",
-        bonus: "Regen 1.5%/s of missing HP, Area +10% · +1% area per level",
+        bonus: "Regen 0.5%/s of missing HP, Area +10% · +1% area per level",
         weaponId: 'spore_cloud', hp: 95,
-        stats: { regen: 0.015, area: 1.1 },
+        stats: { regen: 0.005, area: 1.1 },
         perLevel: { stat: 'area', value: 0.01 } as ClassPerLevel,
     },
     {
@@ -91,9 +92,12 @@ export const CLASSES = [
         // The only class that starts with a tactic: adrenaline turns its
         // missing armour into the reason to keep fighting at low HP
         id: 'berserker', name: "Berserker", emoji: "🔥",
-        bonus: "HP +50%, Damage +10%, Armor −2 · Adrenaline: harder and faster below 35% HP · +1% crit chance per level",
+        bonus: "HP +50%, Damage +10%, Armor −4 · Adrenaline: harder and faster below 35% HP · +1% crit chance per level",
         weaponId: 'spinning_ember', hp: 150,
-        stats: { armor: -2, might: 1.1, adrenaline: 0.15 },
+        // Negative armour runs through the same curve and comes out at +19%
+        // damage taken. It is clamped well short of the pole at -K, so no stack
+        // of debuffs can ever flip the sign (see armorMultiplier).
+        stats: { armor: -4, might: 1.1, adrenaline: 0.15 },
         perLevel: { stat: 'critChance', value: 0.01 } as ClassPerLevel,
     },
     {
@@ -111,9 +115,9 @@ export const CLASSES = [
          * spot, which is worth more than any number this line could add.
          */
         id: 'null_warden', name: "Null Warden", emoji: "🕳️",
-        bonus: "Area +15%, Armor +1 · +1% effect duration per level",
+        bonus: "Area +15%, Armor +2 · +1% effect duration per level",
         weaponId: 'singularity_orb', hp: 105,
-        stats: { area: 1.15, armor: 1 },
+        stats: { area: 1.15, armor: 2 },
         perLevel: { stat: 'duration', value: 0.01 } as ClassPerLevel,
     },
 ];
@@ -154,15 +158,20 @@ export interface PowerupData {
 export const POWERUPS: PowerupData[] = [
     // Basic
     // A fraction of MISSING health per second, and only out of combat (see
-    // REGEN_COMBAT_DELAY). Flat 0.1 HP/s per pick was the old version and it
-    // was worth nothing: 0.8 HP/s at the cap took two minutes to undo one bad
-    // engagement, so the card was a dead pick next to a repair cell.
+    // REGEN_COMBAT_DELAY).
     //
-    // 1% of missing per stack, five stacks: on a 200 HP pool that is 5 HP/s at
-    // half health and carries you from a quarter to three quarters in about
-    // twenty seconds. The out-of-combat gate is what lets the number be this
-    // generous — regeneration cannot out-heal a fight it may not run during.
-    { id: 'nano_repair', name: "Nano-Repair", description: "Hull nanites knit you back together between fights", type: "regen", value: 0.01, maxStacks: 5, emoji: "❤️" },
+    // 0.35% of missing per stack, five stacks: a fully invested player climbs
+    // from a quarter health to three quarters in about **a minute** of not
+    // being touched. That is deliberately slow. Health is a budget for the
+    // whole run (see core/ContactDamage), so regen is a trickle that rewards
+    // clearing your space, not a bar that refills between fights — the "oh god
+    // I'm dying / oh thank god" swing belongs to repair cells, which are flat,
+    // instant, and work while enemies are still on you.
+    //
+    // The previous value was 1% per stack, which read as three times this and
+    // measured as **a fifth** of it: bites landed every ~3.5s against a 3s
+    // lockout, so four picks delivered 0.63 HP/s. The lockout is now 1.5s.
+    { id: 'nano_repair', name: "Nano-Repair", description: "Hull nanites knit you back together between fights", type: "regen", value: 0.0035, maxStacks: 5, emoji: "❤️" },
     // Crit starts at 0%, so this is the only way to build it (bar the Samurai's
     // 15%). 40% at the cap makes crit a direction you commit to rather than a
     // certainty you trip over — the old curve reached a guaranteed crit on the
@@ -202,9 +211,11 @@ export const POWERUPS: PowerupData[] = [
     // old ceiling (+198%) nothing on the map could reach you and the station
     // blackout — which speeds enemies up — stopped meaning anything.
     { id: 'phase_shift', name: "Phase Shift", description: "Move faster between phases", type: "moveSpeed", value: 0.05, maxStacks: 3, emoji: "👻" },
-    // Armor is subtracted from every touching enemy's damage-per-second, so it
-    // compounds with crowd size on its own; 8 is a real but survivable wall.
-    { id: 'void_shield', name: "Void Shield", description: "Flat damage reduction", type: "armor", value: 1, maxStacks: 8, emoji: "🌌" },
+    // Armour is now a curve, `K / (armour + K)` — see ARMOR_K. Eight stacks is
+    // 16 armour, 39% off every point of contact damage, and x1.64 effective
+    // health. It used to be flat subtraction, which meant the maxed card removed
+    // 8 from a bite that had grown to 87.
+    { id: 'void_shield', name: "Void Shield", description: "Damage reduction that scales", type: "armor", value: 2, maxStacks: 8, emoji: "🌌" },
 
     // Tactics — these switch a behaviour on instead of nudging a number. Rules
     // and numbers live in core/Tactics.ts. Overclock (+projectile speed) was
@@ -418,8 +429,22 @@ export const ENEMY_CONFIG = {
     // weapon cards say. Do not "restore" this without reading DamageSystem.
     baseHp: 5,            // Базовое HP первого врага
     hpMultiplier: 2,      // Множитель HP для каждого следующего (x2)
-    baseDamage: 5,        // Контактный урон в секунду у первого врага
-    damageMultiplier: 1.22, // Множитель урона для каждого следующего
+    // Contact damage per second, and it is deliberately TINY and nearly flat.
+    //
+    // This column used to read 5 and climb x1.22 a tier, and then GameManager
+    // multiplied it again by run time, adaptive intensity and stage damageScale
+    // — x33 end to end, against a player pool that grows about x1.2. That is
+    // the whole reason contact damage was rewritten four times; see
+    // core/ContactDamage for the argument, and do not "restore" these numbers
+    // without reading it.
+    //
+    // Health is a budget for the entire run. At 1.0-2.2 HP/s per enemy a full
+    // ring is ~13 HP/s, which the standing-still ramp takes to ~32 — lethal in
+    // 3.6s if you camp, and nearly free if you run through. Late game escalates
+    // through enemy count and health instead (hpMultiplier, hpScale, spawn
+    // rate), which is what DifficultyDirector was always documented as doing.
+    baseDamage: 1,        // Контактный урон в секунду у первого врага
+    damageMultiplier: 1.08, // Множитель урона для каждого следующего
     baseXp: 1,            // Базовый XP первого врага
     xpMultiplier: 1.5,    // Множитель XP для каждого следующего (x1.5)
     baseSpeed: 100,       // Базовая скорость
@@ -445,7 +470,9 @@ export const ENEMIES = ENEMY_TEMPLATES.map((template, index) => ({
     name: template.name,
     hp: Math.floor(ENEMY_CONFIG.baseHp * Math.pow(ENEMY_CONFIG.hpMultiplier, index)),
     speed: Math.floor(ENEMY_CONFIG.baseSpeed * template.speedMod),
-    damage: Math.floor(ENEMY_CONFIG.baseDamage * Math.pow(ENEMY_CONFIG.damageMultiplier, index)),
+    // Rounded to one decimal, not floored: contact damage spans 1.0-2.2 now, and
+    // Math.floor would collapse the first nine tiers into a single flat 1.
+    damage: Math.round(ENEMY_CONFIG.baseDamage * Math.pow(ENEMY_CONFIG.damageMultiplier, index) * 10) / 10,
     xpValue: Math.floor(ENEMY_CONFIG.baseXp * Math.pow(ENEMY_CONFIG.xpMultiplier, index)),
     emoji: template.emoji,
 }));

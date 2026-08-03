@@ -34,16 +34,24 @@ export interface RunStats {
      * The other half of the sustain question, and the half that was missing.
      *
      * "5994 HP healed" says nothing on its own — healed against *what*? These
-     * three make the answer readable: how much came in, in how many bites, and
-     * how deep the worst pile got. Damage divided by bites is the average bite;
-     * bites divided by run time is how often the crowd actually reached you.
+     * three make the answer readable: how much came in, over how long enemies
+     * were actually on you, and how deep the worst pile got. Damage divided by
+     * contact seconds is the average drain; contact seconds over run time is
+     * how much of the run you spent being touched at all.
      *
-     * Tracked because balancing contact damage by feel took two rewrites, and
-     * both times the missing thing was a number nobody was writing down.
+     * Tracked because balancing contact damage by feel took three rewrites, and
+     * every time the missing thing was a number nobody was writing down.
      */
     damageTaken: number;
-    /** How many separate bites landed */
-    bitesTaken: number;
+    /**
+     * Seconds with at least one enemy touching the player.
+     *
+     * This used to be `bitesTaken`, a count of discrete bites. Contact is a
+     * continuous drain again (see core/ContactDamage), so a count would just be
+     * frames-with-contact — a number that changes meaning with the frame rate
+     * and tells you nothing. Time is the honest denominator for a drain.
+     */
+    contactSeconds: number;
     /** Most enemies touching the player at once */
     worstPileUp: number;
 }
@@ -61,7 +69,7 @@ export function createRunStats(): RunStats {
         totalDamage: 0,
         totalHealed: 0,
         damageTaken: 0,
-        bitesTaken: 0,
+        contactSeconds: 0,
         worstPileUp: 0,
     };
 }
@@ -101,11 +109,11 @@ export class RunStatsTracker {
         this.untouchedFor = 0;
     }
 
-    /** One bite landing, and how big the pile around the player was */
-    recordBite(damage: number): void {
+    /** This frame's share of the contact drain, and how long it lasted */
+    recordContact(damage: number, dt: number): void {
         if (damage <= 0) return;
         this.stats.damageTaken += damage;
-        this.stats.bitesTaken++;
+        this.stats.contactSeconds += dt;
     }
 
     /** Discrete environmental damage — a meteor, a rift collapsing */

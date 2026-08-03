@@ -82,7 +82,7 @@ function runAsText(d: RunSummaryData): string {
         `best hit     ${Math.round(d.stats.bestHit)}${d.stats.bestHitCrit ? ' (crit)' : ''}`,
         `healed       ${Math.round(d.stats.totalHealed)}  (${perSecond(d.stats.totalHealed)}/s)`,
         `taken        ${Math.round(d.stats.damageTaken)}  (${perSecond(d.stats.damageTaken)}/s)`,
-        `bites        ${d.stats.bitesTaken}  (avg ${d.stats.bitesTaken ? (d.stats.damageTaken / d.stats.bitesTaken).toFixed(1) : 0} each)`,
+        `in contact   ${formatTime(d.stats.contactSeconds)}  (avg ${d.stats.contactSeconds ? (d.stats.damageTaken / d.stats.contactSeconds).toFixed(1) : 0} HP/s)`,
         `worst pile   ${d.stats.worstPileUp} enemies at once`,
         `untouched    ${formatTime(d.stats.longestUntouched)}`,
         `best combo   x${d.stats.bestMultikill}`,
@@ -156,7 +156,7 @@ function createHighlights(data: RunSummaryData): HTMLElement {
         <div class="highlight">
             <span>${t('result.damageTaken')}</span>
             <strong>${formatScore(Math.round(stats.damageTaken))}</strong>
-            <em>${t('result.inBites', { n: stats.bitesTaken })}</em>
+            <em>${t('result.inContact', { time: formatTime(stats.contactSeconds) })}</em>
         </div>`);
 
     box.innerHTML = rows.join('');

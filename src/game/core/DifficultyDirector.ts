@@ -189,19 +189,17 @@ export class DifficultyDirector {
             * (0.75 + 0.25 * this.intensity);
     }
 
-    /**
-     * Enemy contact damage-per-second multiplier — milder than HP in both time
-     * and intensity.
-     *
-     * Growth is /600 rather than /300 because contact damage is now actually
-     * applied (see core/ContactDamage) and stacks across a crowd: doubling by
-     * minute 10 already turns a late-game pile into a 3-second death sentence.
-     * Enemy *count* is what escalates late, not per-enemy bite.
-     */
-    getDamageMultiplier(gameTime: number, playerLevel: number = 0): number {
-        return (1 + this.effectiveTime(gameTime, playerLevel) / 600)
-            * (0.85 + 0.15 * this.intensity);
-    }
+    // There is deliberately no contact-damage multiplier here.
+    //
+    // There used to be — `(1 + t/600) * (0.85 + 0.15 * intensity)`, applied on
+    // top of the tier curve and the stage's damageScale. Its own comment said
+    // "enemy *count* is what escalates late, not per-enemy bite", and the code
+    // said otherwise: end to end, a bite grew x33 across a run against a player
+    // pool that grows about x1.2, and a full ring killed in 0.18s.
+    //
+    // Contact damage is now flat (see core/ContactDamage). This class still
+    // escalates the late game through getHpMultiplier and through spawn rate,
+    // which is what the sentence above always meant.
 
     /** Elite spawn chance grows with time and with player overperformance */
     getEliteChance(gameTime: number): number {

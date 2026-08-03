@@ -4,6 +4,7 @@ import { input } from '../../engine/Input';
 import { Weapon } from '../Weapon';
 import { sprites } from '../core/SpriteFactory';
 import { adrenalineMultiplier, REGEN_COMBAT_DELAY } from '../core/Tactics';
+import { armorMultiplier, CONTACT_RAMP_FULL, CONTACT_RAMP_DECAY } from '../core/ContactDamage';
 import type { ClassPerLevel } from '../data/GameData';
 import { addStat } from '../core/PlayerStats';
 
@@ -31,6 +32,16 @@ export class Player extends Entity {
     contactTimer: number = 0;
     /** Seconds left before regeneration may resume (see REGEN_COMBAT_DELAY) */
     regenDelay: number = 0;
+    /**
+     * Seconds of unbroken contact, which drives the standing-still ramp.
+     *
+     * Owned by the player rather than by the enemies, because the thing being
+     * measured is *how long you chose to stand there* — swapping which bodies
+     * are touching you must not reset it. That distinction is exactly what the
+     * per-enemy timers got wrong: a pile shoves itself around constantly, so
+     * anything keyed to individual attackers leaks.
+     */
+    contactRampTime: number = 0;
 
     // Knockback system
     knockback: Vector2 = { x: 0, y: 0 };
@@ -253,7 +264,7 @@ export class Player extends Entity {
      * A discrete hit: meteors, rift collapses, boss slams. Grants i-frames so a
      * single event cannot chain-hit, and floors at 1 so a hazard always stings.
      *
-     * Enemy contact does NOT go through here — see takeContactDamage.
+     * Enemy contact does NOT go through here — see takeContact.
      */
     takeDamage(amount: number) {
         // Check if player is currently invulnerable
@@ -261,7 +272,10 @@ export class Player extends Entity {
             return; // No damage taken
         }
 
-        const damage = Math.max(1, amount - this.stats.armor);
+        // Armour is a curve, not a subtraction — the same one contact damage
+        // uses, so a defensive build is worth the same against a meteor as
+        // against a crowd.
+        const damage = Math.max(1, amount * armorMultiplier(this.stats.armor));
         this.regenDelay = REGEN_COMBAT_DELAY;
         this.hp -= damage;
 
@@ -274,17 +288,16 @@ export class Player extends Entity {
     }
 
     /**
-     * One enemy's bite.
+     * This frame's share of the contact drain.
      *
      * **No i-frames, deliberately.** They would cap crowd damage at
-     * 1/invulnerabilityDuration regardless of how many enemies had their teeth
-     * in you, which is exactly what used to make standing in a swarm free. Each
-     * enemy carries its own cooldown instead (see core/ContactDamage), so
-     * twelve enemies land twelve bites.
+     * 1/invulnerabilityDuration regardless of how many enemies were touching
+     * you, which is exactly what used to make standing in a swarm free.
      *
-     * Armor is already applied by the caller, per bite, not here.
+     * Armour and the standing-still ramp are already applied by the caller —
+     * this only spends the health.
      */
-    takeBite(amount: number) {
+    takeContact(amount: number) {
         if (amount <= 0) return;
 
         this.regenDelay = REGEN_COMBAT_DELAY;
@@ -294,6 +307,27 @@ export class Player extends Entity {
         if (this.hp <= 0) {
             this.hp = 0;
             this.isDead = true;
+        }
+    }
+
+    /**
+     * Advance the standing-still ramp. Called once a frame with whether
+     * anything is currently touching the player.
+     *
+     * Decay is scaled so a full ramp sheds in `CONTACT_RAMP_DECAY` seconds
+     * regardless of how long it took to build — leaving is always a fixed,
+     * knowable amount of relief, and dipping back in does not start from zero
+     * the way a hard reset would (which would make jittering in and out of
+     * contact strictly better than committing to a direction).
+     */
+    updateContactRamp(touching: boolean, dt: number) {
+        if (touching) {
+            this.contactRampTime = Math.min(this.contactRampTime + dt, CONTACT_RAMP_FULL);
+        } else {
+            this.contactRampTime = Math.max(
+                0,
+                this.contactRampTime - dt * (CONTACT_RAMP_FULL / CONTACT_RAMP_DECAY),
+            );
         }
     }
 

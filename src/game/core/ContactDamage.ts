@@ -1,114 +1,138 @@
 /**
  * ContactDamage — what it costs to have enemies standing on you.
  *
- * ## Third design. The two before it, and why they failed
+ * ## Fourth design, and the first one that is not a rate limiter
  *
- * **1. Discrete hits behind global i-frames.** `player.takeDamage(dmg * dt)`
- * into a method that floored at 1 and granted 0.5s of invulnerability. Every
- * enemy dealt exactly 1, armour was subtracted from 0.08 and did nothing, and
- * — worst of all — i-frames capped *all* incoming damage at 2 HP/s. One bat and
- * forty Doom Harbingers cost the same. Crowd size was free.
+ * The three before it all tried to bound **how often** damage arrives. All
+ * three failed, because what was actually broken is **how big each hit is**.
  *
- * **2. A continuous stream with a crowd cap.** Fixed the armour and made
- * crowds stack, but left two problems. A drain of 0.3 HP per frame does not
- * *read* as being hurt — there is no moment, nothing to react to, and the HP
- * bar just slides. And `CROWD_CAP = 4` meant a hundred enemies still cost the
- * same as four. A real 10-minute run: 12019 kills, 5994 HP healed, the player
- * standing in the middle of the arena circling for repair cells, because
- * standing still out-healed everything the crowd could do.
+ *   1. **Global i-frames.** `player.takeDamage(dmg * dt)` into a method that
+ *      floored at 1 and granted 0.5s of invulnerability. Armour did nothing and
+ *      all incoming damage was capped at 2 HP/s, so one bat and forty Doom
+ *      Harbingers cost exactly the same. Standing in a crowd was free.
+ *   2. **A continuous stream capped at `CROWD_CAP` x the strongest attacker**,
+ *      with a `1/sqrt(k)` falloff. Armour worked again, but a hundred enemies
+ *      still cost what four did, and a 0.3 HP-per-frame drain does not read as
+ *      damage — a real run ended 12019 kills and 5994 HP healed with the player
+ *      standing still in the middle of the arena.
+ *   3. **A bite per enemy on its own clock, plus a token bucket.** Crowds
+ *      finally scaled with their size — and then the numbers exploded.
  *
- * **3. This one: every enemy bites on its own clock.**
+ * They exploded because contact damage was multiplied by four independent
+ * scalars at once: enemy tier (x7.2) x run time (x2) x adaptive intensity
+ * (x1.53) x stage `damageScale` (x1.5) = **x33 across a run**. Measured on the
+ * shipping build: one lone tier-10 enemy on Void Nexus bit for 87 against a
+ * realistic 115 HP pool, and a full ring killed in 0.18s. A fourth rate limiter
+ * would have failed the same way, because a limit on frequency cannot fix a
+ * fault in magnitude.
  *
- *   - Each enemy carries its own `biteTimer`. There are **no global i-frames**,
- *     so twelve enemies land twelve bites — the exact failure of design 1 is
- *     structurally impossible.
- *   - Damage arrives in chunks you can see and react to. Losing 9 HP at once is
- *     an event; losing 0.3 HP sixty times a second is weather.
- *   - Armour is still applied per bite, with a floor, so it is strong against
- *     many weak enemies and modest against one big one.
+ * ## The pillar: health is a budget for the whole run
  *
- * ## Why there is still a cap, and why it is a different kind of cap
+ * The player's pool grows roughly **x1.2** over a run (75-150 by class, +20 a
+ * pick, and nobody spends eight picks on Barrier Field). Nothing that grows x33
+ * can be balanced against that, at any tuning.
  *
- * `MAX_BITERS` is not a damage multiplier — it is **how many bodies physically
- * fit against you**. The contact ring around the player is about 190px around
- * and enemies are 24–40px across, so six is roughly what geometry allows;
- * separation forces keep them apart until a pile overwhelms them. Capping the
- * number of *mouths* is a rule about the arena. Capping total damage at "4x the
- * strongest attacker", the way design 2 did, was a rule about nothing.
+ * So contact damage is now **almost flat** — see `ENEMY_CONFIG.baseDamage`, and
+ * note that `DifficultyDirector` no longer scales it at all. The late game
+ * escalates through enemy *count* and *health*, which is what that file's
+ * comments always claimed it did.
  *
- * The nearest enemies bite first, which is both fair and what you would guess
- * from looking at the screen.
+ * Small numbers are the design, not a side effect. Damage taken is a resource
+ * spent across ten minutes instead of a per-fight bar that refills, and that is
+ * the whole reason +20 max HP is worth a pick.
+ *
+ * ## The model
+ *
+ *     drain per second = SUM(touching enemies) x armour x ramp
+ *
+ * **No crowd cap and no falloff.** Both existed only to tame a big number.
+ * Geometry already caps the crowd: 6-9 bodies physically fit against the
+ * player, and `touching` is built from real overlap, so the sum is bounded by
+ * the arena rather than by a constant. Capping it again was a rule about
+ * nothing.
  */
 
-/** Fraction of a bite that armor can never remove */
-export const ARMOR_FLOOR = 0.2;
-
-/** Seconds between one enemy's bites */
-export const BITE_INTERVAL = 0.8;
-
 /**
- * How hard one bite lands, as a multiple of the enemy's damage-per-second times
- * the interval.
+ * Armour softening constant, `K` in `K / (armour + K)`.
  *
- * **Below 1 on purpose: individual enemies got gentler.** The danger now comes
- * from how many of them reach you, not from how hard each one hits — crowds
- * scale linearly to MAX_BITERS instead of being capped at "4x the strongest
- * with a falloff", so a full ring is about 2.4x worse than the old model while
- * a single enemy is about 30% cheaper.
+ * Armour used to be **flat subtraction** with a 20% floor, which is the shape
+ * that guarantees the stat dies: eight stacks of Void Shield removed 8 from a
+ * bite that had grown to 87, so the whole card was worth 9% at the moment it
+ * was supposed to matter most.
  *
- * That is the shape the game actually needed. Brushing past one thing while
- * kiting should cost almost nothing; letting six close in should be the thing
- * that kills you.
+ * The League of Legends curve fixes that and brings a property worth having:
+ * every point of armour adds the *same* amount of effective health, because
+ * `effective HP = HP x (1 + armour / K)`. Armour and max HP **multiply**, so a
+ * defensive build compounds instead of competing with itself. It also can never
+ * reach immunity, so no floor constant is needed.
  *
- * The first cut used 1.6 and a test caught it immediately: fully surrounded at
- * minute ten, a 300 HP player died in 0.85s — no time to read the screen, let
- * alone walk out. At 0.7 that is about two seconds, which is frightening and
- * survivable, which is the point.
+ * K and every armour value in the game were divided by 4 together, which leaves
+ * the curve bit-identical and the numbers readable: a class grants 1-4 armour
+ * and a Void Shield stack is 2, instead of 16 and 8. Only the *ratio* to K
+ * means anything, so if you retune this, scale the values in GameData with it.
  */
-export const BITE_PUNCH = 0.7;
+export const ARMOR_K = 25;
 
-/** How many enemies can have their teeth in you at once */
-export const MAX_BITERS = 6;
+/** Ceiling of the standing-still multiplier */
+export const CONTACT_RAMP_MAX = 2.5;
 
-/**
- * How many bites may be banked while nothing is touching you.
- *
- * The rate limiter is a token bucket, and a bucket that banks its full capacity
- * has a nasty property: walk into a standing crowd with six tokens saved and
- * **six bites land on the same frame**. In play that reads as "I stepped in and
- * instantly died" with no ramp at all — the player's words were "раз, и я
- * умер". The sustained rate was never the problem; the entry burst was.
- *
- * Two keeps the top-end rate exactly where it was (MAX_BITERS per
- * BITE_INTERVAL) while making the first half-second of a pile a ramp instead of
- * a wall.
- */
-export const BITE_BUDGET_CAP = 2;
+/** Seconds of unbroken contact needed to reach `CONTACT_RAMP_MAX` */
+export const CONTACT_RAMP_FULL = 3;
+
+/** Seconds clear of everything needed to shed a full ramp */
+export const CONTACT_RAMP_DECAY = 1.5;
 
 /**
- * Extra reach on a bite, beyond the touching radii.
+ * Extra reach on contact, beyond the touching radii.
  *
  * Contact knockback shoves an enemy 190px/s away while it only walks back at
- * ~100, so a *lone* attacker spends most of its time just out of overlap: it
- * landed a bite every ~1.3s instead of every 0.8, which measured as 3.6 HP/s —
- * invisible on a 150 HP bar. In a crowd nobody can be shoved anywhere, because
- * the bodies behind are in the way, so the same enemies bit at full rate. That
- * gap is what made one enemy feel like nothing and eight feel like death.
- *
- * A few pixels of slack closes it without making knockback useless as an
- * escape — you still break contact by *moving*, just not by standing there
- * while the shove does it for you.
+ * ~100, so a lone attacker spends much of its time just outside overlap and
+ * flickers in and out of the touching set. A few pixels of slack keeps the
+ * drain (and therefore the ramp) continuous without making knockback useless as
+ * an escape — you still break contact by *moving*.
  */
-export const BITE_REACH = 9;
+export const CONTACT_REACH = 9;
 
 /**
- * Damage one enemy's bite deals through `armor`.
- *
- * `damage` is the enemy's damage-per-second from ENEMY_CONFIG — the column is
- * still written in per-second terms so the difficulty scaling keeps working
- * unchanged.
+ * Damage multiplier left after armour. 1 at zero armour, above 1 when armour is
+ * negative (the Berserker), and asymptotically approaching but never reaching 0.
  */
-export function biteDamage(damage: number, armor: number): number {
-    const raw = damage * BITE_INTERVAL * BITE_PUNCH;
-    return Math.max(raw * ARMOR_FLOOR, raw - armor);
+export function armorMultiplier(armor: number): number {
+    // Clamped so the Berserker's negative armour cannot cross the pole at -K
+    // and flip the sign of every hit in the game.
+    const a = Math.max(armor, -ARMOR_K * 0.5);
+    return ARMOR_K / (a + ARMOR_K);
+}
+
+/**
+ * The standing-still multiplier, from seconds of unbroken contact.
+ *
+ * This is a turret in League of Legends: diving is cheap, camping is fatal.
+ * It is the piece that lets contact damage be small — the *base* number no
+ * longer has to be scary on its own, because the danger is a function of how
+ * long you choose to stay, which is the one variable the player controls.
+ *
+ * It is also what killed design 2 in reverse: standing still used to out-heal
+ * the drain, and no amount of standing still can out-heal a drain that grows
+ * the longer you do it.
+ */
+export function contactRamp(contactTime: number): number {
+    const t = Math.min(Math.max(contactTime, 0) / CONTACT_RAMP_FULL, 1);
+    return 1 + t * (CONTACT_RAMP_MAX - 1);
+}
+
+/**
+ * Total HP per second drained by every enemy currently touching the player.
+ *
+ * `damages` are the raw per-second values off `ENEMY_CONFIG` — the column is
+ * still written in per-second terms, it is just no longer scaled by time,
+ * intensity or stage.
+ */
+export function contactDamagePerSecond(damages: number[], armor: number, ramp: number): number {
+    if (damages.length === 0) return 0;
+
+    let total = 0;
+    for (const d of damages) total += d;
+
+    return total * armorMultiplier(armor) * ramp;
 }

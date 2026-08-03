@@ -185,14 +185,25 @@ describe('UpgradePool', () => {
             expect(getPowerupValue(0.1, 3, 1.25)).toBeCloseTo(0.1 * 1.25 ** 3);
         });
 
-        it('regen tops out at 5% of missing HP per second', () => {
+        it('regen tops out at a trickle — a quarter to three quarters in a minute', () => {
+            // Health is a budget for the whole run (see core/ContactDamage), so
+            // regen may not be a bar that refills between fights. The exponent
+            // that carries 25% -> 75% in exactly 60s is ln(3)/60 = 0.0183; the
+            // maxed stack sits just under it.
+            //
+            // This was 5%, which read as generous and paid out as 0.63 HP/s,
+            // because the out-of-combat lockout was longer than the gap between
+            // bites. Both numbers moved together; do not raise one alone.
             const regen = POWERUPS.find(p => p.type === 'regen')!;
 
             let total = 0;
             for (let stack = 0; stack < (regen.maxStacks ?? POWERUP_STACK_CAP); stack++) {
                 total += getPowerupValue(regen.value, stack, regen.stackGrowth);
             }
-            expect(total).toBeCloseTo(0.05);
+
+            const secondsQuarterToThreeQuarters = Math.log(3) / total;
+            expect(secondsQuarterToThreeQuarters).toBeGreaterThan(45);
+            expect(secondsQuarterToThreeQuarters).toBeLessThan(80);
         });
 
         it('no powerup can multiply its stat past what a card promises', () => {

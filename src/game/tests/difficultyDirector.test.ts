@@ -131,8 +131,15 @@ describe('DifficultyDirector', () => {
             const onPace = director.getHpMultiplier(180, 15);
             const snowballed = director.getHpMultiplier(180, 40);
             expect(snowballed).toBeGreaterThan(onPace);
-            expect(director.getDamageMultiplier(180, 40))
-                .toBeGreaterThan(director.getDamageMultiplier(180, 15));
+        });
+
+        it('does not scale contact damage at all', () => {
+            // The deleted getDamageMultiplier is what let a bite reach 87
+            // against a 115 HP pool. Health is a budget for the whole run, so
+            // contact damage stays flat and the arena escalates through HP and
+            // spawn count instead — see core/ContactDamage.
+            expect((director as unknown as Record<string, unknown>).getDamageMultiplier)
+                .toBeUndefined();
         });
 
         it('leaves an ordinary run governed by the clock', () => {
