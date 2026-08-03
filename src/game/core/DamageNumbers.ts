@@ -30,7 +30,11 @@ import { juice } from '../../engine/JuiceSystem';
 /** Glyph height of the pixel font, for stacking the hit counter above a total */
 const GLYPH_HEIGHT = 7;
 
+/** Damage the player dealt, or damage the player took */
+export type DamageKind = 'dealt' | 'taken';
+
 interface DamageNumber {
+    kind: DamageKind;
     x: number;
     y: number;
     vx: number;
@@ -61,6 +65,18 @@ const CRIT_STOP_GAP = 0.35;
 /** How long a number accepts merges, and how far away a hit may be to merge */
 const MERGE_WINDOW = 0.22;
 const MERGE_RADIUS = 38;
+
+/**
+ * Damage *taken* gathers for much longer than damage dealt.
+ *
+ * Every one of these spawns at the same point — the player's head — so short
+ * windows do not scatter them the way they scatter across a crowd of enemies;
+ * they just pile into an unreadable stack of overlapping digits. Half a second
+ * turns "1, 5, 4, 5" stacked on top of each other into one "15" you can
+ * actually read, which is also the number that matters: how fast is this crowd
+ * taking me apart.
+ */
+const TAKEN_MERGE_WINDOW = 0.55;
 
 /** Length of the punch-in on spawn and on every merge */
 const POP_TIME = 0.12;
@@ -109,28 +125,52 @@ export class DamageNumbers {
         // The sound is feedback about the hit, not about the digits, so it
         // plays either way (AudioSystem rate-limits it per effect)
         this.playHitFeedback(isCrit);
+        this.push(pos, amount, isCrit, 'dealt');
+    }
+
+    /**
+     * Damage the *player* took, in red, above their head.
+     *
+     * Added because a single enemy chewing on you was invisible: it took about
+     * 3.6 HP/s off a 150 HP bar, which no one notices, and then a crowd took
+     * the whole bar in four seconds. The curve between those was smooth all
+     * along — what was missing was any signal that the first case was happening
+     * at all, so it read as "one enemy does nothing, then I instantly die".
+     *
+     * The HP bar is a *state* readout and states are bad at reporting small
+     * events. A number is an event.
+     */
+    spawnTaken(pos: Vector2, amount: number) {
+        if (amount < 0.5) return;
+        this.push(pos, amount, false, 'taken');
+    }
+
+    private push(pos: Vector2, amount: number, isCrit: boolean, kind: DamageKind) {
         if (!damageNumberSettings.enabled) return;
 
-        if (this.mergeInto(pos, amount, isCrit)) return;
+        if (this.mergeInto(pos, amount, isCrit, kind)) return;
 
         if (this.items.length > MAX_ON_SCREEN) this.items.shift();
 
-        const life = isCrit ? 0.8 : 0.55;
+        const taken = kind === 'taken';
+        const life = taken ? 0.7 : (isCrit ? 0.8 : 0.55);
         this.items.push({
-            // Wide horizontal jitter so simultaneous hits don't stack into an
-            // unreadable pile of digits
-            x: pos.x + (Math.random() - 0.5) * 28,
+            // Enemy hits get wide horizontal jitter so simultaneous ones do not
+            // stack into a pile. Taken damage is always at the same spot, so
+            // jitter would only smear it around the player's head instead.
+            x: taken ? pos.x : pos.x + (Math.random() - 0.5) * 28,
             y: pos.y,
             // Arc upward and outward so overlapping hits stay readable
-            vx: (Math.random() - 0.5) * 60,
-            vy: isCrit ? -160 : -110,
+            vx: taken ? 0 : (Math.random() - 0.5) * 60,
+            vy: taken ? -70 : (isCrit ? -160 : -110),
             amount,
-            text: Math.floor(amount).toString(),
+            text: Math.max(1, Math.round(amount)).toString(),
             life,
             maxLife: life,
             isCrit,
+            kind,
             hits: 1,
-            openFor: MERGE_WINDOW,
+            openFor: taken ? TAKEN_MERGE_WINDOW : MERGE_WINDOW,
             pop: POP_TIME,
         });
     }
@@ -140,16 +180,17 @@ export class DamageNumbers {
      * most recent number is nearly always the right one and a volley resolves
      * in one frame.
      */
-    private mergeInto(pos: Vector2, amount: number, isCrit: boolean): boolean {
+    private mergeInto(pos: Vector2, amount: number, isCrit: boolean, kind: DamageKind): boolean {
         for (let i = this.items.length - 1; i >= 0; i--) {
             const dn = this.items[i];
+            if (dn.kind !== kind) continue; // never fold your damage into theirs
             if (dn.openFor <= 0) continue;
             if (Math.abs(dn.x - pos.x) > MERGE_RADIUS) continue;
             if (Math.abs(dn.y - pos.y) > MERGE_RADIUS) continue;
 
             dn.amount += amount;
             dn.hits++;
-            dn.text = Math.floor(dn.amount).toString();
+            dn.text = Math.max(1, Math.round(dn.amount)).toString();
             // One crit in the group makes the whole total read as a crit: the
             // colour is about "something big happened here", and it did
             if (isCrit && !dn.isCrit) {
@@ -185,9 +226,12 @@ export class DamageNumbers {
 
             if (dn.openFor > 0) {
                 dn.openFor -= dt;
-                // A gathering number hovers: moving it while hits are still
-                // landing on it would drag it away from what it is counting
                 if (dn.pop > 0) dn.pop -= dt;
+                // A number gathering over a crowd hovers, because moving it
+                // would drag it away from what it is counting. One gathering
+                // over the PLAYER has to climb, or it sits on top of the
+                // sprite for half a second and hides the thing being eaten.
+                if (dn.kind === 'taken') dn.y += dn.vy * dt;
                 continue;
             }
 
@@ -216,7 +260,7 @@ export class DamageNumbers {
             const pop = dn.pop > 0
                 ? 1.15 + (dn.pop / POP_TIME) * 0.45
                 : Math.max(0.9, 1.15 - t * 0.15);
-            const base = dn.isCrit ? 3.4 : 2.2;
+            const base = dn.isCrit ? 3.4 : (dn.kind === 'taken' ? 2.6 : 2.2);
             const scale = Math.max(1, Math.round(base * pop));
 
             const sx = dn.x - camera.x;
@@ -228,8 +272,8 @@ export class DamageNumbers {
                 align: 'center',
                 spacing: 1,
                 shadow: 1,
-                color: dn.isCrit ? '#ffe14d' : '#ffffff',
-                outline: dn.isCrit ? '#ff4400' : undefined,
+                color: dn.kind === 'taken' ? '#ff5a6e' : (dn.isCrit ? '#ffe14d' : '#ffffff'),
+                outline: dn.isCrit ? '#ff4400' : (dn.kind === 'taken' ? '#2a0008' : undefined),
             });
 
             // How many hits this total is. Without it a merged number reads as

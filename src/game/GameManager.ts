@@ -22,7 +22,7 @@ import { audio } from '../engine/AudioSystem';
 import { juice } from '../engine/JuiceSystem';
 import { getPowerupValue, POWERUP_STACK_CAP } from './core/UpgradePool';
 import { addStat } from './core/PlayerStats';
-import { biteDamage, BITE_INTERVAL, MAX_BITERS } from './core/ContactDamage';
+import { biteDamage, BITE_INTERVAL, MAX_BITERS, BITE_BUDGET_CAP, BITE_REACH } from './core/ContactDamage';
 import { computeScore, submitScore } from './core/Score';
 import { RunStatsTracker } from './core/RunStats';
 import { achievements, type RunSnapshot } from './core/Achievements';
@@ -114,7 +114,7 @@ export class GameManager {
      * Refills at MAX_BITERS per BITE_INTERVAL — see resolveBites for why the
      * per-enemy timers alone were not enough.
      */
-    private biteBudget: number = MAX_BITERS;
+    private biteBudget: number = BITE_BUDGET_CAP;
     repairCells: RepairCell[] = [];
 
     /**
@@ -193,7 +193,7 @@ export class GameManager {
         this.repairCells = [];
         this.capacitorCharge = 0;
         this.dischargeCooldown = 0;
-        this.biteBudget = MAX_BITERS;
+        this.biteBudget = BITE_BUDGET_CAP;
         this.damageNumbers.clear();
         this.killCount = 0;
         this.killScore = 0;
@@ -436,6 +436,8 @@ export class GameManager {
         if (dealt <= 0) return;
 
         player.takeBite(dealt);
+        // Above the head, so it does not sit under the crowd standing on you
+        this.damageNumbers.spawnTaken({ x: player.pos.x, y: player.pos.y - player.radius }, dealt);
         this.emitContactFeedback(dealt);
         this.chargeCapacitor(dealt);
     }
@@ -624,7 +626,7 @@ export class GameManager {
         this.runStats.update(dt);
         if (this.dischargeCooldown > 0) this.dischargeCooldown -= dt;
         if (this.contactFxTimer > 0) this.contactFxTimer -= dt;
-        this.biteBudget = Math.min(MAX_BITERS, this.biteBudget + (MAX_BITERS / BITE_INTERVAL) * dt);
+        this.biteBudget = Math.min(BITE_BUDGET_CAP, this.biteBudget + (MAX_BITERS / BITE_INTERVAL) * dt);
         this.waveTimer += dt;
 
         // Parallax layers drift with the camera (frozen while paused)
@@ -751,9 +753,12 @@ export class GameManager {
         // path, so twelve enemies land twelve bites; that is the whole point.
         const touching: Enemy[] = [];
         for (const e of this.enemies) {
-            if (!checkCollision(e, this.player)) continue;
+            // Bites reach a little past the shove — see BITE_REACH
+            const gap = distance(e.pos, this.player.pos) - e.radius - this.player.radius;
+            if (gap > BITE_REACH) continue;
 
             touching.push(e);
+            if (gap > 0) continue; // close enough to bite, not close enough to shove
 
             // Calculate direction from enemy to player
             const dx = this.player.pos.x - e.pos.x;

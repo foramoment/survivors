@@ -71,6 +71,37 @@ export const BITE_PUNCH = 0.7;
 export const MAX_BITERS = 6;
 
 /**
+ * How many bites may be banked while nothing is touching you.
+ *
+ * The rate limiter is a token bucket, and a bucket that banks its full capacity
+ * has a nasty property: walk into a standing crowd with six tokens saved and
+ * **six bites land on the same frame**. In play that reads as "I stepped in and
+ * instantly died" with no ramp at all — the player's words were "раз, и я
+ * умер". The sustained rate was never the problem; the entry burst was.
+ *
+ * Two keeps the top-end rate exactly where it was (MAX_BITERS per
+ * BITE_INTERVAL) while making the first half-second of a pile a ramp instead of
+ * a wall.
+ */
+export const BITE_BUDGET_CAP = 2;
+
+/**
+ * Extra reach on a bite, beyond the touching radii.
+ *
+ * Contact knockback shoves an enemy 190px/s away while it only walks back at
+ * ~100, so a *lone* attacker spends most of its time just out of overlap: it
+ * landed a bite every ~1.3s instead of every 0.8, which measured as 3.6 HP/s —
+ * invisible on a 150 HP bar. In a crowd nobody can be shoved anywhere, because
+ * the bodies behind are in the way, so the same enemies bit at full rate. That
+ * gap is what made one enemy feel like nothing and eight feel like death.
+ *
+ * A few pixels of slack closes it without making knockback useless as an
+ * escape — you still break contact by *moving*, just not by standing there
+ * while the shove does it for you.
+ */
+export const BITE_REACH = 9;
+
+/**
  * Damage one enemy's bite deals through `armor`.
  *
  * `damage` is the enemy's damage-per-second from ENEMY_CONFIG — the column is

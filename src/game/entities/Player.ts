@@ -3,7 +3,7 @@ import { type Vector2, normalize, distance } from '../../engine/Utils';
 import { input } from '../../engine/Input';
 import { Weapon } from '../Weapon';
 import { sprites } from '../core/SpriteFactory';
-import { adrenalineMultiplier } from '../core/Tactics';
+import { adrenalineMultiplier, REGEN_COMBAT_DELAY } from '../core/Tactics';
 import type { ClassPerLevel } from '../data/GameData';
 import { addStat } from '../core/PlayerStats';
 
@@ -29,6 +29,8 @@ export class Player extends Entity {
 
     /** Seconds left of the "enemies are on me" tint; refreshed while in contact */
     contactTimer: number = 0;
+    /** Seconds left before regeneration may resume (see REGEN_COMBAT_DELAY) */
+    regenDelay: number = 0;
 
     // Knockback system
     knockback: Vector2 = { x: 0, y: 0 };
@@ -168,9 +170,19 @@ export class Player extends Entity {
         if (Math.abs(this.knockback.x) < 1) this.knockback.x = 0;
         if (Math.abs(this.knockback.y) < 1) this.knockback.y = 0;
 
-        // Regen
-        if (this.stats.regen > 0 && this.hp < this.maxHp) {
-            this.heal(this.stats.regen * dt);
+        // Regeneration: a fraction of MISSING health per second, and only once
+        // you have been left alone for a moment.
+        //
+        // Percent-of-missing is the shape that makes the stat worth taking —
+        // it is strongest exactly when you are hurt and costs nothing at full
+        // health, and it is worth the same to a 100 HP character as to a 300 HP
+        // one, which flat regen never was. The out-of-combat gate is what keeps
+        // it from turning back into "standing still is free"; see
+        // REGEN_COMBAT_DELAY for the full argument.
+        if (this.regenDelay > 0) {
+            this.regenDelay -= dt;
+        } else if (this.stats.regen > 0 && this.hp < this.maxHp) {
+            this.heal(this.stats.regen * (this.maxHp - this.hp) * dt);
         }
 
         // Update invulnerability timer
@@ -250,6 +262,7 @@ export class Player extends Entity {
         }
 
         const damage = Math.max(1, amount - this.stats.armor);
+        this.regenDelay = REGEN_COMBAT_DELAY;
         this.hp -= damage;
 
         // Activate invulnerability
@@ -274,6 +287,7 @@ export class Player extends Entity {
     takeBite(amount: number) {
         if (amount <= 0) return;
 
+        this.regenDelay = REGEN_COMBAT_DELAY;
         this.hp -= amount;
         this.contactTimer = 0.16; // drives the "being chewed" tint in draw()
 

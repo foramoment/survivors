@@ -94,8 +94,7 @@ export const EN: Record<string, string> = {
     'bonus.magnet': 'pull range',
     'bonus.maxHp': 'Max HP',
     'bonus.armor': 'armor',
-    'bonus.regen': 'HP/s',
-    'bonus.discharge': 'charge',
+        'bonus.discharge': 'charge',
     'bonus.reroll': 'reroll',
 
     // Arena event banners — drawn with the pixel font, uppercase only

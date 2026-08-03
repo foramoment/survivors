@@ -185,15 +185,14 @@ describe('UpgradePool', () => {
             expect(getPowerupValue(0.1, 3, 1.25)).toBeCloseTo(0.1 * 1.25 ** 3);
         });
 
-        it('regen caps below 1 HP/s at max stacks', () => {
+        it('regen tops out at 5% of missing HP per second', () => {
             const regen = POWERUPS.find(p => p.type === 'regen')!;
 
             let total = 0;
             for (let stack = 0; stack < (regen.maxStacks ?? POWERUP_STACK_CAP); stack++) {
                 total += getPowerupValue(regen.value, stack, regen.stackGrowth);
             }
-            expect(total).toBeCloseTo(0.8);
-            expect(total).toBeLessThan(1);
+            expect(total).toBeCloseTo(0.05);
         });
 
         it('no powerup can multiply its stat past what a card promises', () => {
@@ -266,7 +265,11 @@ describe('stat previews', () => {
     });
 
     it('keeps one decimal on small flat values', () => {
-        expect(formatStatValue('regen', 0.3)).toBe('0.3');
+        expect(formatStatValue('armor', 0.3)).toBe('0.3');
+    });
+
+    it('shows regen as a percentage — it is a share of missing HP, not HP/s', () => {
+        expect(formatStatValue('regen', 0.03)).toBe('3%');
     });
 });
 

@@ -108,6 +108,29 @@ export const REPAIR_HEAL = 6;
 export const REPAIR_LIFETIME = 12;
 
 /**
+ * Seconds without taking damage before regeneration starts again.
+ *
+ * This is what makes the whole regen model safe. `regen` is now a fraction of
+ * **missing** health per second, which is the right shape — it is worth most
+ * exactly when you are hurt, and nothing at all when you are full — but it has
+ * an obvious failure mode: give it a generous number and standing next to a
+ * single chaser becomes free again, which is precisely what the bite rework
+ * just removed.
+ *
+ * Gating on being out of combat makes that **structurally impossible** rather
+ * than numerically unlikely — the same move as "an echo can never land a
+ * killing blow". Regeneration cannot out-heal a fight it is not allowed to run
+ * during, so the number is free to be big enough to feel like something.
+ *
+ * It also gives the two healing sources genuinely different jobs, which they
+ * did not have before: **repair cells work during a fight** (you break out, you
+ * go and get one, they are flat and they top you off), **regen works between
+ * fights** (automatic, fastest when you are worst hurt, and by its exponential
+ * nature never quite finishes).
+ */
+export const REGEN_COMBAT_DELAY = 3;
+
+/**
  * Bonus multiplier from Adrenal Surge — 1 while healthy, 1 + stacks while
  * bloodied. Applied to both damage and move speed so the perk reads as a
  * single "cornered animal" state rather than two effects.

@@ -122,7 +122,6 @@ export const RU: Record<string, string> = {
     'bonus.magnet': 'к радиусу притяжения',
     'bonus.maxHp': 'к макс. HP',
     'bonus.armor': 'к броне',
-    'bonus.regen': 'HP/с',
     'bonus.discharge': 'заряд',
     'bonus.reroll': 'переброс',
 

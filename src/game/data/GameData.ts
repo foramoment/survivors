@@ -64,12 +64,14 @@ export const CLASSES = [
         perLevel: { stat: 'maxHp', value: 0.01 } as ClassPerLevel,
     },
     {
-        // Regen kept in step with the flat Nano-Repair stack (0.1 HP/s): a
-        // class perk is worth ~2.5 picks, not 6.
+        // Regen kept in step with the Nano-Repair stack (1% of missing HP per
+        // pick): a class perk is worth ~1.5 picks. Converted from 0.25 flat
+        // when the stat changed meaning — under the new one that would have
+        // read as 25% of missing health per second.
         id: 'astro_biologist', name: "Astro Biologist", emoji: "🧬",
-        bonus: "Regen +0.25/s, Area +10% · +1% area per level",
+        bonus: "Regen 1.5%/s of missing HP, Area +10% · +1% area per level",
         weaponId: 'spore_cloud', hp: 95,
-        stats: { regen: 0.25, area: 1.1 },
+        stats: { regen: 0.015, area: 1.1 },
         perLevel: { stat: 'area', value: 0.01 } as ClassPerLevel,
     },
     {
@@ -151,11 +153,16 @@ export interface PowerupData {
 
 export const POWERUPS: PowerupData[] = [
     // Basic
-    // Regen is the one powerup that can invalidate the whole game: enough of it
-    // and standing still inside a crowd out-heals the incoming damage. 0.1 HP/s
-    // per pick, 0.8 at the cap — noticeable between fights, never a substitute
-    // for moving.
-    { id: 'nano_repair', name: "Nano-Repair", description: "Hull nanites knit you back together", type: "regen", value: 0.1, maxStacks: 8, emoji: "❤️" },
+    // A fraction of MISSING health per second, and only out of combat (see
+    // REGEN_COMBAT_DELAY). Flat 0.1 HP/s per pick was the old version and it
+    // was worth nothing: 0.8 HP/s at the cap took two minutes to undo one bad
+    // engagement, so the card was a dead pick next to a repair cell.
+    //
+    // 1% of missing per stack, five stacks: on a 200 HP pool that is 5 HP/s at
+    // half health and carries you from a quarter to three quarters in about
+    // twenty seconds. The out-of-combat gate is what lets the number be this
+    // generous — regeneration cannot out-heal a fight it may not run during.
+    { id: 'nano_repair', name: "Nano-Repair", description: "Hull nanites knit you back together between fights", type: "regen", value: 0.01, maxStacks: 5, emoji: "❤️" },
     // Crit starts at 0%, so this is the only way to build it (bar the Samurai's
     // 15%). 40% at the cap makes crit a direction you commit to rather than a
     // certainty you trip over — the old curve reached a guaranteed crit on the

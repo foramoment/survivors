@@ -12,6 +12,7 @@ vi.mock('../../engine/Input', () => ({
 import {
     biteDamage, ARMOR_FLOOR, BITE_INTERVAL, BITE_PUNCH, MAX_BITERS,
 } from '../core/ContactDamage';
+import { REGEN_COMBAT_DELAY } from '../core/Tactics';
 import { Player } from '../entities/Player';
 import { Enemy } from '../entities/Enemy';
 import { ENEMIES, ENEMY_CONFIG } from '../data/GameData';
@@ -116,6 +117,61 @@ describe('Player bites', () => {
         player.takeDamage(10);
         player.takeDamage(10);
         expect(player.hp).toBeCloseTo(90);
+    });
+});
+
+describe('Regeneration', () => {
+    /** A player with full Nano-Repair, hurt down to half */
+    function hurtPlayer() {
+        const player = new Player(0, 0);
+        player.maxHp = 200;
+        player.hp = 100;
+        player.stats.regen = 0.05;
+        return player;
+    }
+
+    it('does not run while enemies are still biting', () => {
+        // THE guard on the whole model. `regen` is a share of MISSING health,
+        // so on a big pool at low HP it would comfortably out-heal a chaser —
+        // standing next to one would be free again, which is exactly what the
+        // bite rework removed. Gating on being out of combat makes that
+        // impossible by construction rather than by careful tuning, so the
+        // number is free to be generous enough to feel like something.
+        const player = hurtPlayer();
+        player.takeBite(10);
+        const after = player.hp;
+
+        player.update(REGEN_COMBAT_DELAY * 0.9);
+        expect(player.hp).toBe(after);
+    });
+
+    it('resumes once you have been left alone', () => {
+        const player = hurtPlayer();
+        player.takeBite(10);
+        player.update(REGEN_COMBAT_DELAY + 0.001);
+
+        const before = player.hp;
+        player.update(1);
+        // 5% of the 110 missing HP, near enough
+        expect(player.hp - before).toBeGreaterThan(4);
+    });
+
+    it('heals fastest when worst hurt, and not at all when full', () => {
+        const hurt = hurtPlayer();
+        hurt.update(REGEN_COMBAT_DELAY + 1);
+        const whenHurt = hurt.hp - 100;
+
+        const scratched = hurtPlayer();
+        scratched.hp = 190;
+        scratched.update(REGEN_COMBAT_DELAY + 1);
+        const whenScratched = scratched.hp - 190;
+
+        expect(whenHurt).toBeGreaterThan(whenScratched);
+
+        const full = hurtPlayer();
+        full.hp = 200;
+        full.update(REGEN_COMBAT_DELAY + 1);
+        expect(full.hp).toBe(200);
     });
 });
 
