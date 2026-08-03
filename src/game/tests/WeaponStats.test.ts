@@ -28,9 +28,8 @@ const EXPECTED_STATS: Record<string, any> = {
         damage: 15,
         cooldown: 1.5,
         // Most of the 250 it shipped with. It was cut to 125 to force "let them
-        // get close", which PRESSURE_CAP already pays for, and at that reach the
-        // cone left the blade whiffing when the crowd was thickest. See the
-        // weapon for the full argument.
+        // get close", which PRESSURE_CAP already pays for. See the weapon for
+        // the full argument.
         area: 200,
         speed: 0,
         duration: 0.2,

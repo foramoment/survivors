@@ -16,9 +16,8 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import { type Vector2, angleDelta } from '../../../engine/Utils';
+import { type Vector2 } from '../../../engine/Utils';
 import { Zone, Projectile } from '../base';
-import type { Entity } from '../../../engine/Entity';
 import { damageSystem } from '../../core/DamageSystem';
 import { particles } from '../../../engine/ParticleSystem';
 
@@ -196,17 +195,25 @@ export class DimensionalRiftZone extends Zone {
 }
 
 /**
- * Half-angle of the sweep, in radians: 90° total, 140° once evolved.
+ * There is no firing arc. The blade cuts the nearest bodies in **any**
+ * direction, and that is the weapon.
  *
- * The blade used to cut whatever was nearest in any direction, so a volley
- * stacked into a ring around the player and read as an aura rather than swings.
- * The cone is aimed at the *nearest enemy*, not at where the player is walking:
- * tying it to movement would mean turning away from a pack to face it, which is
- * the opposite of what a defensive melee weapon should ask of you. Aiming is
- * automatic; the cone only decides how wide the cuts spread from there.
+ * A 120° cone lived here for a while. It was introduced to fix a *look*: cuts
+ * landing all around the player read as an aura rather than as swings. But it
+ * paid for that with the weapon's whole job — the blade is what you own for the
+ * moment you are surrounded, and a cone means that in the exact situation it
+ * was built for it ignores two thirds of the pack. It also multiplied with the
+ * search radius, so every range cut made the cone bite harder, and the blade
+ * ended up whiffing when the crowd was thickest.
+ *
+ * The look problem is real but belongs to the drawing, not the targeting, and
+ * that is where it is now solved: cuts chain from one to the next along a
+ * phantom trail (see SlashArc.from) and each is rotated by CUT_JITTER, so a
+ * volley reads as a blink-dash through the pack instead of a ring.
+ *
+ * If a volley ever reads as an aura again, change how it is drawn. Do not take
+ * targets away from a weapon whose identity is hitting everything close.
  */
-const HALF_ARC = Math.PI / 3;
-const HALF_ARC_EVOLVED = Math.PI * 0.39;
 /** Random rotation added to each cut so a volley fans out instead of stacking */
 const CUT_JITTER = 0.4;
 
@@ -237,14 +244,15 @@ export class PhantomSlashWeapon extends Weapon {
         // enforce the incentive only took away the weapon's identity — reaching
         // into a pack from a workable distance.
         //
-        // 125 then had a second, mechanical problem worth remembering: the
-        // search radius and the CONE multiply. At 125 the reach barely exceeded
-        // PRESSURE_RADIUS, so the only candidates were bodies already touching
-        // you, and the cone threw most of *those* away too. The blade whiffed
-        // exactly when the crowd was thickest.
+        // 125 then had a second, mechanical problem: it multiplied with the
+        // firing cone that used to filter targets, so the only candidates were
+        // bodies already touching you and the cone discarded most of those too.
+        // The blade whiffed exactly when the crowd was thickest. That cone is
+        // gone now for its own reasons (see CUT_JITTER), which leaves range as
+        // the only thing deciding what gets cut.
         //
-        // 200 restores most of the reach; the cone (120 degrees) and the
-        // pressure bonus still do the work of keeping it a close-range weapon.
+        // 200 restores most of the reach. The pressure bonus is what keeps this
+        // a close-range weapon, and it always was.
         area: 200,
         speed: 0,
         duration: 0.2,
@@ -274,11 +282,6 @@ export class PhantomSlashWeapon extends Weapon {
         return 1 + Math.min(PRESSURE_CAP, Math.max(0, packed - 1) * PRESSURE_PER_ENEMY);
     }
 
-    /** The blade always faces the nearest threat; the cone spreads from there */
-    private aimAngle(nearest: Entity): number {
-        return Math.atan2(nearest.pos.y - this.owner.pos.y, nearest.pos.x - this.owner.pos.x);
-    }
-
     update(dt: number) {
         this.cooldown -= dt;
         if (this.cooldown > 0) return;
@@ -287,18 +290,9 @@ export class PhantomSlashWeapon extends Weapon {
         const baseCount = this.stats.count + Math.floor((this.level - 1) * this.stats.countScaling);
         const count = isEvolved ? baseCount + 3 : baseCount;
 
-        // Closest-first, then narrowed to the cone around the nearest of them
-        const inRange = this.findEnemies({ mode: 'closest', count: count * 4 });
-        if (inRange.length === 0) return;
-
-        const facing = this.aimAngle(inRange[0]);
-        const halfArc = isEvolved ? HALF_ARC_EVOLVED : HALF_ARC;
-        const targets = inRange
-            .filter(e => {
-                const angle = Math.atan2(e.pos.y - this.owner.pos.y, e.pos.x - this.owner.pos.x);
-                return Math.abs(angleDelta(angle, facing)) <= halfArc;
-            })
-            .slice(0, count);
+        // Closest first, in every direction. No arc — see CUT_JITTER above for
+        // why the cone that used to filter this list is gone.
+        const targets = this.findEnemies({ mode: 'closest', count });
         if (targets.length === 0) return;
 
         const pressure = this.pressureMultiplier();

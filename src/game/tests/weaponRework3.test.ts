@@ -418,45 +418,61 @@ describe('Nanobot Swarm', () => {
     });
 });
 
-describe('Phantom Slash cone', () => {
-    it('only cuts inside the arc facing the nearest enemy', () => {
+describe('Phantom Slash has no firing arc', () => {
+    it('cuts in every direction, because being surrounded is what it is for', () => {
         const player = new Player(0, 0);
         const weapon = new PhantomSlashWeapon(player);
         weapon.onSpawn = () => { };
 
-        // One enemy to the right (the blade will face it), one directly behind
-        const front = makeEnemy(60, 0);
-        const behind = makeEnemy(-70, 0);
-        placeEnemies([front, behind]);
+        // Ringed: one in front, one directly behind, one above. A 120 degree
+        // cone used to live here and would have discarded two of these — in
+        // the exact situation the blade exists to answer.
+        const ring = [makeEnemy(60, 0), makeEnemy(-70, 0), makeEnemy(0, 65)];
+        placeEnemies(ring);
 
-        const behindBefore = behind.hp;
+        const before = ring.map(e => e.hp);
         weapon.update(2);
 
-        expect(front.hp).toBeLessThan(front.maxHp);
-        // Cutting something 180° away made the weapon read as an aura, not a blade
-        expect(behind.hp).toBe(behindBefore);
+        ring.forEach((e, i) => expect(e.hp).toBeLessThan(before[i]));
     });
 
-    it('the evolved blade sweeps wider', () => {
-        function hitsAtAngle(evolved: boolean): boolean {
+    it('takes the closest bodies, whatever direction they are in', () => {
+        const player = new Player(0, 0);
+        const weapon = new PhantomSlashWeapon(player);
+        weapon.onSpawn = () => { };
+
+        // Three cuts at level one. The far one is well inside range but is the
+        // fourth closest, so it is the one that survives — distance decides,
+        // never angle.
+        const near = [makeEnemy(40, 0), makeEnemy(-45, 0), makeEnemy(0, -50)];
+        const far = makeEnemy(0, 160);
+        placeEnemies([...near, far]);
+
+        const farBefore = far.hp;
+        weapon.update(2);
+
+        near.forEach(e => expect(e.hp).toBeLessThan(e.maxHp));
+        expect(far.hp).toBe(farBefore);
+    });
+
+    it('the evolved blade cuts more of the pack', () => {
+        function cutsMade(evolved: boolean): number {
             const player = new Player(0, 0);
             const weapon = new PhantomSlashWeapon(player);
             weapon.evolved = evolved;
             weapon.onSpawn = () => { };
 
-            const front = makeEnemy(60, 0);
-            // ~60° off the facing direction: outside the 45° base cone,
-            // inside the evolved one
-            const wide = makeEnemy(Math.cos(1.05) * 90, Math.sin(1.05) * 90);
-            placeEnemies([front, wide]);
+            const ring = Array.from({ length: 8 }, (_, i) => {
+                const a = (i / 8) * Math.PI * 2;
+                return makeEnemy(Math.cos(a) * 70, Math.sin(a) * 70);
+            });
+            placeEnemies(ring);
 
-            const before = wide.hp;
             weapon.update(2);
-            return wide.hp < before;
+            return ring.filter(e => e.hp < e.maxHp).length;
         }
 
-        expect(hitsAtAngle(false)).toBe(false);
-        expect(hitsAtAngle(true)).toBe(true);
+        expect(cutsMade(true)).toBeGreaterThan(cutsMade(false));
     });
 });
 
