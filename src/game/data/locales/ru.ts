@@ -208,7 +208,7 @@ export const RU: Record<string, string> = {
     'class.exo_marine.name': 'Экзо-Пехотинец',
     'class.exo_marine.bonus': 'Броня +2 · +1% макс. HP за уровень',
     'class.astro_biologist.name': 'Астробиолог',
-    'class.astro_biologist.bonus': 'Реген +0.25/с, Площадь +10% · +1% площади за уровень',
+    'class.astro_biologist.bonus': 'Реген 1.5%/с от недостающего HP, Площадь +10% · +1% площади за уровень',
     'class.storm_mage.name': 'Маг Бури',
     'class.storm_mage.bonus': 'Урон +15% · −1% перезарядки за уровень',
     'class.null_warden.name': 'Страж Пустоты',

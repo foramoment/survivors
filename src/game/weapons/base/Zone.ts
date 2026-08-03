@@ -465,11 +465,11 @@ export class SporeZone extends Zone {
     infectDuration: number = 3;
     contagious: boolean = false;
 
-    protected puffs: { x: number; y: number; r: number; phase: number; drift: number }[] = [];
+    protected puffs: { x: number; y: number; r: number; phase: number; drift: number; motes: Vector2[] }[] = [];
     /** Mycelium: short baked polylines crawling out of the centre */
     protected threads: Vector2[][] = [];
     /** Caps sprouting on a stagger; `grow` runs 0..1 */
-    protected caps: { x: number; y: number; scale: number; variant: number; grow: number; at: number }[] = [];
+    protected caps: { x: number; y: number; scale: number; variant: number; grow: number; at: number; phase: number }[] = [];
     protected age: number = 0;
     private particleTimer: number = 0;
 
@@ -490,31 +490,58 @@ export class SporeZone extends Zone {
         for (let i = 0; i < puffCount; i++) {
             const angle = (i / puffCount) * Math.PI * 2 + Math.random() * 0.5;
             const dist = r * (0.2 + Math.random() * 0.65);
+            const pr = r * (0.16 + Math.random() * 0.2);
+            // Each puff is a handful of specks, not a disc. Baked positions
+            // inside its own radius, so the cluster keeps its shape as it bobs.
+            const motes: Vector2[] = [];
+            const moteCount = 4 + Math.floor(Math.random() * 4);
+            for (let m = 0; m < moteCount; m++) {
+                const ma = Math.random() * Math.PI * 2;
+                const md = Math.sqrt(Math.random()) * pr;
+                motes.push({ x: Math.cos(ma) * md, y: Math.sin(ma) * md * 0.8 });
+            }
             this.puffs.push({
                 x: Math.cos(angle) * dist,
                 y: Math.sin(angle) * dist * 0.75,
-                r: r * (0.16 + Math.random() * 0.2),
+                r: pr,
                 phase: Math.random() * Math.PI * 2,
                 drift: 0.6 + Math.random() * 0.8,
+                motes,
             });
         }
 
+        // Hyphae: a slow random WALK, sampled every few pixels, and drawn as a
+        // chain of cells rather than a stroked polyline.
+        //
+        // The old version was four `lineTo` segments per thread, which is
+        // exactly what it looked like — a stick figure of a root system. Three
+        // things fix it: many short steps instead of few long ones (so the
+        // curve is a curve), a bias that keeps each thread heading roughly
+        // outward instead of wandering back over itself, and side branches,
+        // because mycelium forks and a line does not.
         this.threads.length = 0;
-        const threadCount = Math.min(10, 5 + Math.round(r / 30));
+        const threadCount = Math.min(14, 7 + Math.round(r / 22));
         for (let i = 0; i < threadCount; i++) {
-            let angle = (i / threadCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
-            const steps = 3 + Math.floor(Math.random() * 2);
-            const step = (r * (0.6 + Math.random() * 0.35)) / steps;
-            const path: Vector2[] = [{ x: 0, y: 0 }];
-            let x = 0;
-            let y = 0;
-            for (let s = 0; s < steps; s++) {
-                angle += (Math.random() - 0.5) * 0.9;
-                x += Math.cos(angle) * step;
-                y += Math.sin(angle) * step * 0.78;
-                path.push({ x, y });
+            const heading = (i / threadCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.7;
+            // Start somewhere in the inner third rather than all from the exact
+            // centre — every thread sharing one origin draws a starburst, which
+            // is the one shape mycelium never makes
+            const seedDist = Math.random() * r * 0.3;
+            const seedAngle = Math.random() * Math.PI * 2;
+            const trunk = this.growHypha(
+                Math.cos(seedAngle) * seedDist,
+                Math.sin(seedAngle) * seedDist * 0.75,
+                heading,
+                r * (0.5 + Math.random() * 0.4),
+            );
+            this.threads.push(trunk);
+
+            // One fork off the middle of the trunk, angled away from it
+            if (trunk.length > 6 && Math.random() < 0.75) {
+                const at = trunk[Math.floor(trunk.length * (0.35 + Math.random() * 0.3))];
+                const side = heading + (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.5);
+                this.threads.push(this.growHypha(at.x, at.y, side, r * (0.2 + Math.random() * 0.25)));
             }
-            this.threads.push(path);
         }
 
         // Caps are spread across the FIRST HALF of the patch's life, so they
@@ -531,18 +558,47 @@ export class SporeZone extends Zone {
                 variant: Math.floor(Math.random() * 3),
                 grow: 0,
                 at: (i / capCount) * this.lifetime * 0.5,
+                phase: Math.random() * Math.PI * 2,
             });
         }
+    }
+
+    /**
+     * One hypha: short steps with a gentle wander, pulled back toward its
+     * heading so it creeps outward instead of curling into a ball.
+     */
+    private growHypha(x: number, y: number, heading: number, length: number): Vector2[] {
+        const STEP = 4;
+        const steps = Math.max(3, Math.round(length / STEP));
+        const path: Vector2[] = [{ x, y }];
+        let angle = heading;
+
+        for (let i = 0; i < steps; i++) {
+            angle += (Math.random() - 0.5) * 0.7;
+            // Ease back toward the original heading — pure drift wanders home
+            angle += (heading - angle) * 0.18;
+            x += Math.cos(angle) * STEP;
+            y += Math.sin(angle) * STEP * 0.72;
+            path.push({ x, y });
+        }
+        return path;
     }
 
     update(dt: number) {
         super.update(dt);
         this.age += dt;
 
-        // One mushroom pushes up after another
+        // One mushroom pushes up after another, and breaking ground throws a
+        // puff of spores — a mushroom that fades in has not *sprouted*
         for (const cap of this.caps) {
             if (cap.grow < 1 && this.age >= cap.at) {
+                const wasSeed = cap.grow === 0;
                 cap.grow = Math.min(1, cap.grow + dt * 2.2);
+                if (wasSeed) {
+                    particles.emitSporeCloud(
+                        this.pos.x + cap.x, this.pos.y + cap.y, 14 * cap.scale,
+                    );
+                }
             }
         }
 
@@ -585,29 +641,75 @@ export class SporeZone extends Zone {
         ctx.ellipse(0, 0, r, r * 0.78, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Mycelium threads. Faint on purpose — they are texture under the
-        // spores, not the drawing. Hard strokes are the thing this art style
-        // keeps having to be talked out of.
-        ctx.globalAlpha = 0.3 * fade;
-        ctx.strokeStyle = this.contagious ? '#7fc42c' : '#5d6a2c';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        for (const thread of this.threads) {
-            ctx.moveTo(thread[0].x, thread[0].y);
-            for (let i = 1; i < thread.length; i++) ctx.lineTo(thread[i].x, thread[i].y);
-        }
-        ctx.stroke();
+        // Mycelium, drawn as a chain of cells rather than a stroked line —
+        // and the network SIGNALS.
+        //
+        // A stroke is a stroke however you curve it: smooth, uniform, and wrong
+        // next to an arena made of square pixels. Cells that thin toward the tip
+        // read as something that grew outward.
+        //
+        // The part that makes it worth looking at is the pulse. A wave of
+        // brightness rolls out along every strand from the middle, so the patch
+        // reads as a colony passing a message rather than as a texture someone
+        // stamped on the floor. Fungal networks really do signal along their
+        // hyphae, and the effect costs one sine per cell: the cell's index along
+        // its own thread IS its distance from the root, because the walk steps
+        // are uniform.
+        ctx.imageSmoothingEnabled = false;
+        const BANDS: [number, number, string][] = [
+            // [wave floor, alpha, colour] — dim body first, bright crest last
+            [-1, 0.20 * fade, this.contagious ? '#5f9420' : '#48522a'],
+            [0.35, 0.42 * fade, this.contagious ? '#9ada45' : '#7a8a4c'],
+            [0.8, 0.75 * fade, this.contagious ? '#d8ff8c' : '#c2d089'],
+        ];
 
-        // Spore puffs drifting above the mat
-        for (const puff of this.puffs) {
-            const lift = Math.sin(this.age * puff.drift + puff.phase) * 5;
-            ctx.globalAlpha = (0.2 + 0.1 * Math.sin(this.age * 2 + puff.phase)) * fade;
-            ctx.fillStyle = this.contagious ? '#8fd642' : '#7a8b3a';
+        for (let b = 0; b < BANDS.length; b++) {
+            const [floor, alpha, color] = BANDS[b];
+            const ceil = b + 1 < BANDS.length ? BANDS[b + 1][0] : 2;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(puff.x, puff.y + lift, puff.r * breathe, 0, Math.PI * 2);
+            let any = false;
+
+            for (const thread of this.threads) {
+                for (let i = 0; i < thread.length; i++) {
+                    const wave = Math.sin(this.age * 2.6 - i * 0.55);
+                    if (wave < floor || wave >= ceil) continue;
+                    // Thick at the root, a single pixel at the growing tip
+                    const taper = 1 - i / thread.length;
+                    const size = Math.max(1, Math.round(1 + 2 * taper));
+                    any = true;
+                    ctx.rect(Math.round(thread[i].x), Math.round(thread[i].y), size, size);
+                }
+            }
+            if (any) ctx.fill();
+        }
+
+        // Spores drifting above the mat — SPECKS, not discs.
+        //
+        // These were soft translucent circles, and they were the single
+        // loudest thing on the patch: a stack of grey-green bubbles that buried
+        // the mycelium and the mushrooms underneath, which are the parts worth
+        // looking at. A spore is a *speck*; a cloud of them is many specks. The
+        // same mistake the old fire made with its glow, and the same fix.
+        ctx.fillStyle = this.contagious ? '#a8e650' : '#8a9a48';
+        for (const puff of this.puffs) {
+            const lift = Math.sin(this.age * puff.drift + puff.phase) * 6;
+            ctx.globalAlpha = (0.3 + 0.22 * Math.sin(this.age * 2 + puff.phase)) * fade;
+            ctx.beginPath();
+            for (const mote of puff.motes) {
+                // Motes inside a puff breathe outward together, so the cluster
+                // reads as one drifting body rather than as loose confetti
+                const size = mote.x * mote.y % 2 === 0 ? 2 : 3;
+                ctx.rect(
+                    Math.round(puff.x + mote.x * breathe),
+                    Math.round(puff.y + mote.y * breathe + lift),
+                    size, size,
+                );
+            }
             ctx.fill();
         }
+        ctx.globalAlpha = 1;
         ctx.restore();
 
         // Mushrooms are drawn OUTSIDE the growth scale: a mushroom grows where
@@ -616,31 +718,105 @@ export class SporeZone extends Zone {
         // looked like the whole colony was being pushed off the ground.
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
-        ctx.globalAlpha = fade;
         for (const cap of this.caps) {
             if (cap.grow <= 0) continue;
-            this.drawMushroom(ctx, cap.x, cap.y, cap.scale * cap.grow, cap.variant);
+
+            // Bioluminescence: each cap sits in its own small pool of light,
+            // breathing on its own clock. Cheap, and it is what turns a row of
+            // sprites into something growing in the dark.
+            const glowPulse = 0.55 + 0.45 * Math.sin(this.age * 1.8 + cap.phase);
+            const glowR = 22 * cap.scale * cap.grow;
+            const glow = ctx.createRadialGradient(cap.x, cap.y - 8, 0, cap.x, cap.y - 8, glowR);
+            const tint = this.contagious ? '168, 240, 66' : '190, 210, 120';
+            glow.addColorStop(0, `rgba(${tint}, ${(0.22 * glowPulse * fade).toFixed(3)})`);
+            glow.addColorStop(1, `rgba(${tint}, 0)`);
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(cap.x, cap.y - 8, glowR, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.globalAlpha = fade;
+            this.drawMushroom(ctx, cap.x, cap.y, cap.scale * cap.grow, cap.variant, cap.phase);
         }
         ctx.globalAlpha = 1;
         ctx.restore();
     }
 
-    /** Chunky pixel mushroom: stalk, cap, one spot */
-    protected drawMushroom(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, variant: number) {
-        const p = Math.max(2, Math.round(3 * scale));
-        const capColor = this.contagious ? '#9ee83c' : ['#b4552e', '#8a6a2e', '#7a4a6a'][variant];
+    /**
+     * A pixel mushroom built out of rows, not out of five rectangles.
+     *
+     * The old one was a stalk rect, two cap rects and two shading rects — five
+     * calls, and it read as a lego brick on a stick. What actually makes a
+     * mushroom recognisable is the *dome*: a silhouette that widens fast off
+     * the stalk and then rolls over into a rounded top. Rows of decreasing
+     * width give that for the same cost, the same way the flame profile does
+     * in engine/PixelFire.
+     *
+     * Three variants with genuinely different proportions — a squat toadstool,
+     * a tall thin one, a wide flat one — because three copies of one silhouette
+     * at different scales is not variety, it is the same mushroom twice.
+     *
+     * They lean, slowly and out of phase with each other. A colony that is
+     * perfectly still reads as a decal.
+     */
+    protected drawMushroom(
+        ctx: CanvasRenderingContext2D,
+        x: number, y: number, scale: number, variant: number, phase: number,
+    ) {
+        // [cap half-width, cap height, stalk height, stalk half-width] in cells
+        const SHAPES = [
+            [4, 3, 4, 1],   // squat toadstool
+            [3, 3, 6, 1],   // tall and thin
+            [5, 2, 3, 1],   // wide flat parasol
+        ];
+        const [capW, capH, stalkH, stalkW] = SHAPES[variant % SHAPES.length];
+
+        const cell = Math.max(2, Math.round(2.6 * scale));
+        const capColor = this.contagious ? '#a8f042' : ['#c2602f', '#95742f', '#84517a'][variant];
         const capShade = this.contagious ? '#5f9418' : ['#7a3218', '#5c451c', '#4e2d47'][variant];
+        const spotColor = this.contagious ? '#e8ffb0' : '#f0e4c0';
 
-        ctx.fillStyle = '#d8d2b8';
-        ctx.fillRect(x - p / 2, y - p, p, p * 2);
+        const px = Math.round(x);
+        const py = Math.round(y);
+        // Slow lean, out of phase per mushroom, strongest at the cap
+        const lean = Math.sin(this.age * 1.1 + phase) * cell * 0.5;
 
-        ctx.fillStyle = capColor;
-        ctx.fillRect(x - p * 2, y - p * 2, p * 4, p);
-        ctx.fillRect(x - p * 1.5, y - p * 3, p * 3, p);
+        ctx.imageSmoothingEnabled = false;
 
+        // Stalk: a little wider where it meets the ground, like a real one
+        ctx.fillStyle = '#ded7bd';
+        for (let i = 0; i < stalkH; i++) {
+            const f = i / stalkH;                     // 0 at the base
+            const w = stalkW + (f < 0.25 ? 1 : 0);
+            const sway = lean * (1 - f) * 0.4;
+            ctx.fillRect(
+                px - w * cell + sway, py - (i + 1) * cell,
+                w * 2 * cell, cell,
+            );
+        }
+
+        // Cap: rows rolling over into a dome, drawn bottom-up
+        const capBase = py - stalkH * cell;
+        for (let i = 0; i < capH; i++) {
+            const f = (i + 0.5) / capH;               // 0 at the brim, 1 at the top
+            // Circular roll-off — wide at the brim, pinching in fast at the top
+            const w = Math.max(1, Math.round(capW * Math.sqrt(1 - f * f)));
+            ctx.fillStyle = capColor;
+            ctx.fillRect(px - w * cell + lean, capBase - (i + 1) * cell, w * 2 * cell, cell);
+        }
+
+        // Gills: the shaded underside of the brim. This one row is most of what
+        // sells the cap as overhanging the stalk rather than balanced on it.
         ctx.fillStyle = capShade;
-        ctx.fillRect(x - p * 2, y - p, p * 4, Math.max(1, p * 0.5));
-        ctx.fillRect(x - p * 0.5, y - p * 3, p, p);
+        ctx.fillRect(px - capW * cell + lean, capBase - cell, capW * 2 * cell, Math.max(1, cell * 0.6));
+
+        // Two spots, placed off-centre so the cap does not look symmetrical
+        ctx.fillStyle = spotColor;
+        ctx.fillRect(px - (capW - 1) * cell + lean, capBase - capH * cell, cell, cell);
+        if (capW >= 4) {
+            ctx.fillRect(px + (capW - 2) * cell + lean, capBase - (capH - 1) * cell, cell, cell);
+        }
     }
 }
 
