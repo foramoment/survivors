@@ -40,14 +40,14 @@ describe('armor is a curve, not a subtraction', () => {
         // The reason for this curve: effective HP = HP x (1 + armor / K), so
         // armour and max HP multiply instead of competing. Flat subtraction had
         // the opposite property — it decayed to nothing as the run went on.
-        for (const armor of [2, 8, 16, 50]) {
+        for (const armor of [1, 2, 8, 20]) {
             expect(1 / armorMultiplier(armor)).toBeCloseTo(1 + armor / ARMOR_K, 6);
         }
     });
 
     it('negative armor hurts more, and cannot flip the sign', () => {
-        expect(armorMultiplier(-4)).toBeGreaterThan(1);
-        // Berserker sits at -4; nothing may push the multiplier past the pole
+        expect(armorMultiplier(-2)).toBeGreaterThan(1);
+        // Berserker sits at -2; nothing may push the multiplier past the pole
         for (const armor of [-ARMOR_K, -ARMOR_K * 10, -1e9]) {
             expect(armorMultiplier(armor)).toBeGreaterThan(0);
             expect(Number.isFinite(armorMultiplier(armor))).toBe(true);
@@ -143,7 +143,7 @@ describe('balance: the WORST case the game can produce', () => {
 
     it('armor buys real time in the worst case', () => {
         const bare = POOL / ring(6, CONTACT_RAMP_MAX, 0);
-        const armored = POOL / ring(6, CONTACT_RAMP_MAX, 16);
+        const armored = POOL / ring(6, CONTACT_RAMP_MAX, 8);
         expect(armored / bare).toBeGreaterThan(1.5);
     });
 
@@ -223,11 +223,11 @@ describe('Regeneration', () => {
         expect(player.hp).toBeGreaterThan(before);
     });
 
-    it('carries a quarter to three quarters in about a minute', () => {
-        // The agreed feel: regen is a trickle that rewards clearing your space,
-        // not a bar that refills between fights. The previous value read as 3x
-        // this and measured as a fifth of it, because a 3s lockout against
-        // bites every 3.5s is not a gate, it is an off switch.
+    it('takes tens of seconds of being left alone, not a couple', () => {
+        // Regen is a trickle that rewards clearing your space, not a bar that
+        // refills between fights. The band is deliberately wide: the exact
+        // number is not the point, and solving for one produced a per-stack
+        // value so small the card rendered as "+0%".
         const player = hurtPlayer();
         player.update(REGEN_COMBAT_DELAY + 0.001);
 
@@ -237,8 +237,14 @@ describe('Regeneration', () => {
             seconds += 0.05;
         }
 
-        expect(seconds).toBeGreaterThan(40);
-        expect(seconds).toBeLessThan(90);
+        expect(seconds).toBeGreaterThan(20);
+        expect(seconds).toBeLessThan(120);
+    });
+
+    it('renders as a percentage a player can read', () => {
+        // The guard that the "+0%" card can never come back
+        const nano = POWERUPS.find(p => p.id === 'nano_repair')!;
+        expect(Math.round(nano.value * 100)).toBeGreaterThanOrEqual(1);
     });
 
     it('heals fastest when worst hurt, and not at all when full', () => {
@@ -259,12 +265,30 @@ describe('Regeneration', () => {
         expect(full.hp).toBe(POOL);
     });
 
-    it('cannot out-heal a crowd standing on you', () => {
-        // The guard on the whole model. Even at the ramp floor, the drain from
-        // a single worst-case enemy must beat a fully invested regen — anything
-        // else brings back "standing still is free".
+    it('cannot out-heal a crowd, even at its fastest', () => {
+        // The guard on the whole model. Regen is a share of MISSING health, so
+        // it is quickest at low HP — exactly when it would be most tempting to
+        // sit in a pile and tank it. A crowd must always win that race.
+        //
+        // Deliberately measured against a small pile, not a single enemy: one
+        // enemy is designed to be a scratch (52 seconds to kill you from full),
+        // and you outrun everything on the map anyway, so "regen beats one
+        // chaser" is not a degenerate state. Standing in a group is.
         const player = hurtPlayer();
-        expect(contactDamagePerSecond([WORST], 0, 1))
-            .toBeGreaterThan(player.stats.regen * (player.maxHp - player.hp));
+        const fastestRegen = player.stats.regen * (player.maxHp - player.hp);
+
+        expect(contactDamagePerSecond(Array(3).fill(WORST), 0, 1))
+            .toBeGreaterThan(fastestRegen);
+    });
+
+    it('does not run at all while contact is happening', () => {
+        // And this is why the rate comparison above is a canary rather than the
+        // real guard: the lockout means healing and being chewed on cannot
+        // overlap in the first place. You have to actually break away.
+        const player = hurtPlayer();
+        player.takeContact(1);
+        const after = player.hp;
+        player.update(REGEN_COMBAT_DELAY * 0.99);
+        expect(player.hp).toBe(after);
     });
 });

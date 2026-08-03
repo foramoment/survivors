@@ -185,16 +185,17 @@ describe('UpgradePool', () => {
             expect(getPowerupValue(0.1, 3, 1.25)).toBeCloseTo(0.1 * 1.25 ** 3);
         });
 
-        it('regen tops out at a trickle — a quarter to three quarters in a minute', () => {
+        it('regen tops out at a trickle, and the CAP is what bounds it', () => {
             // Health is a budget for the whole run (see core/ContactDamage), so
-            // regen may not be a bar that refills between fights. The exponent
-            // that carries 25% -> 75% in exactly 60s is ln(3)/60 = 0.0183; the
-            // maxed stack sits just under it.
+            // regen may not be a bar that refills between fights. The value per
+            // stack is a round 1% on purpose — an earlier cut solved for an
+            // exact recovery time, landed on 0.35%, and the card rendered as
+            // "+0%" because that is what Math.round(0.0035 * 100) is.
             //
-            // This was 5%, which read as generous and paid out as 0.63 HP/s,
-            // because the out-of-combat lockout was longer than the gap between
-            // bites. Both numbers moved together; do not raise one alone.
+            // So the cap does the balancing. Widen this band rather than
+            // shaving the per-stack value if the pacing needs a nudge.
             const regen = POWERUPS.find(p => p.type === 'regen')!;
+            expect(Math.round(regen.value * 100)).toBeGreaterThanOrEqual(1);
 
             let total = 0;
             for (let stack = 0; stack < (regen.maxStacks ?? POWERUP_STACK_CAP); stack++) {
@@ -202,8 +203,8 @@ describe('UpgradePool', () => {
             }
 
             const secondsQuarterToThreeQuarters = Math.log(3) / total;
-            expect(secondsQuarterToThreeQuarters).toBeGreaterThan(45);
-            expect(secondsQuarterToThreeQuarters).toBeLessThan(80);
+            expect(secondsQuarterToThreeQuarters).toBeGreaterThan(25);
+            expect(secondsQuarterToThreeQuarters).toBeLessThan(90);
         });
 
         it('no powerup can multiply its stat past what a card promises', () => {

@@ -66,12 +66,13 @@
  * defensive build compounds instead of competing with itself. It also can never
  * reach immunity, so no floor constant is needed.
  *
- * K and every armour value in the game were divided by 4 together, which leaves
- * the curve bit-identical and the numbers readable: a class grants 1-4 armour
- * and a Void Shield stack is 2, instead of 16 and 8. Only the *ratio* to K
- * means anything, so if you retune this, scale the values in GameData with it.
+ * Only the **ratio** of armour to K means anything, so K is picked to make the
+ * numbers on the cards small and legible rather than to be a round 100: a class
+ * grants 1-2 armour and a Void Shield stack is 1, exactly the values these
+ * stats had back when armour was flat. If you retune K, scale every armour
+ * value in GameData with it or you have silently rebalanced the game.
  */
-export const ARMOR_K = 25;
+export const ARMOR_K = 10;
 
 /** Ceiling of the standing-still multiplier */
 export const CONTACT_RAMP_MAX = 2.5;
