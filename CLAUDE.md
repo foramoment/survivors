@@ -60,6 +60,67 @@ src/game/
 
 ---
 
+## 🔁 Как устроен один кадр
+
+Карта файлов выше отвечает «где что лежит», но не отвечает «что за чем идёт»,
+а именно это приходится восстанавливать в голове каждый раз. Порядок в
+`GameManager.update` — не случайный, в нём три места, где он уже был причиной
+багов.
+
+```
+Engine.loop
+  dt × juice.timeScale            (juice.update всегда получает РЕАЛЬНОЕ время)
+  ─ state !== PLAYING → выходим целиком (пауза не рисует ничего)
+  GameManager.update(dt)
+    │
+    1. player.update              ввод, движение, реген
+    2. propField.resolve(player)  выталкивание из препятствий
+    3. levelSpatialHash.clear/insertAll        ← ПЕРЕД оружиями
+    4. weapons.forEach(update)    наведение и спавн сущностей
+    5. enemy.speedMultiplier = hazardSpeed     ← сброс ПЕРЕД зонами
+       enemy.resetForces()
+    6. сепарация врагов (через хеш)
+    7. entities.update            снаряды, зоны, лучи
+                                  (здесь зоны домножают speedMultiplier)
+    8. enemies.update(playerPos)  движение = speed × speedMultiplier
+    9. CollisionSystem            попадания → damageSystem.dealDamage
+   10. contactDamagePerSecond     урон ИГРОКУ (см. ContactDamage)
+   11. status.update              тики DoT, откат стана
+   12. цикл смертей: killEcho → siphon → XP-кристалл
+   13. difficultyDirector.update  спавн, волны, события арены
+```
+
+**Три места, где порядок критичен:**
+
+1. **Хеш строится до оружий (шаг 3).** Когда он строился после, оружие целилось
+   по снимку прошлого кадра — а на первом кадре нового забега это были враги
+   **прошлого** забега, застывшие там, где умерли. Отсюда был баг «нажал старт,
+   и оружие сразу во что-то стреляет».
+2. **`speedMultiplier` сбрасывается до зон (шаг 5).** Поэтому зоны и чёрная дыра
+   просто *домножают* его, не заботясь об уборке за собой.
+3. **Урон игроку отдельно от урона врагам (шаг 10).** `damageSystem` — только
+   про врагов. Контакт идёт через `contactDamagePerSecond` +
+   `player.takeContactDamage`, без i-frames.
+
+**Путь одного удара**, если надо проследить цифру:
+
+```
+Weapon.update → onSpawn(entity) → GameManager.entities
+  → CollisionSystem видит пересечение
+  → damageSystem.dealDamage({ baseDamage, source, target })
+      × might (+ адреналин)  × GLOBAL_DAMAGE  × крит  × First Strike
+      × (1 + corrosion.amp)                       ← внутри applyDamage
+  → target.takeDamage → Enemy.isDead
+  → колбэк damage-number → RunStats.recordHit
+  → цикл смертей → killEcho / siphon / XP
+```
+
+`source` тащится через две ступени (снаряд → оружие → игрок), потому что
+`DamageSystem.getPlayer` ищет владельца именно так — если новый снаряд не
+проставил `source`, урон молча пойдёт без модификаторов.
+
+---
+
 ## 🎲 Ключевые системы
 
 ### DamageSystem (Singleton)
