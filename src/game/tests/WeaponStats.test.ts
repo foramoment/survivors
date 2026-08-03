@@ -27,9 +27,11 @@ const EXPECTED_STATS: Record<string, any> = {
     phantom_slash: {
         damage: 15,
         cooldown: 1.5,
-        // Down from 250, but not to 125: reach and the cone multiply, and at
-        // 125 the blade whiffed exactly when the crowd was thickest
-        area: 170,
+        // Most of the 250 it shipped with. It was cut to 125 to force "let them
+        // get close", which PRESSURE_CAP already pays for, and at that reach the
+        // cone left the blade whiffing when the crowd was thickest. See the
+        // weapon for the full argument.
+        area: 200,
         speed: 0,
         duration: 0.2,
         count: 3,

@@ -31,6 +31,7 @@ import {
     dischargeThreshold, dischargeRadius, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
     DISCHARGE_COOLDOWN, DISCHARGE_CHARGE_CAP,
     KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE, KILL_ECHO_BOSS_RESIST,
+    KILL_ECHO_KNOCKBACK, KILL_ECHO_PUNCH_GAP,
 } from './core/Tactics';
 import { screenManager } from '../engine/ui/ScreenManager';
 import { LevelUpOverlay } from './ui/screens/LevelUpOverlay';
@@ -119,6 +120,8 @@ export class GameManager {
     private capacitorCharge: number = 0;
     /** Internal cooldown left on Static Discharge (see DISCHARGE_COOLDOWN) */
     private dischargeCooldown: number = 0;
+    /** Gate on the Kill Echo camera kick (see KILL_ECHO_PUNCH_GAP) */
+    private echoPunchTimer: number = 0;
     /**
      * Contact damage banked since the last time a number was printed.
      *
@@ -207,6 +210,7 @@ export class GameManager {
         this.repairCells = [];
         this.capacitorCharge = 0;
         this.dischargeCooldown = 0;
+        this.echoPunchTimer = 0;
         this.contactPending = 0;
         this.contactPrintTimer = 0;
         this.damageNumbers.clear();
@@ -544,11 +548,37 @@ export class GameManager {
         const radius = KILL_ECHO_RADIUS * this.player.stats.area;
 
         particles.emitExplosion(enemy.pos.x, enemy.pos.y, radius, ['#ffd166', '#ff6b35', '#ffffff']);
-        juice.shockwave(enemy.pos.x, enemy.pos.y, radius * 1.5, '#ffb03c', 0.3, 4);
+        juice.shockwave(enemy.pos.x, enemy.pos.y, radius * 2, '#ffb03c', 0.28, 6);
+
+        // The blast has to be heard and felt, not just seen. Before this the
+        // echo drew particles and a thin ring and stopped there, so a perk sold
+        // as "things explode when they die" registered as health bars quietly
+        // dropping somewhere inside the pile.
+        //
+        // The sound is throttled inside AudioSystem; the camera kick needs its
+        // own gate, because kills arrive several a second late game and an
+        // ungated hit-stop would stutter every good clear. See
+        // KILL_ECHO_PUNCH_GAP.
+        audio.play('explosion');
+        if (this.echoPunchTimer <= 0) {
+            this.echoPunchTimer = KILL_ECHO_PUNCH_GAP;
+            juice.hitStop(0.035);
+            juice.addTrauma(0.14);
+        }
 
         for (const other of levelSpatialHash.getWithinRadius(enemy.pos, radius)) {
             if (other === enemy || other.isDead) continue;
-            if (distance(enemy.pos, other.pos) > radius) continue;
+            const gap = distance(enemy.pos, other.pos);
+            if (gap > radius) continue;
+
+            // Thrown outward, hardest at the epicentre. This is the part that
+            // makes the echo legible: you read the size and shape of the blast
+            // off how far the bodies went, which no amount of particles does.
+            const dx = other.pos.x - enemy.pos.x;
+            const dy = other.pos.y - enemy.pos.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const falloff = 1 - gap / radius;
+            other.applyKnockback(dx / len, dy / len, KILL_ECHO_KNOCKBACK * falloff);
             // A share of the target's CURRENT health, so the blast fades as it
             // weakens — see KILL_ECHO_DAMAGE_SHARE
             const share = other.isBoss ? KILL_ECHO_DAMAGE_SHARE * KILL_ECHO_BOSS_RESIST : KILL_ECHO_DAMAGE_SHARE;
@@ -655,6 +685,7 @@ export class GameManager {
         this.gameTime += dt;
         this.runStats.update(dt);
         if (this.dischargeCooldown > 0) this.dischargeCooldown -= dt;
+        if (this.echoPunchTimer > 0) this.echoPunchTimer -= dt;
         if (this.contactFxTimer > 0) this.contactFxTimer -= dt;
         this.waveTimer += dt;
 

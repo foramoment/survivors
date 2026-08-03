@@ -225,18 +225,27 @@ export class PhantomSlashWeapon extends Weapon {
     readonly stats = {
         damage: 15,
         cooldown: 1.5,
-        // 250 was too far — the "melee" weapon cut things most of a screen away
-        // and there was never a reason to let anything close. But 125 was too
-        // short, and the reason is a trap worth remembering: the search radius
-        // and the CONE multiply. At 125 the reach barely exceeded
-        // PRESSURE_RADIUS, so the only candidates were bodies already touching
-        // you, and then a 90-degree cone threw most of *those* away too. The
-        // blade whiffed exactly when the crowd was thickest — the opposite of
-        // what it is for.
+        // Most of the 250 this shipped with, after two corrections in the wrong
+        // direction and a play report that the blade "stopped being satisfying".
         //
-        // 170 keeps "let them get close" while leaving room for the cone (also
-        // widened, to 120 degrees) to actually find the pack.
-        area: 170,
+        // It went 250 -> 125 to stop a *melee* weapon cutting things most of a
+        // screen away, on the reasoning that long reach removed any reason to
+        // let enemies close. That reasoning was aimed at the wrong lever: the
+        // reason to let them close is PRESSURE_CAP, which pays up to +140%
+        // damage for bodies inside PRESSURE_RADIUS. Range and the
+        // let-them-close incentive are independent, and cutting range to
+        // enforce the incentive only took away the weapon's identity — reaching
+        // into a pack from a workable distance.
+        //
+        // 125 then had a second, mechanical problem worth remembering: the
+        // search radius and the CONE multiply. At 125 the reach barely exceeded
+        // PRESSURE_RADIUS, so the only candidates were bodies already touching
+        // you, and the cone threw most of *those* away too. The blade whiffed
+        // exactly when the crowd was thickest.
+        //
+        // 200 restores most of the reach; the cone (120 degrees) and the
+        // pressure bonus still do the work of keeping it a close-range weapon.
+        area: 200,
         speed: 0,
         duration: 0.2,
         count: 3,

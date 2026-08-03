@@ -100,6 +100,36 @@ export const KILL_ECHO_RADIUS = 62;
 /** Burn left on survivors, as a share of their own max HP per second */
 export const KILL_ECHO_BURN_SHARE = 0.05;
 
+/**
+ * How hard the blast throws the bodies it catches, at the epicentre.
+ *
+ * The echo was **inaudible and untouchable** before this: it drew particles and
+ * a thin ring and did nothing else, so the only evidence it had fired was
+ * health bars moving somewhere in the pile. A perk you buy for "things explode
+ * when they die" has to be felt, and the most direct way to feel an explosion
+ * is to watch it move things.
+ *
+ * Bigger than the 190 of a contact shove on purpose — a shove is a body leaning
+ * on you, this is a detonation. It falls off to nothing at the blast's edge, so
+ * the shape of the shockwave is legible in how far each body flew.
+ *
+ * It is also the one part of the echo with no balance risk attached: knockback
+ * deals no damage, cannot kill, and therefore cannot feed the cascade the
+ * non-lethal rule exists to prevent.
+ */
+export const KILL_ECHO_KNOCKBACK = 320;
+
+/**
+ * Minimum seconds between the echo's camera kick.
+ *
+ * Late game kills arrive several a second and the perk caps at six stacks, so
+ * an un-gated hit-stop would turn a good clear into a stutter. The sound has
+ * its own limiter inside AudioSystem (`explosion`, 0.1s); this one is for the
+ * part that touches time. The knockback and particles are deliberately NOT
+ * gated — those scale with what actually happened.
+ */
+export const KILL_ECHO_PUNCH_GAP = 0.18;
+
 /** Below this share of max HP the adrenal bonus is live */
 export const ADRENALINE_THRESHOLD = 0.35;
 
