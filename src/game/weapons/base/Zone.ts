@@ -124,12 +124,9 @@ export class Zone extends Entity {
         }
         ctx.fill();
 
-        ctx.globalAlpha = 1;
-        ctx.font = '20px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(this.emoji, 0, 0);
-
+        // No glyph in the middle. Every real zone overrides this method, so the
+        // base draw is a placeholder — and a placeholder that calls fillText
+        // teaches the wrong thing to the next zone that copies it.
         ctx.restore();
     }
 }
@@ -801,6 +798,9 @@ export class DelayedExplosionZone extends Zone {
             ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
             ctx.strokeStyle = this.isAtomic ? `rgba(255, 200, 0, ${0.5 + Math.sin(Date.now() / 100) * 0.2})` : `rgba(255, 100, 0, ${0.4 + progress * 0.4})`;
             ctx.lineWidth = 3;
+            // Telegraph, not decoration: this ring exists to be read as an
+            // instrument in the seconds BEFORE the shell lands.
+            // ast-grep-ignore: no-ui-in-arena
             ctx.setLineDash([10, 10]);
             ctx.stroke();
             ctx.restore();
@@ -898,12 +898,6 @@ export class DelayedExplosionZone extends Zone {
                 }
             }
 
-            if (this.isAtomic && progress > 0.3) {
-                ctx.font = 'bold 16px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillStyle = `rgba(255, 200, 0, ${Math.sin(Date.now() / 100) * 0.5 + 0.5})`;
-                ctx.fillText('☢️ NUCLEAR STRIKE INCOMING ☢️', 0, -this.radius - 30);
-            }
 
         } else {
             // Explosion phase
@@ -950,13 +944,6 @@ export class DelayedExplosionZone extends Zone {
                 ctx.fill();
             }
 
-            if (this.flashAlpha > 0.5) {
-                ctx.font = `${this.radius * 1.5}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.globalAlpha = this.flashAlpha;
-                ctx.fillText(this.emoji, 0, 0);
-            }
 
             // Atomic mushroom cloud
             if (this.isAtomic && this.flashAlpha > 0.1) {
@@ -1073,6 +1060,9 @@ export class MindBlastZone extends Zone {
             ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
             ctx.strokeStyle = `rgba(255, 0, 255, ${pulse})`;
             ctx.lineWidth = 2;
+            // The 'warning' stage IS the telegraph — it only draws before the
+            // blast charges
+            // ast-grep-ignore: no-ui-in-arena
             ctx.setLineDash([8, 4]);
             ctx.stroke();
             ctx.setLineDash([]);

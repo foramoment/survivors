@@ -1,0 +1,34 @@
+id: no-ui-in-arena
+language: TypeScript
+severity: warning
+message: Dashed line drawn into the arena
+note: >
+  CLAUDE.md, VFX rule 7: no UI inside the arena. A dashed ring on the floor is a
+  selection marker, and when the thing it outlines has faded it becomes the only
+  object left on screen. This exact shape has been removed four separate times —
+  from Fungal Bloom, from FrostZone, from the acid pool (twice, dashed then
+  solid) and from the black hole's lensing ring — because each time it was added
+  it looked reasonable in isolation.
+
+  If you need to say where an effect ends, let the effect end there: run the
+  gradient to zero alpha before the silhouette does, and tell the edge with
+  particles (particles.emitZoneEdge).
+
+  ONE exception, and it is a real distinction rather than a loophole:
+  **telegraphs are allowed to look like UI.** A targeting reticle that closes on
+  a spot before a shell lands is supposed to read as an instrument — that is the
+  "telegraph first, damage second" rule doing its job. A ring around something
+  that is *already happening* is not a telegraph, it is decoration. Suppress
+  those sites individually with `// ast-grep-ignore: no-ui-in-arena` and say why.
+files:
+  - "src/game/weapons/**"
+  - "src/game/entities/**"
+  - "src/game/core/ArenaEvents.ts"
+ignores:
+  # The dashed line to the cursor while dragging is a control affordance, not
+  # part of the arena's art
+  - "src/game/entities/Player.ts"
+  # Wall-to-wall telegraph: reticle, brackets and closing ring before impact
+  - "src/game/weapons/implementations/OrbitalStrikeWeapon.ts"
+rule:
+  pattern: $CTX.setLineDash([$A, $$$REST])

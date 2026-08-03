@@ -8,7 +8,10 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "lint:rules": "ast-grep scan",
+    "lint:css-vars": "node tools/check-css-vars.mjs",
+    "check": "npm run lint:rules && npm run lint:css-vars && npm run test && npm run build"
   },
   "devDependencies": {
     "typescript": "~5.9.3",

@@ -18,7 +18,9 @@
 .hud-pause:hover,
 .hud-pause:focus-visible {
   color: #fff;
-  box-shadow: 0 0 0 var(--px) #000, 0 0 0 calc(var(--px) * 2) var(--c-accent, #66f7ff);
+  /* Was `var(--c-accent, #66f7ff)`. There is no `--c-accent` token and there
+     never was, so the fallback is what has always rendered. */
+  box-shadow: 0 0 0 var(--px) #000, 0 0 0 calc(var(--px) * 2) #66f7ff;
   outline: none;
 }
 

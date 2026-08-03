@@ -1,0 +1,23 @@
+id: damage-through-system
+language: TypeScript
+severity: error
+message: Enemy damaged directly instead of through DamageSystem
+note: >
+  CLAUDE.md, rule 1: all damage to enemies goes through
+  `damageSystem.dealDamage`. Calling `takeDamage` on an enemy skips crit, might,
+  Adrenal Surge, First Strike, corrosion amplification and the damage-number
+  callback that feeds the run's best-hit record — silently, and only for that one
+  call site.
+
+  Use `damageSystem.dealDamage({ ... })`, with `skipModifiers: true` if the
+  amount is already final.
+files:
+  - "src/game/weapons/**"
+  - "src/game/core/**"
+ignores:
+  - "src/game/core/DamageSystem.ts"
+rule:
+  pattern: $ENEMY.takeDamage($$$ARGS)
+constraints:
+  ENEMY:
+    regex: "^(enemy|other|target|e)$"

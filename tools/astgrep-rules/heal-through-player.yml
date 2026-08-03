@@ -1,0 +1,29 @@
+id: heal-through-player
+language: TypeScript
+severity: error
+message: Player HP written directly instead of through Player.heal
+note: >
+  Every source of healing has to report itself, or the end-of-run "HP restored"
+  figure quietly lies. `Player.heal` also caps at the maximum and refuses to
+  count overheal, both of which a raw assignment gets wrong.
+
+  This is not hypothetical: repair cells were healing with
+  `player.hp = Math.min(player.maxHp, player.hp + cell.heal)` and were invisible
+  to the run summary until the stat was added and the assignment found.
+files:
+  - "src/game/**"
+ignores:
+  # `heal` itself lives here
+  - "src/game/entities/Player.ts"
+  # Tests set HP directly to build a scenario; that is not healing
+  - "src/game/tests/**"
+  # Run setup and the Barrier Field powerup raise max HP and fill the new
+  # headroom in the same breath. Neither is healing and neither can overheal.
+  - "src/game/GameManager.ts"
+rule:
+  any:
+    - pattern: $P.hp = $$$VALUE
+    - pattern: $P.hp += $$$VALUE
+constraints:
+  P:
+    regex: "[Pp]layer$"

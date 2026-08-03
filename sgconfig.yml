@@ -1,0 +1,11 @@
+# ast-grep project config.
+#
+# The rules in tools/astgrep-rules encode the design rules from CLAUDE.md that
+# are *structural code patterns*. Until now those were enforced by memory and by
+# looking at screenshots, which is how a dashed ring survived three separate
+# passes of "remove the UI from the arena" and how an emoji stayed inside a
+# per-frame render for months.
+#
+# Run: npm run lint:rules
+ruleDirs:
+  - tools/astgrep-rules

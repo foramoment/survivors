@@ -1,0 +1,18 @@
+id: no-text-in-arena
+language: TypeScript
+severity: error
+message: Text drawn into the arena with fillText
+note: >
+  CLAUDE.md, VFX rule 1: no emoji in the gameplay render, and rule 7: no UI in
+  the arena. `ctx.fillText` is the most expensive way to draw anything and it is
+  almost always an emoji standing in for art that was never made.
+
+  A `fillText('💣')` sat in the centre of every plasma blast for months and was
+  found by accident while reading neighbouring code. Draw shapes; for text that
+  genuinely belongs on the canvas (arena banners), use `drawPixelText` from
+  core/PixelFont.
+files:
+  - "src/game/weapons/**"
+  - "src/game/entities/**"
+rule:
+  pattern: $CTX.fillText($$$ARGS)

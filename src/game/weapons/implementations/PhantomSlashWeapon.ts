@@ -64,6 +64,9 @@ export class SlashArc extends Projectile {
             ctx.globalAlpha = 0.5 * fade * (1 - p * 0.5);
             ctx.strokeStyle = this.color;
             ctx.lineWidth = 2.5;
+            // A trail between two cuts, not a boundary around anything — it
+            // shows the path the blade travelled and fades with the swing
+            // ast-grep-ignore: no-ui-in-arena
             ctx.setLineDash([7, 6]);
             ctx.beginPath();
             ctx.moveTo(this.from.x - camera.x, this.from.y - camera.y);
@@ -185,16 +188,8 @@ export class DimensionalRiftZone extends Zone {
             ctx.stroke();
         }
 
-        // Event-horizon rim
-        ctx.globalAlpha = fade * 0.8;
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 6]);
-        ctx.lineDashOffset = this.spin * 12;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.95, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // No dashed rim. A rift is a hole, and a hole does not have a drawn
+        // border — the fill above already fades out where it ends.
 
         ctx.restore();
     }
@@ -210,7 +205,7 @@ export class DimensionalRiftZone extends Zone {
  * the opposite of what a defensive melee weapon should ask of you. Aiming is
  * automatic; the cone only decides how wide the cuts spread from there.
  */
-const HALF_ARC = Math.PI / 4;
+const HALF_ARC = Math.PI / 3;
 const HALF_ARC_EVOLVED = Math.PI * 0.39;
 /** Random rotation added to each cut so a volley fans out instead of stacking */
 const CUT_JITTER = 0.4;
@@ -230,11 +225,18 @@ export class PhantomSlashWeapon extends Weapon {
     readonly stats = {
         damage: 15,
         cooldown: 1.5,
-        // Halved from 250. At that reach the "melee" weapon was cutting things
-        // most of a screen away, so there was never a reason to let anything
-        // get close — which is the exact opposite of what a blade that scales
-        // with crowd pressure is asking you to do.
-        area: 125,
+        // 250 was too far — the "melee" weapon cut things most of a screen away
+        // and there was never a reason to let anything close. But 125 was too
+        // short, and the reason is a trap worth remembering: the search radius
+        // and the CONE multiply. At 125 the reach barely exceeded
+        // PRESSURE_RADIUS, so the only candidates were bodies already touching
+        // you, and then a 90-degree cone threw most of *those* away too. The
+        // blade whiffed exactly when the crowd was thickest — the opposite of
+        // what it is for.
+        //
+        // 170 keeps "let them get close" while leaving room for the cone (also
+        // widened, to 120 degrees) to actually find the pack.
+        area: 170,
         speed: 0,
         duration: 0.2,
         count: 3,

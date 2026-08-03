@@ -27,9 +27,9 @@ const EXPECTED_STATS: Record<string, any> = {
     phantom_slash: {
         damage: 15,
         cooldown: 1.5,
-        // Halved: a melee weapon reaching most of a screen gave you no reason
-        // to ever let anything close, which is what it scales on
-        area: 125,
+        // Down from 250, but not to 125: reach and the cone multiply, and at
+        // 125 the blade whiffed exactly when the crowd was thickest
+        area: 170,
         speed: 0,
         duration: 0.2,
         count: 3,

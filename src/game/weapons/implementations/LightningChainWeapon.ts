@@ -78,16 +78,10 @@ export class StaticFieldZone extends Zone {
         ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Rotating containment ring
-        ctx.globalAlpha = 0.75 * fade;
-        ctx.strokeStyle = '#8fd8ff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 7]);
-        ctx.lineDashOffset = -this.spin * 18;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.92, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // The "rotating containment ring" that used to be here was a dashed
+        // circle on the floor — the shape we have removed from four other zones
+        // for reading as a selection marker. The arcs below say "charged"
+        // better than an outline ever did.
 
         // Crackling arcs inside the field
         ctx.globalAlpha = fade;
