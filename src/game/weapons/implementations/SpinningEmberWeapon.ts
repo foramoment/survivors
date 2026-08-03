@@ -43,6 +43,26 @@ export { BurningTrailZone };
  */
 const MISSING_HP_SCALE = 1.6;
 
+/**
+ * The sweet spot: hits landing inside this share of the reach bite for
+ * SWEET_SPOT_BONUS instead of the flat number.
+ *
+ * A sweep that does the same damage everywhere asks nothing of the player —
+ * you stand at maximum range and it is always correct. Putting the power on
+ * the *inside* of the arc inverts that: the strongest swing is the one thrown
+ * with the crowd already on top of you, which is the position every other part
+ * of this class is built around (negative armour, the adrenaline threshold,
+ * damage that scales with missing health). Now the weapon asks for it too.
+ *
+ * The blade is drawn with a bright inner band and a faint outer one, so the
+ * rule is legible without a single word of UI.
+ */
+const SWEET_SPOT_RATIO = 0.62;
+const SWEET_SPOT_BONUS = 1.65;
+
+/** Most burning patches one Ruin swing may leave, however many it cut */
+const MAX_FIRES = 3;
+
 // ============================================
 // CLEAVE ARC - the visual of one swing
 // ============================================
@@ -98,19 +118,29 @@ export class CleaveArc extends Entity {
         // The crescent travels the full circle over the swing
         const head = t * Math.PI * 2.2;
         const tail = Math.max(0, head - 2.6);
-        // Sized so the *outer* edge of the band lands on `reach` at the end of
-        // the swing — the blur has to stop where the damage stops, or the swing
-        // keeps missing things it visibly covered
-        const r = this.reach * (0.55 + 0.28 * t);
 
         // Hotter the more wounded the swing was — the read is "this one hurt"
         const glow = `rgba(255, ${Math.round(120 - 70 * this.hot)}, ${Math.round(90 - 60 * this.hot)}, `;
 
         ctx.lineCap = 'butt';
-        ctx.strokeStyle = `${glow}${(0.6 * alpha).toFixed(3)})`;
-        ctx.lineWidth = this.reach * 0.34;
+
+        // OUTER band — everything from the sweet spot out to the tip. Thin and
+        // dim on purpose: this is where the blade does least.
+        const outerMid = this.reach * (SWEET_SPOT_RATIO + 1) / 2;
+        ctx.strokeStyle = `${glow}${(0.28 * alpha).toFixed(3)})`;
+        ctx.lineWidth = this.reach * (1 - SWEET_SPOT_RATIO);
         ctx.beginPath();
-        ctx.arc(0, 0, r, tail, head);
+        ctx.arc(0, 0, outerMid * (0.94 + 0.06 * t), tail, head);
+        ctx.stroke();
+
+        // INNER band — the sweet spot, drawn as the solid body of the blade.
+        // Damage lives here, so brightness does too; the player never has to be
+        // told the rule, they can see where the swing is thick.
+        const innerMid = this.reach * SWEET_SPOT_RATIO * 0.66;
+        ctx.strokeStyle = `${glow}${(0.75 * alpha).toFixed(3)})`;
+        ctx.lineWidth = this.reach * SWEET_SPOT_RATIO * 0.72;
+        ctx.beginPath();
+        ctx.arc(0, 0, innerMid, tail, head);
         ctx.stroke();
 
         // One shadowBlur pass for the whole effect, on the leading edge only
@@ -119,7 +149,7 @@ export class CleaveArc extends Entity {
         ctx.shadowColor = `${glow}1)`;
         ctx.shadowBlur = 12;
         ctx.beginPath();
-        ctx.arc(0, 0, r, Math.max(tail, head - 0.9), head);
+        ctx.arc(0, 0, this.reach * (0.55 + 0.28 * t), Math.max(tail, head - 0.9), head);
         ctx.stroke();
         ctx.shadowBlur = 0;
 
@@ -204,6 +234,7 @@ export class SpinningEmberWeapon extends Weapon {
     private swing(hot: number, scale: number = 1) {
         const reach = this.reach();
         const multiplier = (1 + hot * MISSING_HP_SCALE) * scale;
+        const inner = reach * SWEET_SPOT_RATIO;
 
         const arc = new CleaveArc(this.owner, reach, hot);
         this.onSpawn(arc);
@@ -211,11 +242,18 @@ export class SpinningEmberWeapon extends Weapon {
             ['#ffdccc', '#ff6b35', '#b32020'], 5);
 
         let struck = 0;
+        /** Where the swing bit deepest — Ruin throws its fire onto these */
+        const scorched: Vector2[] = [];
+
         for (const enemy of levelSpatialHash.getWithinRadius(this.owner.pos, reach)) {
-            if (enemy.isDead || distance(this.owner.pos, enemy.pos) > reach) continue;
+            if (enemy.isDead) continue;
+            const dist = distance(this.owner.pos, enemy.pos);
+            if (dist > reach) continue;
+
+            const sweet = dist <= inner;
 
             damageSystem.dealDamage({
-                baseDamage: this.damage * multiplier,
+                baseDamage: this.damage * multiplier * (sweet ? SWEET_SPOT_BONUS : 1),
                 source: this,
                 target: enemy,
                 position: enemy.pos,
@@ -223,12 +261,14 @@ export class SpinningEmberWeapon extends Weapon {
 
             const dx = enemy.pos.x - this.owner.pos.x;
             const dy = enemy.pos.y - this.owner.pos.y;
-            const len = Math.hypot(dx, dy) || 1;
+            const len = dist || 1;
             enemy.applyKnockback(dx / len, dy / len, SpinningEmberWeapon.KNOCKBACK);
 
             if (struck < 4) {
                 struck++;
-                particles.emitHit(enemy.pos.x, enemy.pos.y, '#ff6b35');
+                // The inner band throws a hotter, heavier spray — the only
+                // in-arena tell that this hit landed on the blade, not the tip
+                particles.emitHit(enemy.pos.x, enemy.pos.y, sweet ? '#fff0b0' : '#ff6b35');
             }
 
             if (this.evolved) {
@@ -238,20 +278,35 @@ export class SpinningEmberWeapon extends Weapon {
                     source: this,
                     kind: 'burn',
                 });
+                // Spread the fires around the swing instead of taking the first
+                // three the spatial hash happens to hand back — those come out
+                // of one bucket, so all three landed in a heap on one side
+                if (sweet && scorched.length < MAX_FIRES) {
+                    const spacing = reach * 0.55;
+                    const clear = scorched.every(s => distance(s, enemy.pos) > spacing);
+                    if (clear) scorched.push({ x: enemy.pos.x, y: enemy.pos.y });
+                }
             }
         }
 
-        // Ruin scorches the ground it swept
+        // Ruin sets alight what it CUT, not the ground it stood on.
+        //
+        // The fire used to be one patch centred on the player, which put a
+        // permanent bonfire under your own feet and read as self-immolation
+        // rather than as a weapon. It now lands where the blade bit, so it is
+        // the crowd that burns and the fire marks where the crowd was.
         if (this.evolved) {
-            const fire = new BurningTrailZone(
-                this.owner.pos.x, this.owner.pos.y,
-                reach * 0.8,
-                1.8 * this.owner.stats.duration,
-                this.damage * 0.1,
-            );
-            fire.burnDps = this.damage * 0.16;
-            fire.source = this;
-            this.onSpawn(fire);
+            for (const spot of scorched) {
+                const fire = new BurningTrailZone(
+                    spot.x, spot.y,
+                    reach * 0.42,
+                    1.8 * this.owner.stats.duration,
+                    this.damage * 0.1,
+                );
+                fire.burnDps = this.damage * 0.16;
+                fire.source = this;
+                this.onSpawn(fire);
+            }
         }
     }
 }

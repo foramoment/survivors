@@ -30,6 +30,69 @@ export interface RunSummaryData {
     stats: RunStats;
     weaponLevels: Map<string, number>;
     powerupLevels: Map<string, number>;
+    /** For the copy-to-clipboard dump */
+    stageName: string;
+    className: string;
+    playerStats: Record<string, number>;
+    maxHp: number;
+}
+
+/**
+ * The whole run as plain text, for pasting into a balance discussion.
+ *
+ * This exists because reading a build off a screenshot is lossy — the icons are
+ * emoji, the stacks are tiny badges, and the derived numbers (kills per second,
+ * healing per second, damage per kill) are the ones that actually say whether a
+ * build was broken, and none of them are on screen at all.
+ */
+function runAsText(d: RunSummaryData): string {
+    const perSecond = (n: number) => (d.seconds > 0 ? n / d.seconds : 0).toFixed(1);
+
+    const weapons = [...d.weaponLevels]
+        .map(([id, level]) => {
+            const w = WEAPONS.find(x => x.id === id);
+            const name = w ? (level >= 6 ? w.evolution.name : w.name) : id;
+            return `  ${name} ${level >= 6 ? '(evolved)' : `lv${level}`}`;
+        })
+        .join('\n');
+
+    const perks = [...d.powerupLevels]
+        .map(([name, stacks]) => {
+            const p = POWERUPS.find(x => x.name === name);
+            return `  ${name} x${stacks}${p ? ` (${p.type})` : ''}`;
+        })
+        .join('\n');
+
+    const stats = Object.entries(d.playerStats)
+        .filter(([, v]) => typeof v === 'number' && v !== 0)
+        .map(([k, v]) => `  ${k}: ${Math.round(v * 1000) / 1000}`)
+        .join('\n');
+
+    return [
+        `SURVIVORS — ${d.variant === 'victory' ? 'VICTORY' : 'DEFEAT'}`,
+        `${d.stageName} · ${d.className}`,
+        '',
+        `time         ${formatTime(d.seconds)}`,
+        `level        ${d.level}`,
+        `kills        ${d.kills}  (${perSecond(d.kills)}/s)`,
+        `score        ${d.score}${d.rank > 0 ? `  (rank ${d.rank})` : ''}`,
+        `max HP       ${Math.round(d.maxHp)}`,
+        '',
+        `damage       ${Math.round(d.stats.totalDamage)}  (${perSecond(d.stats.totalDamage)}/s)`,
+        `best hit     ${Math.round(d.stats.bestHit)}${d.stats.bestHitCrit ? ' (crit)' : ''}`,
+        `healed       ${Math.round(d.stats.totalHealed)}  (${perSecond(d.stats.totalHealed)}/s)`,
+        `untouched    ${formatTime(d.stats.longestUntouched)}`,
+        `best combo   x${d.stats.bestMultikill}`,
+        '',
+        'WEAPONS',
+        weapons || '  (none)',
+        '',
+        'PERKS',
+        perks || '  (none)',
+        '',
+        'STATS',
+        stats || '  (defaults)',
+    ].join('\n');
 }
 
 /**
@@ -185,6 +248,27 @@ export function showRunSummary(uiLayer: HTMLElement, data: RunSummaryData) {
     buttons.appendChild(again);
     buttons.appendChild(menu);
     screen.appendChild(buttons);
+
+    // Copy the run as text. Secondary on purpose — it sits under the two real
+    // choices and does not compete with them.
+    const copy = document.createElement('button');
+    copy.className = 'pixel-btn pixel-btn--ghost interactive result-copy';
+    copy.textContent = t('result.copyStats');
+    copy.addEventListener('pointerenter', () => audio.play('uiHover'));
+    copy.onclick = async () => {
+        audio.play('uiSelect');
+        try {
+            await navigator.clipboard.writeText(runAsText(data));
+            copy.textContent = t('result.copied');
+        } catch {
+            // Clipboard needs a secure context and permission; if it is denied
+            // there is still somewhere useful to put the text
+            console.log(runAsText(data));
+            copy.textContent = t('result.copiedConsole');
+        }
+        setTimeout(() => { copy.textContent = t('result.copyStats'); }, 2000);
+    };
+    screen.appendChild(copy);
 
     const credit = document.createElement('div');
     credit.className = 'menu-credit';

@@ -9,6 +9,7 @@
 
 import { audio } from '../../core/AudioSystem';
 import { juice } from '../../core/JuiceSystem';
+import { damageNumberSettings } from '../../core/DamageNumbers';
 import { i18n, t, LANGUAGES } from '../../core/I18n';
 
 export type SettingsChannel = 'master' | 'sfx' | 'music';
@@ -70,6 +71,40 @@ export function createJuiceToggle(): HTMLElement {
 }
 
 /**
+ * Toggle for the floating damage numbers.
+ *
+ * They are merged rather than stacked (see core/DamageNumbers), which fixes
+ * most of the clutter — but reading a fight with no digits at all is a real
+ * preference, and in a bullet-heaven the numbers are the thing most likely to
+ * hide the gap you are trying to walk through.
+ */
+export function createDamageNumberToggle(): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'option-row interactive';
+
+    const text = document.createElement('span');
+    text.className = 'option-label';
+    text.textContent = `🔢 ${t('options.damageNumbers')}`;
+
+    const btn = document.createElement('button');
+    btn.className = 'pixel-btn interactive';
+    btn.style.flex = '1';
+    const render = () => {
+        btn.textContent = damageNumberSettings.enabled ? t('common.on') : t('common.off');
+    };
+    render();
+    btn.onclick = () => {
+        damageNumberSettings.set(!damageNumberSettings.enabled);
+        render();
+        audio.play('uiSelect');
+    };
+
+    row.appendChild(text);
+    row.appendChild(btn);
+    return row;
+}
+
+/**
  * Language picker. Every label on screen is built in the screen's enter(), so
  * switching fires i18n's change listeners and the host rebuilds itself — this
  * control does not try to patch the DOM around it.
@@ -113,5 +148,6 @@ export function createSettingsPanel(compact: boolean = false): HTMLElement {
     panel.appendChild(createVolumeSlider(`💥 ${t('options.sfx')}`, 'sfx'));
     panel.appendChild(createVolumeSlider(`🎵 ${t('options.music')}`, 'music'));
     panel.appendChild(createJuiceToggle());
+    panel.appendChild(createDamageNumberToggle());
     return panel;
 }

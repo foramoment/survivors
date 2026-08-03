@@ -21,6 +21,7 @@ import { STAGES, type StageConfig } from './data/StageData';
 import { audio } from './core/AudioSystem';
 import { juice } from './core/JuiceSystem';
 import { getPowerupValue, POWERUP_STACK_CAP } from './core/UpgradePool';
+import { clampStats } from './core/PlayerStats';
 import { contactDamagePerSecond } from './core/ContactDamage';
 import { computeScore, submitScore } from './core/Score';
 import { RunStatsTracker } from './core/RunStats';
@@ -28,6 +29,7 @@ import { achievements, type RunSnapshot } from './core/Achievements';
 import { RepairCell } from './entities/RepairCell';
 import {
     dischargeThreshold, DISCHARGE_RADIUS, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
+    DISCHARGE_COOLDOWN, DISCHARGE_CHARGE_CAP,
     KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE, KILL_ECHO_BOSS_RESIST,
 } from './core/Tactics';
 import { screenManager } from './ui/ScreenManager';
@@ -109,6 +111,8 @@ export class GameManager {
     private contactDamageBank: number = 0;
     /** Absorbed damage banked toward the next Static Discharge */
     private capacitorCharge: number = 0;
+    /** Internal cooldown left on Static Discharge (see DISCHARGE_COOLDOWN) */
+    private dischargeCooldown: number = 0;
     repairCells: RepairCell[] = [];
 
     /**
@@ -186,6 +190,7 @@ export class GameManager {
         this.crystals.clear();
         this.repairCells = [];
         this.capacitorCharge = 0;
+        this.dischargeCooldown = 0;
         this.damageNumbers.clear();
         this.killCount = 0;
         this.killScore = 0;
@@ -385,15 +390,29 @@ export class GameManager {
     /**
      * Static Discharge: the capacitor is charged by the damage you absorb, so
      * the perk is strongest exactly when being surrounded is about to kill you.
+     *
+     * Gated by an internal cooldown as well as by the charge threshold. Charge
+     * alone is not a rate limit — a late-game crowd feeds the capacitor far
+     * faster than it costs, so the perk fired every few frames and its
+     * knockback turned into a permanent field holding the arena at arm's
+     * length. See DISCHARGE_COOLDOWN.
      */
     private chargeCapacitor(dps: number, dt: number) {
         if (!this.player || this.player.stats.discharge <= 0) return;
 
-        this.capacitorCharge += dps * dt;
         const threshold = dischargeThreshold(this.player.stats.discharge);
+        // Charge banks during the cooldown — absorbed damage is never wasted —
+        // but not without limit, or the window ends in a burst of discharges
+        this.capacitorCharge = Math.min(
+            this.capacitorCharge + dps * dt,
+            threshold * DISCHARGE_CHARGE_CAP,
+        );
+
+        if (this.dischargeCooldown > 0) return;
         if (this.capacitorCharge < threshold) return;
 
         this.capacitorCharge = 0;
+        this.dischargeCooldown = DISCHARGE_COOLDOWN;
         const radius = DISCHARGE_RADIUS * this.player.stats.area;
         const damage = DISCHARGE_DAMAGE * this.player.stats.discharge;
 
@@ -526,10 +545,10 @@ export class GameManager {
             (this.player.stats as any)[opt.type] += value;
         }
 
-        // Backstop only: the powerup caps keep cooldown at 0.60, and only a
-        // long Storm Mage run can push it lower. Zone tick intervals scale with
-        // this stat too, so it must never reach zero.
-        if (this.player.stats.cooldown < 0.25) this.player.stats.cooldown = 0.25;
+        // Backstops only — see STAT_LIMITS. The powerup caps keep cooldown at
+        // 0.60 on their own and only a long Storm Mage run pushes it lower;
+        // crit chance is the one a class can carry past its ceiling by itself.
+        clampStats(this.player.stats as any);
 
         // Special handling for maxHp
         if (opt.type === 'maxHp') {
@@ -554,6 +573,7 @@ export class GameManager {
 
         this.gameTime += dt;
         this.runStats.update(dt);
+        if (this.dischargeCooldown > 0) this.dischargeCooldown -= dt;
         this.waveTimer += dt;
 
         // Parallax layers drift with the camera (frozen while paused)
@@ -883,6 +903,12 @@ export class GameManager {
             stats: this.runStats.stats,
             weaponLevels: this.weaponLevels,
             powerupLevels: this.powerupLevels,
+            // Raw English, not the localised label: this dump is read next to
+            // the code, where everything is called by its English name
+            stageName: this.currentStage.name,
+            className: this.player?.className ?? '',
+            playerStats: { ...(this.player?.stats ?? {}) } as Record<string, number>,
+            maxHp: this.player?.maxHp ?? 0,
         });
     }
 

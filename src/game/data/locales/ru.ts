@@ -37,6 +37,7 @@ export const RU: Record<string, string> = {
     'options.sfx': 'Эффекты',
     'options.music': 'Музыка',
     'options.screenFx': 'Эффекты экрана',
+    'options.damageNumbers': 'Цифры урона',
     'options.language': 'Язык',
 
     'pause.title': 'ПАУЗА',
@@ -74,6 +75,9 @@ export const RU: Record<string, string> = {
     'result.healed': 'HP ВОССТАНОВЛЕНО',
     'result.build': 'ТВОЙ БИЛД',
     'result.again': '↻ ЕЩЁ РАЗ',
+    'result.copyStats': '📋 СКОПИРОВАТЬ СТАТЫ',
+    'result.copied': '✓ СКОПИРОВАНО',
+    'result.copiedConsole': '✓ В КОНСОЛЬ',
     'result.menu': '⌂ ГЛАВНОЕ МЕНЮ',
 
     'hud.level': 'УР {n}',
@@ -181,9 +185,9 @@ export const RU: Record<string, string> = {
     'weapon.lightning_chain.evoDesc': 'Более медленные дуги оставляют трещащие поля статики',
 
     'weapon.spinning_ember.name': 'Кровавый Тесак',
-    'weapon.spinning_ember.desc': 'Тяжёлый размах, который бьёт тем сильнее, чем меньше у тебя HP',
+    'weapon.spinning_ember.desc': 'Тяжёлый размах. Бьёт сильнее вблизи и тем сильнее, чем меньше у тебя HP',
     'weapon.spinning_ember.evoName': 'Разорение',
-    'weapon.spinning_ember.evoDesc': 'Размах приходит дважды и выжигает землю под ногами',
+    'weapon.spinning_ember.evoDesc': 'Размах приходит дважды и поджигает тех, кого разрубил',
 
     'weapon.frost_nova.name': 'Ледяная Новая',
     'weapon.frost_nova.desc': 'Стужа, брошенная в самую гущу толпы — всё в ней еле ползёт',

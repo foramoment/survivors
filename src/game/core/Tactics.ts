@@ -26,6 +26,29 @@ export const DISCHARGE_DAMAGE = 34;
 export const DISCHARGE_KNOCKBACK = 420;
 
 /**
+ * Internal cooldown, in seconds — the capacitor cannot fire again inside this
+ * window however fast it refills.
+ *
+ * The charge threshold alone was not a rate limit. Standing inside a late-game
+ * crowd absorbs damage far faster than 26 HP/s per stack, so the perk fired
+ * every few frames and the knockback became a permanent field pushing the whole
+ * arena away. That is the failure mode every proc in an ARPG eventually finds,
+ * and the standard fix is the one used here: charge keeps accumulating during
+ * the window (nothing you absorbed is wasted), it simply cannot *discharge*
+ * until the window is up.
+ */
+export const DISCHARGE_COOLDOWN = 3.5;
+
+/**
+ * Ceiling on stored charge, as a multiple of the firing threshold.
+ *
+ * Without it the capacitor banks the whole cooldown window and then fires
+ * several times back-to-back the moment it opens — the same burst, just
+ * delayed.
+ */
+export const DISCHARGE_CHARGE_CAP = 1.5;
+
+/**
  * Kill Echo's blast, as a fraction of **the CURRENT HP of each enemy it hits**.
  *
  * Three designs, and the reasoning for landing here:

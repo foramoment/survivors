@@ -358,12 +358,12 @@ export const WEAPONS = [
         id: 'spinning_ember',
         name: "Blood Cleaver",
         emoji: "🔥",
-        description: "A heavy sweep that hits harder the more health you are missing",
+        description: "A heavy sweep. Hits harder up close, and harder still the more health you are missing",
         class: SpinningEmberWeapon,
         evolution: {
             name: "Ruin",
             emoji: "🌋",
-            description: "The sweep lands twice and leaves the ground burning"
+            description: "The sweep lands twice and sets what it cuts alight"
         }
     },
     {

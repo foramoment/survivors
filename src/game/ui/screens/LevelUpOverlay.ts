@@ -185,6 +185,9 @@ export class LevelUpOverlay {
             weaponLevels: this.host.weaponLevels,
             powerupLevels: this.host.powerupLevels,
             classId: this.host.player?.classId,
+            // Lets the pool drop perks that have hit a hard ceiling — a
+            // Berserker at 100% crit should stop being shown Targeting HUD
+            stats: this.host.player?.stats as any,
             count,
         });
 

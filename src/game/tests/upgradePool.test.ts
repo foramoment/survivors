@@ -290,3 +290,34 @@ describe('Player XP curve', () => {
         expect(costs[20]).toBeLessThan(500);
     });
 });
+
+describe('Stat ceilings', () => {
+    it('crit chance can never pass certainty, however it is raised', () => {
+        const player = new Player(0, 0);
+        player.onLevelUp = () => { };
+        // A Berserker gains +1% crit per level and reaches 100% on class growth
+        // alone around level 35 — this is what a long run actually does
+        player.perLevel = { stat: 'critChance', value: 0.01 };
+        for (let i = 0; i < 200; i++) player.levelUp();
+        expect(player.stats.critChance).toBe(1);
+    });
+
+    it('stops offering a perk whose stat is already maxed', () => {
+        const atCap = buildUpgradeOptions({
+            weaponLevels: new Map(),
+            powerupLevels: new Map(),
+            stats: { critChance: 1 },
+            count: 40,
+        });
+        expect(atCap.some(o => o.type === 'powerup' && o.data.type === 'critChance')).toBe(false);
+
+        // ...and still offers it below the cap, so the filter is not a blanket
+        const below = buildUpgradeOptions({
+            weaponLevels: new Map(),
+            powerupLevels: new Map(),
+            stats: { critChance: 0.9 },
+            count: 40,
+        });
+        expect(below.some(o => o.type === 'powerup' && o.data.type === 'critChance')).toBe(true);
+    });
+});

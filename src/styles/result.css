@@ -5,6 +5,16 @@
 .result-screen {
   gap: 6px;
   animation: crash-zoom 300ms cubic-bezier(0.2, 1.3, 0.35, 1) both;
+
+  /* A long build can outgrow a short window — `.screen` is `overflow: hidden`,
+     so the panel was simply clipped, and because it is centred the clipping
+     took the TITLE off the top. `safe center` keeps it centred while it fits
+     and falls back to start-aligned once it does not, which is the whole point
+     of the keyword: plain `center` in a scrollable box puts the overflow above
+     the scroll origin, where it is unreachable. */
+  justify-content: safe center;
+  overflow-y: auto;
+  padding-block: 3vh;
 }
 
 .result-screen--defeat {
@@ -207,3 +217,15 @@
   max-width: min(560px, 88vw);
 }
 
+
+/* Copy-run-stats: a utility, not a choice. Deliberately quieter and smaller
+   than "play again" / "main menu" so it never competes with them. */
+.result-copy {
+  font-size: 0.62em;
+  padding: 0.5em 1.2em;
+  opacity: 0.75;
+}
+
+.result-copy:hover {
+  opacity: 1;
+}

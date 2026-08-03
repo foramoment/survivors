@@ -33,6 +33,7 @@ export const EN: Record<string, string> = {
     'options.sfx': 'Effects',
     'options.music': 'Music',
     'options.screenFx': 'Screen FX',
+    'options.damageNumbers': 'Damage numbers',
     'options.language': 'Language',
 
     'pause.title': 'PAUSED',
@@ -70,6 +71,9 @@ export const EN: Record<string, string> = {
     'result.healed': 'HP RESTORED',
     'result.build': 'YOUR BUILD',
     'result.again': '↻ PLAY AGAIN',
+    'result.copyStats': 'Copy run stats',
+    'result.copied': 'Copied',
+    'result.copiedConsole': 'Sent to console',
     'result.menu': '⌂ MAIN MENU',
 
     'hud.level': 'LVL {n}',

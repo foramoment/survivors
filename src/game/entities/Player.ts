@@ -5,6 +5,7 @@ import { Weapon } from '../Weapon';
 import { sprites } from '../core/SpriteFactory';
 import { adrenalineMultiplier } from '../core/Tactics';
 import type { ClassPerLevel } from '../data/GameData';
+import { clampStats } from '../core/PlayerStats';
 
 export class Player extends Entity {
     /**
@@ -300,8 +301,8 @@ export class Player extends Entity {
         if (this.perLevel.stat in stats) {
             stats[this.perLevel.stat] += this.perLevel.value;
         }
-        // Stacked cooldown growth must not go degenerate
-        if (this.stats.cooldown < 0.25) this.stats.cooldown = 0.25;
+        // Cooldown must not go degenerate, crit chance must not exceed certainty
+        clampStats(stats);
     }
 
     gainXp(amount: number) {

@@ -459,3 +459,45 @@ describe('Phantom Slash cone', () => {
         expect(hitsAtAngle(true)).toBe(true);
     });
 });
+
+describe('Blood Cleaver sweet spot', () => {
+    /** Damage the cleaver deals to one enemy standing `dist` away */
+    function hitAt(dist: number): number {
+        const player = new Player(0, 0);
+        const weapon = new SpinningEmberWeapon(player);
+        weapon.onSpawn = () => { };
+        const enemy = makeEnemy(dist, 0);
+        placeEnemies([enemy]);
+
+        const spy = vi.spyOn(damageSystem, 'dealDamage')
+            .mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
+        weapon.update(0.1);
+        const dealt = (spy.mock.calls[0]?.[0] as any)?.baseDamage ?? 0;
+        spy.mockRestore();
+        return dealt;
+    }
+
+    it('bites harder on the inside of the arc than at the tip', () => {
+        // area is 110, so ~68px is the sweet spot edge
+        const close = hitAt(30);
+        const tip = hitAt(100);
+        expect(close).toBeGreaterThan(tip);
+    });
+
+    it('leaves its fire on what it cut, never under the player', () => {
+        const player = new Player(0, 0);
+        const weapon = new SpinningEmberWeapon(player);
+        weapon.evolved = true;
+        const spawned: Entity[] = [];
+        weapon.onSpawn = e => spawned.push(e);
+        // A body well off to one side, inside the sweet spot
+        placeEnemies([makeEnemy(50, 0)]);
+
+        weapon.update(0.1);
+        const fires = spawned.filter(e => e instanceof BurningTrailZone);
+        expect(fires.length).toBeGreaterThan(0);
+        for (const fire of fires) {
+            expect(Math.hypot(fire.pos.x, fire.pos.y)).toBeGreaterThan(20);
+        }
+    });
+});

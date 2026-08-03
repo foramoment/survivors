@@ -10,6 +10,7 @@ import { damageSystem } from '../../core/DamageSystem';
 import { levelSpatialHash } from '../../core/SpatialHash';
 import { juice } from '../../core/JuiceSystem';
 import { status } from '../../core/StatusEffects';
+import { PixelFire } from '../../core/PixelFire';
 
 // ============================================
 // ZONE - Base class for area damage
@@ -388,8 +389,8 @@ export class AcidZone extends Zone {
  * the beam path.
  */
 export class BurningTrailZone extends Zone {
-    /** Baked once: flames only bob, they never move to a new spot */
-    private readonly flames: { x: number; y: number; scale: number; phase: number }[] = [];
+    /** All the flame geometry, baked once — see core/PixelFire */
+    private readonly fire: PixelFire;
     private readonly maxDuration: number;
     private age: number = 0;
     burnDps: number = 0;
@@ -399,17 +400,7 @@ export class BurningTrailZone extends Zone {
         this.maxDuration = duration;
         // Fire spreads while it burns
         this.growOver(0.55, 1);
-
-        for (let i = 0; i < 4; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * radius * 0.6;
-            this.flames.push({
-                x: Math.cos(angle) * dist,
-                y: Math.sin(angle) * dist * 0.7,
-                scale: 0.6 + Math.random() * 0.6,
-                phase: Math.random() * Math.PI * 2,
-            });
-        }
+        this.fire = new PixelFire(radius);
     }
 
     update(dt: number) {
@@ -435,32 +426,17 @@ export class BurningTrailZone extends Zone {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
         ctx.scale(this.growScale, this.growScale);
+        ctx.imageSmoothingEnabled = false;
 
-        const fade = Math.max(0, Math.min(1, this.duration / (this.maxDuration * 0.5)));
+        // Heat, not opacity, is what runs out. A fire that simply goes
+        // transparent looks like a rendering bug; one that sinks into its own
+        // embers over the last third of its life looks like a fire going out.
+        const left = Math.max(0, Math.min(1, this.duration / this.maxDuration));
+        const heat = Math.min(1, left / 0.34);
+        const alpha = Math.min(1, left / 0.12);
 
-        const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, this.baseRadius);
-        glow.addColorStop(0, `rgba(255, 150, 50, ${0.45 * fade})`);
-        glow.addColorStop(0.5, `rgba(255, 80, 20, ${0.26 * fade})`);
-        glow.addColorStop(1, 'rgba(200, 50, 0, 0)');
-        ctx.beginPath();
-        ctx.arc(0, 0, this.baseRadius, 0, Math.PI * 2);
-        ctx.fillStyle = glow;
-        ctx.fill();
+        this.fire.draw(ctx, { x: 0, y: 0 }, this.age, alpha, heat);
 
-        // Chunky pixel flames — cheaper and more on-style than gradient tongues
-        for (const flame of this.flames) {
-            const flicker = 1 + Math.sin(this.age * 12 + flame.phase) * 0.25;
-            const p = Math.max(2, Math.round(3 * flame.scale * flicker));
-            ctx.globalAlpha = fade;
-            ctx.fillStyle = '#ff5a1e';
-            ctx.fillRect(flame.x - p, flame.y - p, p * 2, p * 2);
-            ctx.fillStyle = '#ffb23c';
-            ctx.fillRect(flame.x - p / 2, flame.y - p * 1.6, p, p * 1.6);
-            ctx.fillStyle = '#fff0b0';
-            ctx.fillRect(flame.x - 1, flame.y - p * 1.8, 2, p * 0.8);
-        }
-
-        ctx.globalAlpha = 1;
         ctx.restore();
     }
 }
