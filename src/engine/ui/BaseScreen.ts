@@ -12,7 +12,7 @@
  *   - Use this.uiLayer for DOM manipulation
  */
 
-import { audio } from '../core/AudioSystem';
+import { audio } from '../AudioSystem';
 
 export interface ScreenParams {
     [key: string]: any;

@@ -3,8 +3,8 @@
  * Abstract weapon types for projectile and zone weapons.
  */
 import { Weapon } from '../../Weapon';
-import { Entity } from '../../Entity';
-import type { Vector2 } from '../../core/Utils';
+import { Entity } from '../../../engine/Entity';
+import type { Vector2 } from '../../../engine/Utils';
 import { Projectile } from './Projectile';
 import { Zone } from './Zone';
 

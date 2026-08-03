@@ -1,6 +1,6 @@
-import { Entity } from '../Entity';
-import { type Vector2, normalize, distance } from '../core/Utils';
-import { input } from '../core/Input';
+import { Entity } from '../../engine/Entity';
+import { type Vector2, normalize, distance } from '../../engine/Utils';
+import { input } from '../../engine/Input';
 import { Weapon } from '../Weapon';
 import { sprites } from '../core/SpriteFactory';
 import { adrenalineMultiplier } from '../core/Tactics';

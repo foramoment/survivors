@@ -1,7 +1,7 @@
-import { Entity } from './Entity';
+import { Entity } from '../engine/Entity';
 import type { Player } from './entities/Player';
-import { type Vector2, distance, normalize } from './core/Utils';
-import { levelSpatialHash } from './core/SpatialHash';
+import { type Vector2, distance, normalize } from '../engine/Utils';
+import { levelSpatialHash } from '../engine/SpatialHash';
 
 /**
  * WEAPON BASE CLASS

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../core/ParticleSystem', () => ({
+vi.mock('../../engine/ParticleSystem', () => ({
     particles: {
         emitLightning: vi.fn(),
         emit: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock('../core/DamageSystem', () => ({
     },
 }));
 
-vi.mock('../core/SpatialHash', () => ({
+vi.mock('../../engine/SpatialHash', () => ({
     levelSpatialHash: {
         getWithinRadius: vi.fn(() => []),
         getNearby: vi.fn(() => []),
@@ -24,7 +24,7 @@ vi.mock('../core/SpatialHash', () => ({
 
 import { LightningChainWeapon, StaticFieldZone } from '../weapons/implementations/LightningChainWeapon';
 import { ChainLightning } from '../weapons/base';
-import { levelSpatialHash } from '../core/SpatialHash';
+import { levelSpatialHash } from '../../engine/SpatialHash';
 import { damageSystem } from '../core/DamageSystem';
 
 function makeOwner(): any {

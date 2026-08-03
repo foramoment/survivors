@@ -17,12 +17,12 @@
  */
 import { ProjectileWeapon, SingularityProjectile, Zone } from '../base';
 import type { Player } from '../../entities/Player';
-import { Entity } from '../../Entity';
-import { distance, normalize, type Vector2 } from '../../core/Utils';
-import { levelSpatialHash } from '../../core/SpatialHash';
+import { Entity } from '../../../engine/Entity';
+import { distance, normalize, type Vector2 } from '../../../engine/Utils';
+import { levelSpatialHash } from '../../../engine/SpatialHash';
 import { damageSystem } from '../../core/DamageSystem';
-import { particles } from '../../core/ParticleSystem';
-import { juice } from '../../core/JuiceSystem';
+import { particles } from '../../../engine/ParticleSystem';
+import { juice } from '../../../engine/JuiceSystem';
 
 /** Fraction of the pull radius that counts as inside the horizon */
 const HORIZON_RATIO = 0.42;

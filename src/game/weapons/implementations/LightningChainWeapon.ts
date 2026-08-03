@@ -15,10 +15,10 @@
 import { Weapon } from '../../Weapon';
 import { ChainLightning, Zone } from '../base';
 import type { Player } from '../../entities/Player';
-import { type Vector2 } from '../../core/Utils';
-import { particles } from '../../core/ParticleSystem';
+import { type Vector2 } from '../../../engine/Utils';
+import { particles } from '../../../engine/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
-import { juice } from '../../core/JuiceSystem';
+import { juice } from '../../../engine/JuiceSystem';
 
 // ============================================
 // STATIC FIELD - lingering AoE left by Thunderstorm

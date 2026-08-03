@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // Input creates DOM elements (joystick) at module load — stub it out
-vi.mock('../core/Input', () => ({
+vi.mock('../../engine/Input', () => ({
     input: {
         getAxis: () => ({ x: 0, y: 0 }),
         isMouseDown: false,

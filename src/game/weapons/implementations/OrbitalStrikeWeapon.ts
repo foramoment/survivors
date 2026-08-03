@@ -11,10 +11,10 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import type { Vector2 } from '../../core/Utils';
+import type { Vector2 } from '../../../engine/Utils';
 import { DelayedExplosionZone } from '../base';
-import { particles } from '../../core/ParticleSystem';
-import { juice } from '../../core/JuiceSystem';
+import { particles } from '../../../engine/ParticleSystem';
+import { juice } from '../../../engine/JuiceSystem';
 
 // ============================================
 // ORBITAL STRIKE ZONE - targeting + impact visuals

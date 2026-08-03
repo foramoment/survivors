@@ -16,13 +16,13 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import { type Vector2, distance } from '../../core/Utils';
+import { type Vector2, distance } from '../../../engine/Utils';
 import { LobbedProjectile, FrostZone, Zone } from '../base';
-import { particles } from '../../core/ParticleSystem';
-import { levelSpatialHash } from '../../core/SpatialHash';
+import { particles } from '../../../engine/ParticleSystem';
+import { levelSpatialHash } from '../../../engine/SpatialHash';
 import { damageSystem } from '../../core/DamageSystem';
 import { status } from '../../core/StatusEffects';
-import { juice } from '../../core/JuiceSystem';
+import { juice } from '../../../engine/JuiceSystem';
 
 /** How far the weapon looks for a crowd to freeze */
 const SEARCH_RANGE = 460;

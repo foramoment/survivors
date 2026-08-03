@@ -22,10 +22,10 @@
  * appears and then closes for good, so a continuous stream cannot pin one digit
  * in place forever; it flies off and the next hit opens a fresh one.
  */
-import type { Vector2 } from './Utils';
-import { drawPixelText } from './PixelFont';
-import { audio } from './AudioSystem';
-import { juice } from './JuiceSystem';
+import type { Vector2 } from '../../engine/Utils';
+import { drawPixelText } from '../../engine/PixelFont';
+import { audio } from '../../engine/AudioSystem';
+import { juice } from '../../engine/JuiceSystem';
 
 /** Glyph height of the pixel font, for stacking the hit counter above a total */
 const GLYPH_HEIGHT = 7;

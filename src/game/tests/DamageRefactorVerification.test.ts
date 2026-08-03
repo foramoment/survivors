@@ -13,7 +13,7 @@ vi.mock('../entities/Player', () => ({
     }
 }));
 
-vi.mock('../core/Input', () => ({
+vi.mock('../../engine/Input', () => ({
     input: {
         getAxis: () => ({ x: 0, y: 0 }),
         isMouseDown: false,
@@ -21,14 +21,14 @@ vi.mock('../core/Input', () => ({
     }
 }));
 
-vi.mock('../core/SpatialHash', () => ({
+vi.mock('../../engine/SpatialHash', () => ({
     levelSpatialHash: {
         remove: vi.fn(),
         update: vi.fn()
     }
 }));
 
-vi.mock('../core/ParticleSystem', () => ({
+vi.mock('../../engine/ParticleSystem', () => ({
     particles: {
         emitHit: vi.fn(),
         emitText: vi.fn()

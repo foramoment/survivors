@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StatusSystem } from '../core/StatusEffects';
 import { Enemy } from '../entities/Enemy';
-import { levelSpatialHash } from '../core/SpatialHash';
+import { levelSpatialHash } from '../../engine/SpatialHash';
 import { damageSystem } from '../core/DamageSystem';
 
 const TYPE = { name: 'Void Bat', hp: 100, speed: 100, damage: 5, xpValue: 1, emoji: '🦇' };

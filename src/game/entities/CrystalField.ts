@@ -8,8 +8,8 @@
  */
 import { XPCrystal } from './XPCrystal';
 import type { Player } from './Player';
-import { checkCollision, type Vector2 } from '../core/Utils';
-import { audio } from '../core/AudioSystem';
+import { checkCollision, type Vector2 } from '../../engine/Utils';
+import { audio } from '../../engine/AudioSystem';
 
 /**
  * Margin beyond the viewport within which a crystal still ticks and draws.

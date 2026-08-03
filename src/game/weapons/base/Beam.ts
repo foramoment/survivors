@@ -6,9 +6,9 @@
  * weapons/implementations/VoidRayWeapon.SweepingLance) and nothing else ever
  * used that class, so it is gone rather than left as a decoy.
  */
-import { type Vector2, distance } from '../../core/Utils';
+import { type Vector2, distance } from '../../../engine/Utils';
 import { Projectile } from './Projectile';
-import { levelSpatialHash } from '../../core/SpatialHash';
+import { levelSpatialHash } from '../../../engine/SpatialHash';
 
 // ============================================
 // BEAM - Simple visual beam (no collision)

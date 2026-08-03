@@ -1,7 +1,7 @@
-import { BaseScreen } from '../BaseScreen';
+import { BaseScreen } from '../../../engine/ui/BaseScreen';
 import { CLASSES, WEAPONS } from '../../data/GameData';
-import { screenManager } from '../ScreenManager';
-import { audio } from '../../core/AudioSystem';
+import { screenManager } from '../../../engine/ui/ScreenManager';
+import { audio } from '../../../engine/AudioSystem';
 import { t } from '../../core/I18n';
 import { classLabel, classBonus, weaponName } from '../../core/Labels';
 import { sprites } from '../../core/SpriteFactory';

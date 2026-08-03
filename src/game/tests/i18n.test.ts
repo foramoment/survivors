@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { i18n, t, tf, LANGUAGES } from '../core/I18n';
 import { EN } from '../data/locales/en';
 import { RU } from '../data/locales/ru';
-import { hasPixelGlyph } from '../core/PixelFont';
+import { hasPixelGlyph } from '../../engine/PixelFont';
 import { CLASSES, POWERUPS, WEAPONS } from '../data/GameData';
 import { STAGES } from '../data/StageData';
 import {

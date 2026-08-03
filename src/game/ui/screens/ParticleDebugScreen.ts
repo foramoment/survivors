@@ -7,9 +7,9 @@
  *   - Proper layering (controls overlay on canvas)
  */
 
-import { BaseScreen } from '../BaseScreen';
-import { screenManager } from '../ScreenManager';
-import { particles } from '../../core/ParticleSystem';
+import { BaseScreen } from '../../../engine/ui/BaseScreen';
+import { screenManager } from '../../../engine/ui/ScreenManager';
+import { particles } from '../../../engine/ParticleSystem';
 
 interface EffectButton {
     name: string;

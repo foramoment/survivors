@@ -7,12 +7,12 @@
  * - Delegates hit handling to projectiles (encapsulation)
  * - Emits events for side effects (particles, damage numbers)
  */
-import { Entity } from '../Entity';
+import { Entity } from '../../engine/Entity';
 import { Projectile } from '../weapons/base/Projectile';
 import { Zone } from '../weapons/base/Zone';
-import { levelSpatialHash } from './SpatialHash';
+import { levelSpatialHash } from '../../engine/SpatialHash';
 import { damageSystem } from './DamageSystem';
-import { events } from './EventBus';
+import { events } from '../../engine/EventBus';
 
 // ============================================
 // COLLISION HELPERS

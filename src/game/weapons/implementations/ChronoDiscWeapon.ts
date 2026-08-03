@@ -19,9 +19,9 @@
  */
 import { ProjectileWeapon, BouncingProjectile } from '../base';
 import type { Player } from '../../entities/Player';
-import { Entity } from '../../Entity';
-import { type Vector2 } from '../../core/Utils';
-import { particles } from '../../core/ParticleSystem';
+import { Entity } from '../../../engine/Entity';
+import { type Vector2 } from '../../../engine/Utils';
+import { particles } from '../../../engine/ParticleSystem';
 import { status } from '../../core/StatusEffects';
 import type { HitResult } from '../../core/CollisionSystem';
 

@@ -9,7 +9,7 @@
  */
 
 import { GameManager } from '../GameManager';
-import { screenManager } from '../ui/ScreenManager';
+import { screenManager } from '../../engine/ui/ScreenManager';
 import { MainMenuScreen } from '../ui/screens/MainMenuScreen';
 import { ClassSelectionScreen } from '../ui/screens/ClassSelectionScreen';
 import { GameScreen } from '../ui/screens/GameScreen';
@@ -20,7 +20,7 @@ import { StageSelectionScreen } from '../ui/screens/StageSelectionScreen';
 import { RecordsScreen } from '../ui/screens/RecordsScreen';
 import { AchievementsScreen } from '../ui/screens/AchievementsScreen';
 import { menuBackdrop } from '../ui/MenuBackdrop';
-import { juice } from './JuiceSystem';
+import { juice } from '../../engine/JuiceSystem';
 import { i18n } from './I18n';
 
 export class Engine {

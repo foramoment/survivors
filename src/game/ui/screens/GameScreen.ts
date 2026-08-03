@@ -10,7 +10,7 @@
  * The actual game logic remains in GameManager, this screen handles UI lifecycle.
  */
 
-import { BaseScreen } from '../BaseScreen';
+import { BaseScreen } from '../../../engine/ui/BaseScreen';
 import { HUD, type HUDData } from '../components/HUD';
 import { BuildPanel } from '../components/BuildPanel';
 import { AchievementToast } from '../components/AchievementToast';

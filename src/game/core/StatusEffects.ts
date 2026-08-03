@@ -23,9 +23,9 @@
  */
 
 import { damageSystem } from './DamageSystem';
-import { levelSpatialHash } from './SpatialHash';
-import { particles } from './ParticleSystem';
-import { distance } from './Utils';
+import { levelSpatialHash } from '../../engine/SpatialHash';
+import { particles } from '../../engine/ParticleSystem';
+import { distance } from '../../engine/Utils';
 import type { Enemy } from '../entities/Enemy';
 
 /** Seconds between damage ticks — also how often damage numbers appear */

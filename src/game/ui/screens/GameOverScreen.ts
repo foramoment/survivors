@@ -2,8 +2,8 @@
  * GAME OVER SCREEN - Displayed when player dies
  */
 
-import { BaseScreen } from '../BaseScreen';
-import { screenManager } from '../ScreenManager';
+import { BaseScreen } from '../../../engine/ui/BaseScreen';
+import { screenManager } from '../../../engine/ui/ScreenManager';
 import { t } from '../../core/I18n';
 
 export interface GameOverParams {

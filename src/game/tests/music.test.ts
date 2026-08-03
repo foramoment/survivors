@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PROGRESSIONS, SECTIONS, FORM } from '../core/AudioSystem';
+import { PROGRESSIONS, SECTIONS, FORM } from '../../engine/AudioSystem';
 
 /**
  * The tracker reads drum patterns by index, so a 15- or 17-character string

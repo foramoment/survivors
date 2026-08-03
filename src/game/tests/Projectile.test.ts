@@ -18,14 +18,14 @@ import {
 } from '../weapons/base/Projectile';
 
 // Mock dependencies
-vi.mock('../core/ParticleSystem', () => ({
+vi.mock('../../engine/ParticleSystem', () => ({
     particles: {
         emitSingularityDistortion: vi.fn(),
         emitPlasmaEnergy: vi.fn()
     }
 }));
 
-vi.mock('../core/SpatialHash', () => ({
+vi.mock('../../engine/SpatialHash', () => ({
     levelSpatialHash: {
         getWithinRadius: vi.fn(() => [])
     }

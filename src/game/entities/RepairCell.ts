@@ -1,5 +1,5 @@
-import { Entity } from '../Entity';
-import { type Vector2, normalize, distance } from '../core/Utils';
+import { Entity } from '../../engine/Entity';
+import { type Vector2, normalize, distance } from '../../engine/Utils';
 import { REPAIR_HEAL, REPAIR_LIFETIME } from '../core/Tactics';
 
 /**

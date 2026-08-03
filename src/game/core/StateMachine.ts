@@ -7,7 +7,7 @@
  *   stateMachine.transition('LEVEL_UP');
  *   if (stateMachine.isPaused()) return; // Skip game logic
  */
-import { events } from './EventBus';
+import { events } from '../../engine/EventBus';
 
 export type GameState = 'MENU' | 'PLAYING' | 'PAUSED' | 'LEVEL_UP' | 'GAME_OVER';
 

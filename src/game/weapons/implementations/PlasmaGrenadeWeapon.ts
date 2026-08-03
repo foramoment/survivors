@@ -23,11 +23,11 @@
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
 import { LobbedProjectile, PlasmaExplosionZone, BurningTrailZone } from '../base';
-import { particles } from '../../core/ParticleSystem';
-import { juice } from '../../core/JuiceSystem';
+import { particles } from '../../../engine/ParticleSystem';
+import { juice } from '../../../engine/JuiceSystem';
 import { status } from '../../core/StatusEffects';
-import { levelSpatialHash } from '../../core/SpatialHash';
-import { distance } from '../../core/Utils';
+import { levelSpatialHash } from '../../../engine/SpatialHash';
+import { distance } from '../../../engine/Utils';
 
 /** Chain explosions allowed per detonation (evolved only) */
 const MAX_CHAINS = 3;

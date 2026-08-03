@@ -7,9 +7,9 @@
  * the buttons, which need real hit-testing and focus handling.
  */
 
-import { BaseScreen } from '../BaseScreen';
-import { screenManager } from '../ScreenManager';
-import { drawPixelText, measurePixelText, PIXEL_GLYPH_HEIGHT } from '../../core/PixelFont';
+import { BaseScreen } from '../../../engine/ui/BaseScreen';
+import { screenManager } from '../../../engine/ui/ScreenManager';
+import { drawPixelText, measurePixelText, PIXEL_GLYPH_HEIGHT } from '../../../engine/PixelFont';
 import { t } from '../../core/I18n';
 import { AUTHOR_CREDIT } from '../../core/Credits';
 

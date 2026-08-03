@@ -10,11 +10,11 @@
 import { WEAPONS, POWERUPS } from '../../data/GameData';
 import type { RunStats } from '../../core/RunStats';
 import { formatScore } from '../../core/Score';
-import { formatTime } from '../../core/Utils';
-import { audio } from '../../core/AudioSystem';
+import { formatTime } from '../../../engine/Utils';
+import { audio } from '../../../engine/AudioSystem';
 import { t } from '../../core/I18n';
 import { weaponName, weaponEvoName, powerupName } from '../../core/Labels';
-import { screenManager } from '../ScreenManager';
+import { screenManager } from '../../../engine/ui/ScreenManager';
 import { AUTHOR_CREDIT } from '../../core/Credits';
 
 export interface RunSummaryData {

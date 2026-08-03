@@ -19,8 +19,8 @@
 
 import { STAGES, type StageConfig, type StageVisuals } from '../data/StageData';
 import { sprites } from './SpriteFactory';
-import { juice } from './JuiceSystem';
-import type { Vector2 } from './Utils';
+import { juice } from '../../engine/JuiceSystem';
+import type { Vector2 } from '../../engine/Utils';
 
 const FAR_PARALLAX = 0.22;
 const NEAR_PARALLAX = 1.45;

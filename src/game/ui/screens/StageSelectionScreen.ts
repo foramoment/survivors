@@ -3,10 +3,10 @@
  * Carries classIndex/devMode through to the game screen.
  */
 
-import { BaseScreen } from '../BaseScreen';
+import { BaseScreen } from '../../../engine/ui/BaseScreen';
 import { STAGES } from '../../data/StageData';
-import { screenManager } from '../ScreenManager';
-import { audio } from '../../core/AudioSystem';
+import { screenManager } from '../../../engine/ui/ScreenManager';
+import { audio } from '../../../engine/AudioSystem';
 import { t } from '../../core/I18n';
 import { stageName, stageDesc } from '../../core/Labels';
 

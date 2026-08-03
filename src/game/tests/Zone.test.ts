@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Zone, NanobotCloud, DelayedExplosionZone, MindBlastZone } from '../weapons/base/Zone';
 
 // Mock dependencies
-vi.mock('../core/ParticleSystem', () => ({
+vi.mock('../../engine/ParticleSystem', () => ({
     particles: {
         emitNanoSwarm: vi.fn(),
         emitOrbitalStrike: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('../core/ParticleSystem', () => ({
     }
 }));
 
-vi.mock('../core/SpatialHash', () => ({
+vi.mock('../../engine/SpatialHash', () => ({
     levelSpatialHash: {
         getWithinRadius: vi.fn(() => [])
     }
@@ -35,7 +35,7 @@ vi.mock('../core/DamageSystem', () => ({
     }
 }));
 
-import { levelSpatialHash } from '../core/SpatialHash';
+import { levelSpatialHash } from '../../engine/SpatialHash';
 import { damageSystem } from '../core/DamageSystem';
 
 describe('Zone', () => {

@@ -24,11 +24,11 @@
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
 import { BurningTrailZone } from '../base';
-import { Entity } from '../../Entity';
-import { type Vector2, distance } from '../../core/Utils';
-import { particles } from '../../core/ParticleSystem';
+import { Entity } from '../../../engine/Entity';
+import { type Vector2, distance } from '../../../engine/Utils';
+import { particles } from '../../../engine/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
-import { levelSpatialHash } from '../../core/SpatialHash';
+import { levelSpatialHash } from '../../../engine/SpatialHash';
 import { status } from '../../core/StatusEffects';
 
 export { BurningTrailZone };

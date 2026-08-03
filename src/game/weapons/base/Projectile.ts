@@ -2,11 +2,11 @@
  * BASE PROJECTILE CLASSES
  * Extracted from WeaponTypes.ts for better AI context management.
  */
-import { Entity } from '../../Entity';
+import { Entity } from '../../../engine/Entity';
 import type { Weapon } from '../../Weapon';
-import { type Vector2, normalize, distance } from '../../core/Utils';
-import { particles } from '../../core/ParticleSystem';
-import { levelSpatialHash } from '../../core/SpatialHash';
+import { type Vector2, normalize, distance } from '../../../engine/Utils';
+import { particles } from '../../../engine/ParticleSystem';
+import { levelSpatialHash } from '../../../engine/SpatialHash';
 import { damageSystem } from '../../core/DamageSystem';
 import { sprites, type ThrownKind } from '../../core/SpriteFactory';
 

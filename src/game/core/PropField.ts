@@ -17,7 +17,7 @@
 
 import { STAGES, type StageConfig, type StageProps } from '../data/StageData';
 import { sprites } from './SpriteFactory';
-import type { Vector2 } from './Utils';
+import type { Vector2 } from '../../engine/Utils';
 
 const CHUNK = 520;
 /** Nothing spawns within this radius of the world origin (player start) */

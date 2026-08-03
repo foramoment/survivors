@@ -1,5 +1,5 @@
-import { Entity } from '../Entity';
-import { type Vector2, normalize, distance } from '../core/Utils';
+import { Entity } from '../../engine/Entity';
+import { type Vector2, normalize, distance } from '../../engine/Utils';
 import { sprites, type EnemyTint } from '../core/SpriteFactory';
 import type { Infection, Corrosion, InfectionKind } from '../core/StatusEffects';
 import { BITE_INTERVAL } from '../core/ContactDamage';

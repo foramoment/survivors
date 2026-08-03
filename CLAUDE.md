@@ -7,7 +7,21 @@
 ## 📁 Структура проекта
 
 ```
-src/game/
+src/engine/               # ⚙️ ДВИЖОК — не знает про Survivors вообще
+├── Entity.ts             # Базовая сущность (pos, radius, layer)
+├── Utils.ts              # Vector2, distance, normalize, formatTime
+├── SpatialHash.ts        # 🗺️ Поиск сущностей O(1)
+├── EventBus.ts           # Pub/sub
+├── Input.ts + Joystick.ts# WASD/мышь/тач
+├── JuiceSystem.ts        # 💥 Тряска, hit-stop, вспышки, zoom, ударные волны
+├── ParticleSystem.ts     # ✨ Частицы
+├── PixelFont.ts          # 🔤 Битмап-шрифт 5×7 (латиница + кириллица)
+├── PixelFire.ts          # 🔥 Процедурное пламя
+├── AudioSystem.ts        # 🔊 Чиптюн Web Audio
+├── DebugOverlay.ts       # FPS и счётчики
+└── ui/                   # BaseScreen (+ createPixelButton), ScreenManager
+
+src/game/                 # 🎮 СОБСТВЕННО SURVIVORS
 ├── GameManager.ts        # 🎯 Забег: game loop, спавн, столкновения, смерти
 ├── Weapon.ts             # Базовый абстрактный класс оружия
 ├── Entity.ts             # Базовая сущность (pos, radius, layer)
@@ -27,14 +41,8 @@ src/game/
 │   ├── StatusEffects.ts  # 🍄 Дебаффы на врагах: infection (DoT, заразный) и stun
 │   ├── I18n.ts           # 🌐 Языки (en/ru): t() для UI, tf() для игровых данных
 │   ├── Labels.ts         # 🏷️ Отображаемые имена оружий/классов/бонусов/стейджей
-│   ├── PixelFont.ts      # 🔤 Битмап-шрифт 5×7 в коде (латиница + кириллица)
-│   ├── AudioSystem.ts    # 🔊 Процедурный чиптюн Web Audio (SFX + генеративная музыка)
-│   ├── JuiceSystem.ts    # 💥 Game feel: тряска, hit-stop, вспышки, zoom, ударные волны
 │   ├── StateMachine.ts   # Состояния игры: PLAYING, LEVEL_UP, PAUSED
-│   ├── EventBus.ts       # Pub/sub система событий
-│   ├── PlayerStats.ts    # Типы и дефолты статов
-│   ├── Input.ts          # WASD/мышь/тач ввод
-│   └── Utils.ts          # Vector2, distance, normalize
+│   └── PlayerStats.ts    # Типы, дефолты и потолки статов
 ├── data/
 │   ├── GameData.ts       # 📊 Конфиг: классы, powerups, враги, оружия
 │   ├── CharacterSprites.ts # 🧍 По одному пиксельному шаблону на каждого из 6 персонажей
@@ -62,6 +70,18 @@ src/game/
         ├── RunSummaryOverlay.ts # Итоги забега (чистая функция от снимка)
         └── PauseOverlay.ts      # Пауза + настройки, разворачиваемые на месте
 ```
+
+**`src/engine/` — это отдельный движок, а не папка.** ~3400 строк, которые
+ничего не знают про Survivors, плюс дизайн-система в `src/styles/`. Границу
+сторожит `npm run lint:engine`: **ничто в `engine/` не имеет права импортировать
+из `game/`**. Проверка заодно отвечает на вопрос «а это движок?» — если файл не
+проходит, он не движок, и его надо либо вернуть, либо развернуть зависимость
+(игра регистрируется в движке, не наоборот).
+
+Ещё не перенесено, у каждого ровно одна связь с игрой: `Engine` (импортирует
+`GameManager`), `I18n` (локали), `CollisionSystem` (`instanceof` Projectile/Zone
+вместо проверки способности), `SpriteFactory` (шаблоны персонажей),
+`PropField` и `StageBackdrop` (`StageData`).
 
 **Оверлеи вынесены из GameManager** (был 1942 строки, половина — DOM).
 Экран уровня берёт `GameManager` как **живой** host-интерфейс, а не снимок:

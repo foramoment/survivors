@@ -23,10 +23,10 @@
  */
 import { ProjectileWeapon, Projectile, Zone, type ProjectileParams } from '../base';
 import type { Player } from '../../entities/Player';
-import { type Vector2, distance, normalize } from '../../core/Utils';
-import { levelSpatialHash } from '../../core/SpatialHash';
-import { particles } from '../../core/ParticleSystem';
-import { juice } from '../../core/JuiceSystem';
+import { type Vector2, distance, normalize } from '../../../engine/Utils';
+import { levelSpatialHash } from '../../../engine/SpatialHash';
+import { particles } from '../../../engine/ParticleSystem';
+import { juice } from '../../../engine/JuiceSystem';
 
 /** How far the weapon looks for something to shoot */
 const RANGE = 520;

@@ -20,11 +20,11 @@
  */
 import { ProjectileWeapon, PlasmaProjectile, Projectile, type ProjectileParams } from '../base';
 import type { Player } from '../../entities/Player';
-import type { Entity } from '../../Entity';
-import { type Vector2 } from '../../core/Utils';
-import { particles } from '../../core/ParticleSystem';
+import type { Entity } from '../../../engine/Entity';
+import { type Vector2 } from '../../../engine/Utils';
+import { particles } from '../../../engine/ParticleSystem';
 import { status } from '../../core/StatusEffects';
-import { juice } from '../../core/JuiceSystem';
+import { juice } from '../../../engine/JuiceSystem';
 import type { HitResult } from '../../core/CollisionSystem';
 
 // ============================================

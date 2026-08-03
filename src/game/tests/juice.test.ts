@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { JuiceSystem } from '../core/JuiceSystem';
-import { measurePixelText, drawPixelText } from '../core/PixelFont';
+import { JuiceSystem } from '../../engine/JuiceSystem';
+import { measurePixelText, drawPixelText } from '../../engine/PixelFont';
 
 /** Minimal 2D-context stand-in — enough to prove the draw paths don't throw */
 function mockCtx() {

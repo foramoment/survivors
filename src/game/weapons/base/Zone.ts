@@ -2,15 +2,15 @@
  * BASE ZONE CLASSES
  * Extracted from WeaponTypes.ts for better AI context management.
  */
-import { Entity } from '../../Entity';
+import { Entity } from '../../../engine/Entity';
 import type { Weapon } from '../../Weapon';
-import { type Vector2, distance } from '../../core/Utils';
-import { particles } from '../../core/ParticleSystem';
+import { type Vector2, distance } from '../../../engine/Utils';
+import { particles } from '../../../engine/ParticleSystem';
 import { damageSystem } from '../../core/DamageSystem';
-import { levelSpatialHash } from '../../core/SpatialHash';
-import { juice } from '../../core/JuiceSystem';
+import { levelSpatialHash } from '../../../engine/SpatialHash';
+import { juice } from '../../../engine/JuiceSystem';
 import { status } from '../../core/StatusEffects';
-import { PixelFire } from '../../core/PixelFire';
+import { PixelFire } from '../../../engine/PixelFire';
 
 // ============================================
 // ZONE - Base class for area damage

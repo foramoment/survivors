@@ -19,12 +19,12 @@
 
 import { t } from './I18n';
 import { damageSystem } from './DamageSystem';
-import { levelSpatialHash } from './SpatialHash';
-import { particles } from './ParticleSystem';
-import { juice } from './JuiceSystem';
-import { audio } from './AudioSystem';
-import { drawPixelText } from './PixelFont';
-import { distance, type Vector2 } from './Utils';
+import { levelSpatialHash } from '../../engine/SpatialHash';
+import { particles } from '../../engine/ParticleSystem';
+import { juice } from '../../engine/JuiceSystem';
+import { audio } from '../../engine/AudioSystem';
+import { drawPixelText } from '../../engine/PixelFont';
+import { distance, type Vector2 } from '../../engine/Utils';
 import type { ArenaEventKind } from '../data/StageData';
 
 export interface ArenaContext {

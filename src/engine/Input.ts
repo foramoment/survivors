@@ -1,5 +1,5 @@
 import type { Vector2 } from './Utils';
-import { Joystick } from '../ui/Joystick';
+import { Joystick } from './Joystick';
 
 export class Input {
     keys: { [key: string]: boolean } = {};

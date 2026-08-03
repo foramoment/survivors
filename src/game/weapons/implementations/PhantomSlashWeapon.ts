@@ -16,11 +16,11 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import { type Vector2, angleDelta } from '../../core/Utils';
+import { type Vector2, angleDelta } from '../../../engine/Utils';
 import { Zone, Projectile } from '../base';
-import type { Entity } from '../../Entity';
+import type { Entity } from '../../../engine/Entity';
 import { damageSystem } from '../../core/DamageSystem';
-import { particles } from '../../core/ParticleSystem';
+import { particles } from '../../../engine/ParticleSystem';
 
 // ============================================
 // SLASH ARC - the visible cut

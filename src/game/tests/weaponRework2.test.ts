@@ -12,7 +12,7 @@ import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWea
 import { MindBlastWeapon, PsiBlastZone } from '../weapons/implementations/MindBlastWeapon';
 import { LobbedProjectile, PlasmaExplosionZone, SporeZone } from '../weapons/base';
 import { Enemy } from '../entities/Enemy';
-import { levelSpatialHash } from '../core/SpatialHash';
+import { levelSpatialHash } from '../../engine/SpatialHash';
 import { damageSystem } from '../core/DamageSystem';
 
 const TYPE = { name: 'Void Bat', hp: 1000, speed: 100, damage: 5, xpValue: 1, emoji: '🦇' };

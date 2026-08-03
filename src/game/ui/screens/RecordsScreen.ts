@@ -5,8 +5,8 @@
  * under Capacitor, so there is nothing to sync to. See core/Score.
  */
 
-import { BaseScreen } from '../BaseScreen';
-import { screenManager } from '../ScreenManager';
+import { BaseScreen } from '../../../engine/ui/BaseScreen';
+import { screenManager } from '../../../engine/ui/ScreenManager';
 import { loadScores, clearScores, formatScore, type ScoreEntry } from '../../core/Score';
 import { STAGES } from '../../data/StageData';
 import { CLASSES } from '../../data/GameData';

@@ -6,8 +6,8 @@
  * tried, and a hidden goal suggests nothing.
  */
 
-import { BaseScreen } from '../BaseScreen';
-import { screenManager } from '../ScreenManager';
+import { BaseScreen } from '../../../engine/ui/BaseScreen';
+import { screenManager } from '../../../engine/ui/ScreenManager';
 import { ACHIEVEMENTS, loadUnlocked, resetAchievements, achievements } from '../../core/Achievements';
 import { t, tf } from '../../core/I18n';
 

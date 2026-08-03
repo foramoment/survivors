@@ -11,7 +11,7 @@
  * something you are reading.
  */
 
-import { audio } from '../../core/AudioSystem';
+import { audio } from '../../../engine/AudioSystem';
 import { achievements, type Achievement } from '../../core/Achievements';
 import { tf } from '../../core/I18n';
 

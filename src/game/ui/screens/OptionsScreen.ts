@@ -5,8 +5,8 @@
  * overlay can mount the exact same block mid-run.
  */
 
-import { BaseScreen } from '../BaseScreen';
-import { screenManager } from '../ScreenManager';
+import { BaseScreen } from '../../../engine/ui/BaseScreen';
+import { screenManager } from '../../../engine/ui/ScreenManager';
 import { createSettingsPanel } from '../components/SettingsPanel';
 import { t } from '../../core/I18n';
 

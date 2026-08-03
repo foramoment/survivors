@@ -16,10 +16,10 @@
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
 import { NanobotCloud } from '../base';
-import { type Vector2, distance } from '../../core/Utils';
-import { levelSpatialHash } from '../../core/SpatialHash';
+import { type Vector2, distance } from '../../../engine/Utils';
+import { levelSpatialHash } from '../../../engine/SpatialHash';
 import { damageSystem } from '../../core/DamageSystem';
-import { particles } from '../../core/ParticleSystem';
+import { particles } from '../../../engine/ParticleSystem';
 import { status } from '../../core/StatusEffects';
 
 interface Drone {

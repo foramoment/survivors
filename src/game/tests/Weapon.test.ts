@@ -10,16 +10,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Weapon } from '../Weapon';
-import type { Vector2 } from '../core/Utils';
+import type { Vector2 } from '../../engine/Utils';
 
 // Mock SpatialHash
-vi.mock('../core/SpatialHash', () => ({
+vi.mock('../../engine/SpatialHash', () => ({
     levelSpatialHash: {
         getWithinRadius: vi.fn(() => [])
     }
 }));
 
-import { levelSpatialHash } from '../core/SpatialHash';
+import { levelSpatialHash } from '../../engine/SpatialHash';
 
 // Concrete weapon for testing abstract class
 class TestWeapon extends Weapon {

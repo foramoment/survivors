@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Input creates DOM elements (joystick) at module load — stub it out
-vi.mock('../core/Input', () => ({
+vi.mock('../../engine/Input', () => ({
     input: {
         getAxis: () => ({ x: 0, y: 0 }),
         isMouseDown: false,
@@ -12,7 +12,7 @@ vi.mock('../core/Input', () => ({
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { ENEMIES } from '../data/GameData';
-import { levelSpatialHash } from '../core/SpatialHash';
+import { levelSpatialHash } from '../../engine/SpatialHash';
 import { status } from '../core/StatusEffects';
 import { damageSystem } from '../core/DamageSystem';
 import { AcidPoolWeapon, CorrosivePool } from '../weapons/implementations/AcidPoolWeapon';
@@ -24,7 +24,7 @@ import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWea
 import { SporeCloudWeapon } from '../weapons/implementations/SporeCloudWeapon';
 import { BlackHoleZone } from '../weapons/implementations/SingularityOrbWeapon';
 import { NanobotSwarmWeapon } from '../weapons/implementations/NanobotSwarmWeapon';
-import type { Entity } from '../Entity';
+import type { Entity } from '../../engine/Entity';
 
 function makeEnemy(x: number, y: number): Enemy {
     return new Enemy(x, y, ENEMIES[0]);

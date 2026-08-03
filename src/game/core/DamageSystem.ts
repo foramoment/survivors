@@ -14,8 +14,8 @@
  *   // From zone with pre-calculated damage (no modifiers):
  *   damageSystem.dealDamage({ baseDamage: 50, source: null, target: enemy, position: enemy.pos, skipModifiers: true })
  */
-import type { Vector2 } from './Utils';
-import { events } from './EventBus';
+import type { Vector2 } from '../../engine/Utils';
+import { events } from '../../engine/EventBus';
 
 export interface DamageParams {
     baseDamage: number;

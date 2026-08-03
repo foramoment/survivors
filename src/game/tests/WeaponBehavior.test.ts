@@ -11,13 +11,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock dependencies first
-vi.mock('../core/SpatialHash', () => ({
+vi.mock('../../engine/SpatialHash', () => ({
     levelSpatialHash: {
         getWithinRadius: vi.fn(() => [])
     }
 }));
 
-vi.mock('../core/ParticleSystem', () => ({
+vi.mock('../../engine/ParticleSystem', () => ({
     particles: {
         emitHit: vi.fn(),
         emitPoison: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock('../core/ParticleSystem', () => ({
     }
 }));
 
-vi.mock('../core/JuiceSystem', () => ({
+vi.mock('../../engine/JuiceSystem', () => ({
     juice: {
         shockwave: vi.fn(),
         addTrauma: vi.fn(),
@@ -53,7 +53,7 @@ vi.mock('../core/DamageSystem', () => ({
     }
 }));
 
-import { levelSpatialHash } from '../core/SpatialHash';
+import { levelSpatialHash } from '../../engine/SpatialHash';
 import { VoidRayWeapon, VoidBolt } from '../weapons/implementations/VoidRayWeapon';
 import { PlasmaCannonWeapon } from '../weapons/implementations/PlasmaCannonWeapon';
 import { AcidPoolWeapon } from '../weapons/implementations/AcidPoolWeapon';

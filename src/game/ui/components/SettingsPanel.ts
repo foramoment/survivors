@@ -7,8 +7,8 @@
  * mid-run shows the new value.
  */
 
-import { audio } from '../../core/AudioSystem';
-import { juice } from '../../core/JuiceSystem';
+import { audio } from '../../../engine/AudioSystem';
+import { juice } from '../../../engine/JuiceSystem';
 import { damageNumberSettings } from '../../core/DamageNumbers';
 import { i18n, t, LANGUAGES } from '../../core/I18n';
 

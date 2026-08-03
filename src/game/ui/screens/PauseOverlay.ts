@@ -10,7 +10,7 @@
  * come back in the old language.
  */
 import { createSettingsPanel } from '../components/SettingsPanel';
-import { audio } from '../../core/AudioSystem';
+import { audio } from '../../../engine/AudioSystem';
 import { i18n, t } from '../../core/I18n';
 
 export interface PauseInfo {

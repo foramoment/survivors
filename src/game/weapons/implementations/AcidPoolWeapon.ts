@@ -16,11 +16,11 @@
  */
 import { Weapon } from '../../Weapon';
 import type { Player } from '../../entities/Player';
-import { type Vector2 } from '../../core/Utils';
+import { type Vector2 } from '../../../engine/Utils';
 import { LobbedProjectile, AcidZone } from '../base';
-import { particles } from '../../core/ParticleSystem';
+import { particles } from '../../../engine/ParticleSystem';
 import { status } from '../../core/StatusEffects';
-import { juice } from '../../core/JuiceSystem';
+import { juice } from '../../../engine/JuiceSystem';
 
 /** How far the weapon looks for a crowd to aim at */
 const SEARCH_RANGE = 480;

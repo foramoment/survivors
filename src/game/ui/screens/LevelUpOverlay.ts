@@ -18,8 +18,8 @@ import {
     buildUpgradeOptions, getPowerupValue, formatPowerupBonus, formatStatPreview,
     effectivePowerup,
 } from '../../core/UpgradePool';
-import { audio } from '../../core/AudioSystem';
-import { juice } from '../../core/JuiceSystem';
+import { audio } from '../../../engine/AudioSystem';
+import { juice } from '../../../engine/JuiceSystem';
 import { t } from '../../core/I18n';
 import {
     weaponName, weaponDesc, weaponEvoName, weaponEvoDesc, powerupName, powerupDesc,
