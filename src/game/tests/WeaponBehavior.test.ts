@@ -221,8 +221,9 @@ describe('PlasmaCannonWeapon', () => {
         plasma.onExplosion!(100, 100);
 
         // Copy: `spawnedEntities` is cleared below and `first` must survive it
+        // Level 6 evolved: 5 base + 5 levels + 3 for evolving
         const first = [...spawnedEntities] as any[];
-        expect(first.length).toBe(8);
+        expect(first.length).toBe(13);
         expect(first.every(s => s.splinters === 1)).toBe(true);
 
         // A shard biting into a body seeds the next spray from that body

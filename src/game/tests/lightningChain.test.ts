@@ -59,16 +59,31 @@ describe('LightningChainWeapon', () => {
         expect(weapon.area).toBe(260);
     });
 
-    it('keeps the chain bounded at both tiers', () => {
-        const base = new LightningChainWeapon(makeOwner());
-        base.level = 20;
-        expect(fire(base).chain.bounces).toBeLessThanOrEqual(10);
+    it('grows the chain every level, at both tiers', () => {
+        // There used to be a `Math.min(10, ...)` here and a flat 12 once
+        // evolved. The cap needed level 7 to bind and evolution lands at 6, so
+        // it was dead code; the flat 12 meant every level after evolving bought
+        // pure damage on a weapon whose whole fantasy is the arc reaching
+        // further. Damage falls off per hop, so length is self-limiting.
+        const at = (level: number, evolved: boolean) => {
+            const w = new LightningChainWeapon(makeOwner());
+            w.level = level;
+            w.evolved = evolved;
+            return fire(w).chain.bounces;
+        };
 
+        expect(at(2, false)).toBe(at(1, false) + 1);
+        expect(at(20, false)).toBeGreaterThan(at(10, false));
+
+        // An evolution may never hand back fewer hops than the tier it replaced
+        expect(at(6, true)).toBeGreaterThan(at(6, false));
+        expect(at(7, true)).toBeGreaterThan(at(6, true));
+    });
+
+    it('keeps the evolved arc reaching wide and slow', () => {
         const evolved = new LightningChainWeapon(makeOwner());
         evolved.evolved = true;
-        const chain = fire(evolved).chain;
-        expect(chain.bounces).toBeLessThanOrEqual(12);
-        expect(chain.maxChainLength).toBeLessThanOrEqual(1300);
+        expect(fire(evolved).chain.maxChainLength).toBeLessThanOrEqual(1300);
     });
 
     it('makes the evolved chain hop noticeably slower', () => {

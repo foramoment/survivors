@@ -180,7 +180,7 @@ describe('Plasma Grenade', () => {
         expect(new Set(lobs.map(l => l.delay)).size).toBe(3);
     });
 
-    it('gains a canister every second level, and each one hits for less', () => {
+    it('gains a canister every second level, and each one hits in full', () => {
         const weapon = new PlasmaGrenadeWeapon(mockOwner());
         const spawned = collect(weapon);
         const target = enemyAt(200, 0);
@@ -196,9 +196,13 @@ describe('Plasma Grenade', () => {
         }
         expect(counts).toEqual([1, 1, 2, 2, 3]);
 
-        // Total output grows as sqrt(count), so extra canisters buy reach and
-        // not a free damage multiplier
-        expect((weapon as any).canisterPower(4)).toBeCloseTo(0.5);
+        // Damage used to be divided by 1/sqrt(count), so three canisters were
+        // worth 1.73 of one and two levels bought +30% output plus some crater
+        // shuffling. Coverage is fine to sell alongside a damage upgrade; it is
+        // not fine as the ONLY thing two levels bought. Every canister now
+        // carries a full blast, and the evolution pays its cooldown tax for the
+        // extra two instead.
+        expect((weapon as any).canisterPower).toBeUndefined();
     });
 
     it('caps and delays chain explosions', () => {

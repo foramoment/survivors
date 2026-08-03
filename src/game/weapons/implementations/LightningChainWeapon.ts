@@ -125,6 +125,12 @@ export class LightningChainWeapon extends Weapon {
         this.duration = this.stats.duration;
     }
 
+    /** Enemies one bolt walks through: +1 a level, +6 on evolving */
+    private chainLength(isEvolved: boolean): number {
+        const hops = 3 + this.level;
+        return isEvolved ? hops + 6 : hops;
+    }
+
     update(dt: number) {
         this.cooldown -= dt;
         if (this.cooldown > 0) return;
@@ -153,12 +159,23 @@ export class LightningChainWeapon extends Weapon {
         juice.shockwave(target.pos.x, target.pos.y, 46 * areaScale, '#bfe9ff', 0.25, 3);
         juice.addTrauma(isEvolved ? 0.14 : 0.07);
 
+        // Damage falls off per hop, so a longer chain is self-limiting: the
+        // fifteenth arc is worth a fraction of the first and no cap is needed
+        // to keep it honest.
         const chain = new ChainLightning(
             target.pos.x,
             target.pos.y,
             this.damage,
-            // Base chain grows with level; evolved covers a wide arc slowly
-            isEvolved ? 12 : Math.min(10, 3 + this.level),
+            // One more hop every level, six more on evolving. L1 4, L6 9,
+            // L6 evolved 15.
+            //
+            // This used to be `isEvolved ? 12 : Math.min(10, 3 + level)`, which
+            // was broken at both ends. The cap of 10 needed level 7 to bind and
+            // evolution lands at 6, so it was dead code that only ever misled
+            // whoever read it. And the flat 12 meant every level *after*
+            // evolving bought pure damage on a weapon whose entire fantasy is
+            // the arc reaching further into the pack.
+            this.chainLength(isEvolved),
             isEvolved ? 1300 : 700,
         );
         chain.source = this;

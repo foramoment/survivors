@@ -251,7 +251,7 @@ export class FrostNovaWeapon extends Weapon {
         this.cooldown -= dt;
         if (this.cooldown > 0 || this.inFlight) return;
 
-        const radius = this.area * this.owner.stats.area;
+        const radius = this.fieldRadius();
         const spot = this.findDensestSpot(SEARCH_RANGE, radius);
         // No crowd in range: chill the ground under the player instead of
         // wasting the cast — the field still buys space if something arrives
@@ -299,6 +299,25 @@ export class FrostNovaWeapon extends Weapon {
         return Math.min(0.62, 0.42 + (this.level - 1) * 0.05);
     }
 
+    /**
+     * The field itself widens with level: +9% of the base radius a level.
+     *
+     * `slowStrength` is capped at 62% and reaches that cap at level 5, and the
+     * cap has to stay — a deeper slow on a field this size is a stun without
+     * the downtime rule that `StatusEffects` makes every other stun obey. But
+     * that left the weapon with **nothing at all** past level five: the slow was
+     * done, and radius and duration never scaled. Five picks in, the card was
+     * selling +20% damage on a weapon whose damage is a rounding error next to
+     * what it does to movement.
+     *
+     * Radius is the right axis precisely because the slow is capped: a wider
+     * field is more ground denied without any enemy crawling slower than the
+     * floor. It compounds with `stats.area` rather than replacing it.
+     */
+    private fieldRadius(): number {
+        return this.area * this.owner.stats.area * (1 + (this.level - 1) * 0.09);
+    }
+
     private detonate(x: number, y: number, radius: number) {
         particles.emitFrost(x, y);
         this.impactBurst(x, y, radius);
@@ -308,9 +327,15 @@ export class FrostNovaWeapon extends Weapon {
         // field covered the ground permanently — enemies crawling at a fifth of
         // their speed forever is a stun without the stun's downtime rule.
         // Zone.SLOW_FLOOR backstops this at 65%.
+        // Absolute Zero used to ask for `min(0.62, slow + 0.1)` here, which is a
+        // dead expression: `slowStrength` is already clamped to 0.62, so the
+        // +0.1 never survived the clamp and the evolution's advertised deeper
+        // chill was worth exactly nothing. The evolution earns its keep through
+        // the landing stun, the shatter and the ice slab instead — so ask for
+        // the same slow and stop pretending.
         const slow = this.slowStrength();
         const zone = this.evolved
-            ? new AbsoluteZeroZone(x, y, radius, this.damage, duration, Math.min(0.62, slow + 0.1))
+            ? new AbsoluteZeroZone(x, y, radius, this.damage, duration, slow)
             : new FrostZone(x, y, radius, duration, this.damage, 0.5, slow);
 
         if (zone instanceof AbsoluteZeroZone) zone.shatterDamage = this.damage * 4;

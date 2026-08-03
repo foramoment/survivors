@@ -143,14 +143,21 @@ export class AcidPoolWeapon extends Weapon {
         );
         pool.source = this;
 
+        // Level scales how much softer the target gets, not just the tick — and
+        // it keeps scaling **through** the evolution.
+        //
+        // The evolved branch used to hard-code 0.35 and throw the level term
+        // away entirely, so every level past six bought pure damage on the one
+        // weapon whose whole point is that it makes everything else you own hit
+        // harder. Worse, it was a cliff in the wrong direction: at level 9 the
+        // base pool would have out-corroded the evolution it upgraded into.
+        //
+        // The evolution is a flat bonus on top of the curve instead, so it can
+        // never hand back less than the thing it replaced.
+        pool.corrosionAmp = 0.18 + this.level * 0.02 + (this.evolved ? 0.17 : 0);
+        pool.corrosionDuration = this.evolved ? 4 : 3;
         if (this.evolved) {
-            pool.corrosionAmp = 0.35;
-            pool.corrosionDuration = 4;
             pool.acidDps = this.damage * 0.4;
-        } else {
-            // Level scales how much softer the target gets, not just the tick
-            pool.corrosionAmp = 0.18 + this.level * 0.02;
-            pool.corrosionDuration = 3;
         }
 
         this.onSpawn(pool);

@@ -119,6 +119,24 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
      * A conditional payoff has to be worth *more* than an unconditional one,
      * not the same.
      */
+    /**
+     * Shards in a detonation: one more every level, three more on evolving.
+     * L1 5, L6 10, L6 evolved 13.
+     *
+     * This weapon was the ONLY one in the pool that never read `this.level` at
+     * all — every level was +20% damage on the same five shards and nothing
+     * else. For a weapon whose whole identity is "it bursts into shrapnel",
+     * the count is the obvious axis and it was the one axis standing still.
+     *
+     * The evolved bonus stays additive rather than a flat replacement, because
+     * the flat 8 it used to be would have been a **downgrade** past level four.
+     * An evolution may never hand back fewer of the thing the weapon is about.
+     */
+    private shardCount(): number {
+        const base = 5 + (this.level - 1);
+        return this.evolved ? base + 3 : base;
+    }
+
     private static readonly SPLINTER_COUNT = 6;
     /** Size of a second-generation shard relative to its parent */
     private static readonly SPLINTER_SCALE = 0.72;
@@ -174,7 +192,7 @@ export class PlasmaCannonWeapon extends ProjectileWeapon {
         const radius = this.area * this.owner.stats.area;
         particles.emitPlasmaBurst(x, y, radius, this.evolved);
         juice.shockwave(x, y, radius * 1.4, '#3dff86', 0.3, 4);
-        this.throwShards(x, y, this.evolved ? 8 : 5, 1, this.evolved ? 1 : 0);
+        this.throwShards(x, y, this.shardCount(), 1, this.evolved ? 1 : 0);
     }
 
     /**

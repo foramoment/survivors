@@ -81,18 +81,6 @@ export class PlasmaGrenadeWeapon extends Weapon {
         return this.evolved ? base + 2 : base;
     }
 
-    /**
-     * Damage share of a single canister, `1/sqrt(count)`.
-     *
-     * A cluster must not be a straight multiplication of the single throw, or
-     * every extra canister is a free damage upgrade on top of the coverage.
-     * The square root means total output grows as sqrt(count) — 1 → 1.41 → 1.73
-     * → 2.24 — so more canisters is mostly more *reach*.
-     */
-    private canisterPower(count: number): number {
-        return 1 / Math.sqrt(count);
-    }
-
     update(dt: number) {
         this.cooldown -= dt;
         if (this.cooldown > 0) return;
@@ -102,7 +90,22 @@ export class PlasmaGrenadeWeapon extends Weapon {
 
         const flight = this.duration * this.owner.stats.duration;
         const count = this.canisterCount();
-        const power = this.canisterPower(count);
+
+        // Every canister carries a full blast.
+        //
+        // Damage used to be divided by `1/sqrt(count)`, on the reasoning that a
+        // cluster must not be a straight multiplication of the single throw —
+        // so three canisters were worth 1.73 of one, and the extra two bought
+        // coverage rather than power. In play that made the level-ups this
+        // weapon is built around read as almost nothing: you waited two levels
+        // for a canister that added 30% output and moved some craters around.
+        //
+        // Coverage is a fine thing to sell when the alternative is a damage
+        // upgrade the player also gets. It is a bad thing to sell as the ONLY
+        // thing two levels bought. The evolution still pays its cooldown tax
+        // for the extra two canisters (see below), which is where the brake
+        // belongs.
+        const power = 1;
 
         if (count === 1) {
             this.throwGrenade({ x: target.pos.x, y: target.pos.y }, flight, 0, power);
