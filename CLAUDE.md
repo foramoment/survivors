@@ -8,11 +8,12 @@
 
 ```
 src/game/
-├── GameManager.ts        # 🎯 Главный файл: game loop, UI, спавн, столкновения
+├── GameManager.ts        # 🎯 Забег: game loop, спавн, столкновения, смерти
 ├── Weapon.ts             # Базовый абстрактный класс оружия
-├── Entity.ts             # Базовая сущность (pos, radius)
+├── Entity.ts             # Базовая сущность (pos, radius, layer)
 ├── core/                 # Ядро движка
 │   ├── DamageSystem.ts   # ⚔️ Singleton: расчёт урона, криты, might
+│   ├── DamageNumbers.ts  # 🔢 Цифры урона + фидбек попадания (звук, hit-stop)
 │   ├── ContactDamage.ts  # 🩸 Урон игроку от врагов вокруг: броня + стакинг толпы
 │   ├── ParticleSystem.ts # ✨ Singleton: эффекты частиц
 │   ├── SpatialHash.ts    # 🗺️ Оптимизация поиска сущностей O(1)
@@ -41,7 +42,8 @@ src/game/
 ├── entities/
 │   ├── Player.ts         # Игрок со статами
 │   ├── Enemy.ts          # Враги с сепарацией
-│   └── XPCrystal.ts      # Кристаллы XP
+│   ├── XPCrystal.ts      # Кристаллы XP
+│   └── CrystalField.ts   # 💎 Все кристаллы на арене: куллинг + слияние дальних
 ├── weapons/
 │   ├── base/             # Базовые классы
 │   │   ├── WeaponBase.ts # ProjectileWeapon, ZoneWeapon
@@ -56,7 +58,16 @@ src/game/
     ├── components/       # HUD, BuildPanel (иконки оружий/перков), SettingsPanel
     ├── MenuBackdrop.ts   # 🌌 Анимированный пиксельный космос под всеми меню
     └── screens/          # MainMenu, ClassSelection, Game и т.д.
+        ├── LevelUpOverlay.ts    # Карточки апгрейда, реролл, клавиши, dev-вкладки
+        ├── RunSummaryOverlay.ts # Итоги забега (чистая функция от снимка)
+        └── PauseOverlay.ts      # Пауза + настройки, разворачиваемые на месте
 ```
+
+**Оверлеи вынесены из GameManager** (был 1942 строки, половина — DOM).
+Экран уровня берёт `GameManager` как **живой** host-интерфейс, а не снимок:
+`player` пересоздаётся каждый забег. Итоги забега наоборот — чистая функция от
+`RunSummaryData`; всё, что *меняет* состояние (ачивки, очки, лидерборд),
+остаётся в `GameManager.endRun`.
 
 ---
 
@@ -89,6 +100,15 @@ Engine.loop
    12. цикл смертей: killEcho → siphon → XP-кристалл
    13. difficultyDirector.update  спавн, волны, события арены
 ```
+
+**Один список сущностей, а не проверка класса.** Всё, что спавнят оружия —
+снаряды, зоны и чисто визуальные штуки — лежит в `GameManager.entities`.
+Отрисовка выбирает проход по полю `Entity.layer` (`'ground'` под кристаллами,
+врагами и игроком; `'air'` — над ними), а `instanceof` остался только в
+`CollisionSystem`, где он решает **как** сущность сталкивается. Раньше он решал
+ещё и то, попадёт ли сущность в мир вообще: `spawnEntity` молча выбрасывал всё,
+что не `Projectile` и не `Zone`, — и Кровавый Тесак так и вышел в релиз,
+нанося полный урон и будучи полностью невидимым.
 
 **Три места, где порядок критичен:**
 

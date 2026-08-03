@@ -85,7 +85,11 @@ export class CleaveArc extends Entity {
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         const t = Math.min(1, this.age / this.life);
-        const alpha = 1 - t;
+        // Hold, then fade. A linear `1 - t` looked correct on paper and was
+        // nearly invisible in play: the crescent has no length at t=0 and is
+        // already half faded by the time it has swept far enough to read as a
+        // swing. The bright part of the animation has to overlap the long part.
+        const alpha = t < 0.55 ? 1 : 1 - (t - 0.55) / 0.45;
         if (alpha <= 0) return;
 
         ctx.save();
@@ -93,7 +97,7 @@ export class CleaveArc extends Entity {
 
         // The crescent travels the full circle over the swing
         const head = t * Math.PI * 2.2;
-        const tail = Math.max(0, head - 2.1);
+        const tail = Math.max(0, head - 2.6);
         // Sized so the *outer* edge of the band lands on `reach` at the end of
         // the swing — the blur has to stop where the damage stops, or the swing
         // keeps missing things it visibly covered
@@ -103,17 +107,21 @@ export class CleaveArc extends Entity {
         const glow = `rgba(255, ${Math.round(120 - 70 * this.hot)}, ${Math.round(90 - 60 * this.hot)}, `;
 
         ctx.lineCap = 'butt';
-        ctx.strokeStyle = `${glow}${(0.35 * alpha).toFixed(3)})`;
+        ctx.strokeStyle = `${glow}${(0.6 * alpha).toFixed(3)})`;
         ctx.lineWidth = this.reach * 0.34;
         ctx.beginPath();
         ctx.arc(0, 0, r, tail, head);
         ctx.stroke();
 
-        ctx.strokeStyle = `rgba(255, 240, 220, ${(0.9 * alpha).toFixed(3)})`;
-        ctx.lineWidth = Math.max(2, this.reach * 0.07);
+        // One shadowBlur pass for the whole effect, on the leading edge only
+        ctx.strokeStyle = `rgba(255, 246, 232, ${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(3, this.reach * 0.11);
+        ctx.shadowColor = `${glow}1)`;
+        ctx.shadowBlur = 12;
         ctx.beginPath();
-        ctx.arc(0, 0, r, Math.max(tail, head - 0.5), head);
+        ctx.arc(0, 0, r, Math.max(tail, head - 0.9), head);
         ctx.stroke();
+        ctx.shadowBlur = 0;
 
         ctx.restore();
     }
