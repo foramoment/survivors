@@ -58,6 +58,17 @@ const CONTACT_SOUND_MIN_GAP = 0.75;
  */
 const CONTACT_NUMBER_INTERVAL = 0.4;
 
+/** Seconds between printed healing numbers, when it is a trickle */
+const HEAL_NUMBER_INTERVAL = 0.5;
+/**
+ * A single heal at least this big prints immediately instead of waiting.
+ * Sized under one repair cell (REPAIR_HEAL) so a pickup always jumps the queue,
+ * and well above any one frame of regen so a trickle never does.
+ */
+const HEAL_INSTANT_EVENT = 3;
+/** Pixels above the damage-taken number, so the two never overlap */
+const HEAL_NUMBER_LIFT = 16;
+
 /** Knockback on contact: the player barely moves, the enemy is shoved aside */
 const PLAYER_SHOVE_BACK = 55;
 const ENEMY_SHOVE = 190;
@@ -132,6 +143,16 @@ export class GameManager {
      */
     private contactPending: number = 0;
     private contactPrintTimer: number = 0;
+    /**
+     * Healing banked since the last green number, and the largest single event
+     * in it. Regen arrives as a fraction of a point every frame, so it has to
+     * gather the same way contact damage does — but a repair cell is a thing
+     * you walked over and got, and waiting even half a second to say so breaks
+     * the one moment healing exists for.
+     */
+    private healPending: number = 0;
+    private healBiggestEvent: number = 0;
+    private healPrintTimer: number = 0;
     repairCells: RepairCell[] = [];
 
     /**
@@ -199,7 +220,11 @@ export class GameManager {
 
         this.player.baseMaxHp = cls.hp;
         this.player.onLevelUp = () => this.levelUp.show();
-        this.player.onHeal = amount => this.runStats.recordHeal(amount);
+        this.player.onHeal = amount => {
+            this.runStats.recordHeal(amount);
+            this.healPending += amount;
+            this.healBiggestEvent = Math.max(this.healBiggestEvent, amount);
+        };
 
         // Add starting weapon
         this.addWeapon(cls.weaponId);
@@ -213,6 +238,9 @@ export class GameManager {
         this.echoPunchTimer = 0;
         this.contactPending = 0;
         this.contactPrintTimer = 0;
+        this.healPending = 0;
+        this.healBiggestEvent = 0;
+        this.healPrintTimer = 0;
         this.damageNumbers.clear();
         this.killCount = 0;
         this.killScore = 0;
@@ -459,6 +487,39 @@ export class GameManager {
      * failure of the continuous model the first time it was tried. Batching to
      * a beat gives the drain a *voice* without giving it false precision.
      */
+    /**
+     * Print banked healing as one green number over the player's head.
+     *
+     * Two clocks in one, because healing arrives in two completely different
+     * shapes. Regen is a fraction of a point every frame and has to gather or
+     * it is sub-1 noise flickering sixty times a second. A repair cell is six
+     * points at once, in response to the player walking onto it, and the answer
+     * has to arrive **now** — that pickup is the "oh thank god" moment the whole
+     * healing model is built around, and a number that shows up half a second
+     * late lands after the feeling it was meant to confirm.
+     *
+     * So a discrete event jumps the queue and everything else waits its turn.
+     */
+    private flushHealNumber(dt: number) {
+        if (!this.player) return;
+
+        this.healPrintTimer -= dt;
+        const discrete = this.healBiggestEvent >= HEAL_INSTANT_EVENT;
+        if (this.healPrintTimer > 0 && !discrete) return;
+
+        this.healPrintTimer = HEAL_NUMBER_INTERVAL;
+        this.healBiggestEvent = 0;
+        if (this.healPending < 1) return;
+
+        // Above the damage-taken number, so a frame that both hurts and heals
+        // reads as two things rather than one number changing colour
+        this.damageNumbers.spawnHealed(
+            { x: this.player.pos.x, y: this.player.pos.y - this.player.radius - HEAL_NUMBER_LIFT },
+            this.healPending,
+        );
+        this.healPending = 0;
+    }
+
     private flushContactNumber(dt: number) {
         if (!this.player) return;
 
@@ -522,6 +583,29 @@ export class GameManager {
             const dy = enemy.pos.y - this.player.pos.y;
             const len = Math.hypot(dx, dy) || 1;
             enemy.applyKnockback(dx / len, dy / len, DISCHARGE_KNOCKBACK);
+        }
+    }
+
+    /**
+     * A body that fell on a fungal mat feeds it, and the mat lives longer.
+     *
+     * Asks for the *capability* rather than testing the class, the way the rest
+     * of the entity list works — `instanceof` in this file is what used to
+     * decide whether a spawned thing existed at all, and it has no business
+     * deciding this either. A zone that can eat says so by having the method.
+     *
+     * Every overlapping mat gets fed, which is deliberate: laying patches on
+     * top of each other is the Astro Biologist's whole game, and a kill in the
+     * overlap ought to pay all of them. Each mat's own budget is what stops it
+     * running away.
+     */
+    private feedFungus(enemy: Enemy) {
+        for (const entity of this.entities) {
+            const mat = entity as unknown as { feedOnDeath?: (x: number, y: number) => boolean };
+            if (typeof mat.feedOnDeath !== 'function') continue;
+            if (mat.feedOnDeath(enemy.pos.x, enemy.pos.y)) {
+                particles.emitPoison(enemy.pos.x, enemy.pos.y);
+            }
         }
     }
 
@@ -687,6 +771,7 @@ export class GameManager {
         if (this.dischargeCooldown > 0) this.dischargeCooldown -= dt;
         if (this.echoPunchTimer > 0) this.echoPunchTimer -= dt;
         if (this.contactFxTimer > 0) this.contactFxTimer -= dt;
+        this.flushHealNumber(dt);
         this.waveTimer += dt;
 
         // Parallax layers drift with the camera (frozen while paused)
@@ -872,6 +957,7 @@ export class GameManager {
                 }
                 // Tactics that trigger on death (see core/Tactics)
                 this.killEcho(enemy);
+                this.feedFungus(enemy);
                 if (Math.random() < this.player.stats.siphon) {
                     this.repairCells.push(new RepairCell(enemy.pos.x, enemy.pos.y));
                 }

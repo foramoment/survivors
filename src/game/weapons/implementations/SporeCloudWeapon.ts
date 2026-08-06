@@ -72,35 +72,58 @@ export class SporeCloudWeapon extends ZoneWeapon {
         return this.area * this.owner.stats.area * (1 + (this.level - 1) * 0.08);
     }
 
+    /**
+     * Seconds a mat may bank from kills, as a multiple of the life it was born
+     * with. This is what levelling this weapon actually buys.
+     *
+     * +8% radius a level was structural on paper and invisible in play, sitting
+     * next to weapons that hand out a whole extra disc or shard per pick. The
+     * mycelium feeding on its own kills is the mechanic worth levelling: at
+     * level 1 a mat can roughly double its life if you keep the crowd on it, by
+     * level 6 it can hold ground for several times as long, and it is the only
+     * thing in the pool that turns a fight into territory you own.
+     *
+     * The budget is per-mat and never refills, so the ceiling is knowable: a
+     * patch cannot outlive `duration * (1 + budget)` no matter how many bodies
+     * fall on it.
+     */
+    private extensionBudget(baseDuration: number): number {
+        return baseDuration * (0.5 + this.level * 0.5);
+    }
+
     spawnZone() {
         const baseInterval = Math.max(0.1, this.interval * this.owner.stats.cooldown);
         const radius = this.zoneRadius();
 
         if (this.evolved) {
+            const life = this.stats.duration * this.owner.stats.duration * 2;
             const zone = new FungalBloomZone(
                 this.owner.pos.x,
                 this.owner.pos.y,
                 radius,
-                this.stats.duration * this.owner.stats.duration * 2,
+                life,
                 this.damage * 0.6,
                 baseInterval
             );
             // Contact damage is halved; the infection is where the damage went
             zone.infectDps = this.damage * 0.75;
             zone.infectDuration = 5;
+            zone.extensionBudget = this.extensionBudget(life);
             zone.source = this;
             this.onSpawn(zone);
         } else {
+            const life = this.duration * this.owner.stats.duration;
             const zone = new SporeZone(
                 this.owner.pos.x,
                 this.owner.pos.y,
                 radius,
-                this.duration * this.owner.stats.duration,
+                life,
                 this.damage * 0.6,
                 baseInterval
             );
             zone.infectDps = this.damage * 0.45;
             zone.infectDuration = 3;
+            zone.extensionBudget = this.extensionBudget(life);
             zone.source = this;
             this.onSpawn(zone);
         }

@@ -198,16 +198,28 @@ export class OrbitalStrikeWeapon extends Weapon {
 
     /** How far from the player a strike may be placed */
     private static readonly SPREAD = 420;
-    /**
-     * Shells per evolved salvo, before the finisher.
-     *
-     * Six read as visual spam — seven reticles at once buried the arena under
-     * targeting rings, and the heavy shell that is supposed to be the payoff
-     * got lost among them. Four plus the finisher is the readable version.
-     */
-    private static readonly BARRAGE_SHELLS = 4;
     /** How far apart shells in a salvo land. Tight enough to overlap. */
     private static readonly BARRAGE_SPACING = 1.3;
+
+    /**
+     * Seconds between shells being *launched*, and the fuse each one then burns.
+     *
+     * The salvo used to spawn every shell on the same frame with staggered
+     * fuses, which meant every reticle in it was on the ground at once. Six
+     * shells read as visual spam for exactly that reason — seven rings buried
+     * the arena and the heavy finisher that is supposed to be the payoff got
+     * lost among them — and the count was frozen at four to contain it.
+     *
+     * Launching them on a stagger fixes the cause instead of the symptom: with
+     * a 0.8s fuse arriving every 0.22s there are only ever three or four rings
+     * up, no matter how long the salvo is. That is what lets shell count grow
+     * with level at all.
+     */
+    private static readonly SHELL_STAGGER = 0.22;
+    private static readonly SHELL_FUSE = 0.8;
+
+    /** Shells launched but not yet in the sky */
+    private queue: { pos: Vector2, radius: number, damage: number, heavy: boolean, at: number }[] = [];
 
     constructor(owner: Player) {
         super(owner);
@@ -218,19 +230,42 @@ export class OrbitalStrikeWeapon extends Weapon {
 
     update(dt: number) {
         this.cooldown -= dt;
-        if (this.cooldown > 0) return;
-
-        if (this.evolved) {
+        if (this.cooldown <= 0) {
             this.fireBarrage();
-            this.cooldown = 8.0 * this.owner.stats.cooldown;
-        } else {
-            this.fireShell(this.pickTarget(), this.blastRadius(), this.damage, 0.9, false);
-            this.cooldown = this.baseCooldown * this.owner.stats.cooldown;
+            this.cooldown = (this.evolved ? 8.0 : this.baseCooldown) * this.owner.stats.cooldown;
+        }
+
+        // Drained AFTER the salvo is queued, so the first shell of a fresh one
+        // goes out on this frame rather than the next.
+        for (let i = this.queue.length - 1; i >= 0; i--) {
+            const shell = this.queue[i];
+            shell.at -= dt;
+            if (shell.at > 0) continue;
+            this.queue.splice(i, 1);
+            this.fireShell(shell.pos, shell.radius, shell.damage, OrbitalStrikeWeapon.SHELL_FUSE, shell.heavy);
         }
     }
 
+    /**
+     * Shells in a salvo: one more every second level, three more on evolving.
+     * L1 1, L3 2, L5 3, L6 evolved 6.
+     *
+     * Levelling used to buy +7% blast radius, which is structural on paper and
+     * invisible in play — you cannot see seven percent, and the weapon sat next
+     * to a Chrono Disc handing out a whole extra disc per pick. Artillery has an
+     * obvious axis and it was the one standing still.
+     *
+     * The evolved bonus is additive so the salvo keeps growing after evolving
+     * rather than being replaced by a frozen four, which is the same trap that
+     * had the evolved Plasma Cannon handing back fewer shards than level five.
+     */
+    private shellCount(): number {
+        const base = 1 + Math.floor((this.level - 1) / 2);
+        return this.evolved ? base + 3 : base;
+    }
+
     private blastRadius(): number {
-        return this.area * this.owner.stats.area * (1 + this.level * 0.07);
+        return this.area * this.owner.stats.area;
     }
 
     /**
@@ -270,8 +305,16 @@ export class OrbitalStrikeWeapon extends Weapon {
      * wall of fire that visibly crosses the pack.
      */
     private fireBarrage() {
-        const shells = OrbitalStrikeWeapon.BARRAGE_SHELLS;
-        const radius = this.blastRadius() * 0.9;
+        const shells = this.shellCount();
+        const radius = this.blastRadius() * (shells > 1 ? 0.9 : 1);
+        const stagger = OrbitalStrikeWeapon.SHELL_STAGGER;
+
+        // A single shell has no line to walk, so it just goes where the target is
+        if (shells === 1) {
+            this.queue.push({ pos: this.pickTarget(), radius, damage: this.damage, heavy: false, at: 0 });
+            return;
+        }
+
         const centre = this.findDensestSpot(OrbitalStrikeWeapon.SPREAD, radius * 2) ?? this.pickTarget();
         const sweep = Math.random() * Math.PI * 2;
         const spacing = radius * OrbitalStrikeWeapon.BARRAGE_SPACING;
@@ -279,17 +322,29 @@ export class OrbitalStrikeWeapon extends Weapon {
         for (let i = 0; i < shells; i++) {
             const offset = (i - (shells - 1) / 2) * spacing;
             const jitter = radius * 0.25;
-            const pos = {
-                x: centre.x + Math.cos(sweep) * offset + (Math.random() - 0.5) * jitter,
-                y: centre.y + Math.sin(sweep) * offset + (Math.random() - 0.5) * jitter,
-            };
-            // Staggered fuses make the salvo land as a rolling barrage
-            this.fireShell(pos, radius, this.damage, 0.75 + i * 0.18, false);
+            this.queue.push({
+                pos: {
+                    x: centre.x + Math.cos(sweep) * offset + (Math.random() - 0.5) * jitter,
+                    y: centre.y + Math.sin(sweep) * offset + (Math.random() - 0.5) * jitter,
+                },
+                radius,
+                damage: this.damage,
+                heavy: false,
+                at: i * stagger,
+            });
         }
 
         // Finisher lands last and alone, on the middle of the run — with the
         // sky clear of the other reticles it is the shot you watch
-        this.fireShell(centre, radius * 2.1, this.damage * 3.2, 0.75 + shells * 0.18 + 0.3, true);
+        if (this.evolved) {
+            this.queue.push({
+                pos: centre,
+                radius: radius * 2.1,
+                damage: this.damage * 3.2,
+                heavy: true,
+                at: shells * stagger + 0.35,
+            });
+        }
     }
 
     private fireShell(pos: Vector2, radius: number, damage: number, delay: number, heavy: boolean) {

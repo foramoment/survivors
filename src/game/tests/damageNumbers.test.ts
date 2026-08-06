@@ -10,7 +10,9 @@ import { DamageNumbers } from '../core/DamageNumbers';
 
 /** Reach into the pool the way only a test may */
 function entries(dn: DamageNumbers) {
-    return (dn as unknown as { items: Array<{ isCrit: boolean; hits: number; amount: number }> }).items;
+    return (dn as unknown as {
+        items: Array<{ isCrit: boolean; hits: number; amount: number; text: string }>
+    }).items;
 }
 
 /**
@@ -96,6 +98,37 @@ describe('crit styling follows the damage, not a single lucky hit', () => {
     it('a plain sweep never turns orange', () => {
         zoneTick(numbers, 20, 320);
         expect(entries(numbers).every(e => !e.isCrit)).toBe(true);
+    });
+});
+
+describe('healing', () => {
+    let numbers: DamageNumbers;
+    beforeEach(() => { numbers = new DamageNumbers(); });
+
+    it('prints with a plus, so the direction is unmistakable', () => {
+        numbers.spawnHealed({ x: 0, y: 0 }, 6);
+        expect(entries(numbers)[0].text).toBe('+6');
+    });
+
+    it('keeps the sign after merging', () => {
+        numbers.spawnHealed({ x: 0, y: 0 }, 6);
+        numbers.spawnHealed({ x: 0, y: 0 }, 4);
+        expect(numbers.count).toBe(1);
+        expect(entries(numbers)[0].text).toBe('+10');
+    });
+
+    it('never folds into damage of either direction', () => {
+        // Three different things happening to the same point above the player's
+        // head; folding any two of them together would be a lie
+        numbers.spawnHealed({ x: 0, y: 0 }, 6);
+        numbers.spawnTaken({ x: 0, y: 0 }, 6);
+        numbers.spawn({ x: 0, y: 0 }, 6);
+        expect(numbers.count).toBe(3);
+    });
+
+    it('ignores sub-point trickle', () => {
+        numbers.spawnHealed({ x: 0, y: 0 }, 0.4);
+        expect(numbers.count).toBe(0);
     });
 });
 

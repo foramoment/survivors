@@ -54,6 +54,11 @@ describe('OrbitalStrikeWeapon', () => {
     let weapon: OrbitalStrikeWeapon;
     let spawned: any[];
 
+    /** Shells launch on a stagger, so a salvo needs a few frames to leave */
+    function runSalvo(w: any) {
+        for (let t = 0; t < 2; t += 0.05) w.update(0.05);
+    }
+
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([]);
@@ -78,29 +83,58 @@ describe('OrbitalStrikeWeapon', () => {
         expect(Math.abs(spawned[0].pos.x - 300)).toBeLessThanOrEqual(20);
     });
 
-    it('evolves into a staggered salvo instead of one nuke', () => {
+    it('launches the salvo over time, not all on one frame', () => {
         weapon.evolved = true;
         weapon.cooldown = 0;
         weapon.update(0.016);
 
-        // Four shells plus the heavy finisher. Six read as visual spam — the
-        // finisher that is meant to be the payoff was lost among the reticles.
+        // Only the first shell is in the sky. Every shell used to spawn on the
+        // same frame with staggered fuses, so every reticle in the salvo was on
+        // the ground at once — which is why the count was frozen at four.
+        // Launching on a stagger is what lets it grow with level.
+        expect(spawned.length).toBe(1);
+
+        runSalvo(weapon);
+        // Level 1 evolved: 1 base + 3 for evolving, plus the heavy finisher
         expect(spawned.length).toBe(5);
-        const delays = spawned.map((z: any) => z.delay);
-        // Fuses are staggered, so the salvo rolls across the field
-        expect(new Set(delays).size).toBe(delays.length);
-        expect(Math.max(...delays)).toBeGreaterThan(Math.min(...delays));
+    });
+
+    it('grows the salvo with level, at both tiers', () => {
+        const salvoAt = (level: number, evolved: boolean) => {
+            const w = new OrbitalStrikeWeapon(makeOwner());
+            const out: any[] = [];
+            w.onSpawn = (e: any) => out.push(e);
+            w.level = level;
+            w.evolved = evolved;
+            w.cooldown = 0;
+            runSalvo(w);
+            return out.length;
+        };
+
+        // +1 shell every second level, and evolving keeps adding rather than
+        // replacing — the trap that had the evolved Plasma Cannon handing back
+        // fewer shards than level five
+        expect(salvoAt(3, false)).toBe(salvoAt(1, false) + 1);
+        expect(salvoAt(5, false)).toBe(salvoAt(3, false) + 1);
+        expect(salvoAt(6, true)).toBeGreaterThan(salvoAt(6, false));
+        expect(salvoAt(8, true)).toBeGreaterThan(salvoAt(6, true));
     });
 
     it('gives the barrage exactly one heavy finisher, landing last', () => {
         weapon.evolved = true;
         weapon.cooldown = 0;
-        weapon.update(0.016);
+        runSalvo(weapon);
 
         const heavies = spawned.filter((z: any) => z.heavy);
         expect(heavies).toHaveLength(1);
-        expect(heavies[0].delay).toBe(Math.max(...spawned.map((z: any) => z.delay)));
+        expect(spawned[spawned.length - 1].heavy).toBe(true);
         expect(heavies[0].radius).toBeGreaterThan(spawned.find((z: any) => !z.heavy).radius);
+    });
+
+    it('gives the base tier no finisher — that is what evolving buys', () => {
+        weapon.cooldown = 0;
+        runSalvo(weapon);
+        expect(spawned.some((z: any) => z.heavy)).toBe(false);
     });
 
     it('puts the evolved tier on a long cooldown', () => {
@@ -117,7 +151,7 @@ describe('OrbitalStrikeWeapon', () => {
         vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue(crowd as any);
         weapon.evolved = true;
         weapon.cooldown = 0;
-        weapon.update(0.016);
+        runSalvo(weapon);
 
         const heavy = spawned.find((z: any) => z.heavy)!;
         // Every shell lands within a couple of blast radii of the crowd centre

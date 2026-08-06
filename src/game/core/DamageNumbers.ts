@@ -30,8 +30,8 @@ import { juice } from '../../engine/JuiceSystem';
 /** Glyph height of the pixel font, for stacking the hit counter above a total */
 const GLYPH_HEIGHT = 7;
 
-/** Damage the player dealt, or damage the player took */
-export type DamageKind = 'dealt' | 'taken';
+/** Damage the player dealt, damage the player took, or health they got back */
+export type DamageKind = 'dealt' | 'taken' | 'healed';
 
 interface DamageNumber {
     kind: DamageKind;
@@ -109,6 +109,19 @@ const TAKEN_MERGE_WINDOW = 0.55;
 /** Length of the punch-in on spawn and on every merge */
 const POP_TIME = 0.12;
 
+/**
+ * Colour per kind. Damage dealt falls through to white, or yellow on a crit —
+ * it is the only kind whose colour depends on more than what it is.
+ */
+const KIND_COLOR: Partial<Record<DamageKind, string>> = {
+    taken: '#ff5a6e',
+    healed: '#6bff9e',
+};
+const KIND_OUTLINE: Partial<Record<DamageKind, string>> = {
+    taken: '#2a0008',
+    healed: '#00301a',
+};
+
 const STORAGE_KEY = 'survivors.damageNumbers';
 
 function loadEnabled(): boolean {
@@ -173,6 +186,20 @@ export class DamageNumbers {
         this.push(pos, amount, false, 'taken');
     }
 
+    /**
+     * Health the player got back, in green, above their head.
+     *
+     * The screen reported damage dealt and damage taken and said nothing at all
+     * about healing, so the one number a player is desperate for at 20% HP —
+     * *is this working?* — was only visible as a bar creeping. Picking up a
+     * repair cell in particular has to answer instantly, because it is a thing
+     * you went and did.
+     */
+    spawnHealed(pos: Vector2, amount: number) {
+        if (amount < 1) return;
+        this.push(pos, amount, false, 'healed');
+    }
+
     private push(pos: Vector2, amount: number, isCrit: boolean, kind: DamageKind) {
         if (!damageNumberSettings.enabled) return;
 
@@ -180,27 +207,31 @@ export class DamageNumbers {
 
         if (this.items.length > MAX_ON_SCREEN) this.items.shift();
 
-        const taken = kind === 'taken';
-        const life = taken ? 0.7 : (isCrit ? 0.8 : 0.55);
+        // Both of the player's own numbers spawn at a fixed point over their
+        // head rather than scattered across a crowd, so they share the layout
+        const onPlayer = kind !== 'dealt';
+        const life = onPlayer ? 0.7 : (isCrit ? 0.8 : 0.55);
         this.items.push({
             // A little horizontal jitter so two simultaneous hits that failed to
             // merge do not sit exactly on top of each other. Kept small — it
             // pushes hits apart *before* they get a chance to merge, so it works
             // against the thing that actually keeps the screen readable.
-            x: taken ? pos.x : pos.x + (Math.random() - 0.5) * 14,
+            x: onPlayer ? pos.x : pos.x + (Math.random() - 0.5) * 14,
             y: pos.y,
             // Arc upward and outward so overlapping hits stay readable
-            vx: taken ? 0 : (Math.random() - 0.5) * 60,
-            vy: taken ? -70 : (isCrit ? -160 : -110),
+            vx: onPlayer ? 0 : (Math.random() - 0.5) * 60,
+            vy: onPlayer ? -70 : (isCrit ? -160 : -110),
             amount,
-            text: Math.max(1, Math.round(amount)).toString(),
+            // Healing is the only one that carries a sign, because it is the
+            // only one whose direction is not obvious from where it appears
+            text: (kind === 'healed' ? '+' : '') + Math.max(1, Math.round(amount)).toString(),
             life,
             maxLife: life,
             isCrit,
             kind,
             hits: 1,
             critAmount: isCrit ? amount : 0,
-            openFor: taken ? TAKEN_MERGE_WINDOW : MERGE_WINDOW,
+            openFor: onPlayer ? TAKEN_MERGE_WINDOW : MERGE_WINDOW,
             pop: POP_TIME,
         });
     }
@@ -229,7 +260,7 @@ export class DamageNumbers {
             dn.amount += amount;
             dn.hits++;
             if (isCrit) dn.critAmount += amount;
-            dn.text = Math.max(1, Math.round(dn.amount)).toString();
+            dn.text = (kind === 'healed' ? '+' : '') + Math.max(1, Math.round(dn.amount)).toString();
 
             // Crit styling follows where the DAMAGE came from, not whether any
             // single hit crit.
@@ -283,7 +314,7 @@ export class DamageNumbers {
                 // would drag it away from what it is counting. One gathering
                 // over the PLAYER has to climb, or it sits on top of the
                 // sprite for half a second and hides the thing being eaten.
-                if (dn.kind === 'taken') dn.y += dn.vy * dt;
+                if (dn.kind !== 'dealt') dn.y += dn.vy * dt;
                 continue;
             }
 
@@ -318,7 +349,7 @@ export class DamageNumbers {
             const pop = dn.pop > 0
                 ? 1 + (dn.pop / POP_TIME) * 0.3
                 : Math.max(0.85, 1 - t * 0.15);
-            const base = dn.isCrit ? 2.8 : (dn.kind === 'taken' ? 2.6 : 2.0);
+            const base = dn.isCrit ? 2.8 : (dn.kind === 'dealt' ? 2.0 : 2.6);
             const scale = Math.max(1, Math.round(base * pop));
 
             const sx = dn.x - camera.x;
@@ -330,8 +361,8 @@ export class DamageNumbers {
                 align: 'center',
                 spacing: 1,
                 shadow: 1,
-                color: dn.kind === 'taken' ? '#ff5a6e' : (dn.isCrit ? '#ffe14d' : '#ffffff'),
-                outline: dn.isCrit ? '#ff4400' : (dn.kind === 'taken' ? '#2a0008' : undefined),
+                color: KIND_COLOR[dn.kind] ?? (dn.isCrit ? '#ffe14d' : '#ffffff'),
+                outline: KIND_OUTLINE[dn.kind] ?? (dn.isCrit ? '#ff4400' : undefined),
             });
 
             // How many hits this total is. Without it a merged number reads as

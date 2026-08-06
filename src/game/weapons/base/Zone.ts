@@ -71,9 +71,21 @@ export class Zone extends Entity {
         this.radius = this.baseRadius * from;
     }
 
-    /** 0 the instant it lands, 1 the instant it dies */
+    /** Seconds this zone has been on the ground */
+    protected elapsed: number = 0;
+
+    /**
+     * 0 the instant it lands, 1 once it has lived out the life it was born with.
+     *
+     * Measured from `elapsed` rather than from what is left of `duration`, so a
+     * zone whose life gets **extended** keeps growing instead of snapping back.
+     * The old form was `1 - duration / lifetime`, and any zone handed extra
+     * seconds (see SporeZone.feedOnDeath) would have read as suddenly younger
+     * and shrunk on the spot. Saturating at 1 is the right end state: a patch
+     * that is being fed holds its full size for as long as it is fed.
+     */
     protected get lifeProgress(): number {
-        return Math.max(0, Math.min(1, 1 - this.duration / this.lifetime));
+        return Math.max(0, Math.min(1, this.elapsed / this.lifetime));
     }
 
     /**
@@ -87,6 +99,7 @@ export class Zone extends Entity {
     }
 
     update(dt: number) {
+        this.elapsed += dt;
         this.duration -= dt;
         if (this.duration <= 0) this.isDead = true;
 
@@ -459,11 +472,48 @@ export class BurningTrailZone extends Zone {
  *
  * All geometry is baked against `baseRadius` and scaled at draw time.
  */
+/** Seconds a fungal mat gains from one body dying on it */
+export const SPORE_DEATH_EXTEND = 1;
+
 export class SporeZone extends Zone {
     /** Damage per second applied as an infection to anything inside */
     infectDps: number = 0;
     infectDuration: number = 3;
     contagious: boolean = false;
+
+    /**
+     * Total seconds this mat may still bank from kills. Set by the weapon from
+     * its level; 0 means the mat cannot be fed at all.
+     *
+     * **A cap is the whole reason this is safe.** Without one, a patch under a
+     * late-game crowd gains more than a second per second and never dies, and
+     * "carpet the arena in mushrooms" stops being something you work for and
+     * becomes something that happens once and never stops. With a cap the mat
+     * is a lease you renew by feeding it, and it always eventually rots.
+     */
+    extensionBudget: number = 0;
+
+    /**
+     * Something died on the mat. Returns whether the mat actually took the meal
+     * — false once its budget is spent, so callers can skip the effect.
+     *
+     * The mycelium feeding on what it kills is the one behaviour that makes
+     * this class play differently from everything else in the pool: every other
+     * weapon fires and forgets, and this one holds ground for as long as the
+     * ground keeps paying. It also self-limits in the right direction — the mat
+     * only persists while it is still killing, so a thinning crowd lets it rot.
+     */
+    feedOnDeath(x: number, y: number): boolean {
+        if (this.extensionBudget <= 0 || this.isDead) return false;
+        const dx = x - this.pos.x;
+        const dy = y - this.pos.y;
+        if (dx * dx + dy * dy > this.radius * this.radius) return false;
+
+        const gain = Math.min(SPORE_DEATH_EXTEND, this.extensionBudget);
+        this.extensionBudget -= gain;
+        this.duration += gain;
+        return true;
+    }
 
     protected puffs: { x: number; y: number; r: number; phase: number; drift: number; motes: Vector2[] }[] = [];
     /** Mycelium: short baked polylines crawling out of the centre */

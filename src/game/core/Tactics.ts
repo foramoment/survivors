@@ -158,14 +158,19 @@ export const REPAIR_LIFETIME = 12;
  * fastest when you are worst hurt, and by its exponential nature never quite
  * finishes).
  *
- * **Halved from 3 seconds**, which was long enough to be a permanent lockout
- * rather than a gate. Measured over a real run: bites landed every ~3.5s
- * against a 3s delay, so regeneration ran about a fifth of the time and four
- * picks of Nano-Repair delivered 0.63 HP/s — a card that read as generous and
- * paid out as nothing. 1.5s leaves a satisfiable window without letting the
- * trickle run while a crowd is chewing on you.
+ * **Down from 3 seconds, then from 1.5.** Three was long enough to be a
+ * permanent lockout rather than a gate: measured over a real run, bites landed
+ * every ~3.5s against a 3s delay, so regeneration ran about a fifth of the time
+ * and four picks of Nano-Repair delivered 0.63 HP/s — a card that read as
+ * generous and paid out as nothing.
+ *
+ * One second is short enough that stepping out of a fight pays immediately,
+ * which is what makes disengaging a decision rather than a formality, and still
+ * long enough that nothing regenerates while a crowd is on it. The rate is
+ * bounded by the stack cap on Nano-Repair, not by this — see its entry in
+ * GameData for why the cap is what does the balancing.
  */
-export const REGEN_COMBAT_DELAY = 1.5;
+export const REGEN_COMBAT_DELAY = 1;
 
 /**
  * Bonus multiplier from Adrenal Surge — 1 while healthy, 1 + stacks while
