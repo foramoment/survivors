@@ -847,19 +847,41 @@ export class AudioSystem {
      * the finale — and in between the track walks the written FORM. Within a
      * cycle the two halves can differ, so an eight-bar cycle is not just the
      * same four bars twice: the second half lifts when the fight is hot.
+     *
+     * ## The thresholds are calibrated to the heat the GAME actually sends
+     *
+     * They were originally spread across 0..1 as if intensity used the whole
+     * range. It does not. The caller feeds
+     * `0.15 + 0.55 * min(1, t / 480) + 0.3 * adaptHeat`, so a run opens at
+     * about **0.20** and only reaches 0.85 near minute eight. Measured against
+     * the old numbers, that meant:
+     *
+     *   - `< 0.45` held every chorus back to verseB for the first **3:38**
+     *   - `> 0.66` never lifted anything before **6:41**
+     *   - `>= 0.95` was unreachable outside a boss, so the finale never fired
+     *
+     * A player therefore spent the first third of a run in the quiet half of
+     * the arrangement, which is the whole of "the tracks lost their drive" —
+     * the writing was fine, the gates were set for a signal that never arrives.
+     *
+     * If the heat formula in GameManager changes, these move with it.
      */
     private sectionFor(cycleIndex: number, bar: number, heat: number): Section {
-        if (heat >= 0.95) return SECTIONS.finale;
+        // Reachable now: a hot minute eight sits near 0.85, and a boss pins 1
+        if (heat >= 0.84) return SECTIONS.finale;
+        // ~17 seconds of opener at the start of a run, then it is done
         if (heat < 0.22) return SECTIONS.intro;
 
         const planned = SECTIONS[FORM[cycleIndex % FORM.length]] ?? SECTIONS.verse;
 
-        // Hot fight: the back half of any non-chorus cycle steps up
-        if (heat > 0.66 && bar >= 4 && planned !== SECTIONS.chorus) {
+        // Hot fight: the back half of any non-chorus cycle steps up. Crosses
+        // around minute four instead of minute seven.
+        if (heat > 0.5 && bar >= 4 && planned !== SECTIONS.chorus) {
             return planned === SECTIONS.bridge ? SECTIONS.chorus : SECTIONS.verseB;
         }
-        // Quiet stretch: hold a chorus back so it still means something later
-        if (heat < 0.45 && planned === SECTIONS.chorus) return SECTIONS.verseB;
+        // Quiet stretch: hold a chorus back so it still means something later.
+        // Only the opening minute now, not the opening third of the run.
+        if (heat < 0.30 && planned === SECTIONS.chorus) return SECTIONS.verseB;
 
         return planned;
     }
