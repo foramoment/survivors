@@ -31,7 +31,7 @@ import {
     dischargeThreshold, dischargeRadius, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
     DISCHARGE_COOLDOWN, DISCHARGE_CHARGE_CAP,
     KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE, KILL_ECHO_BOSS_RESIST,
-    KILL_ECHO_KNOCKBACK, KILL_ECHO_PUNCH_GAP,
+    KILL_ECHO_KNOCKBACK, KILL_ECHO_PUNCH_GAP, KILL_ECHO_ICD,
 } from './core/Tactics';
 import { screenManager } from '../engine/ui/ScreenManager';
 import { LevelUpOverlay } from './ui/screens/LevelUpOverlay';
@@ -133,6 +133,8 @@ export class GameManager {
     private dischargeCooldown: number = 0;
     /** Gate on the Kill Echo camera kick (see KILL_ECHO_PUNCH_GAP) */
     private echoPunchTimer: number = 0;
+    /** Internal cooldown on Kill Echo itself (see KILL_ECHO_ICD) */
+    private echoIcdTimer: number = 0;
     /**
      * Contact damage banked since the last time a number was printed.
      *
@@ -236,6 +238,7 @@ export class GameManager {
         this.capacitorCharge = 0;
         this.dischargeCooldown = 0;
         this.echoPunchTimer = 0;
+        this.echoIcdTimer = 0;
         this.contactPending = 0;
         this.contactPrintTimer = 0;
         this.healPending = 0;
@@ -627,7 +630,11 @@ export class GameManager {
     private killEcho(enemy: Enemy) {
         if (!this.player) return;
         if (enemy.echoed) return;
+        // Bounded rate first, chance second — see KILL_ECHO_ICD for why a
+        // per-kill chance alone is not a rate at all
+        if (this.echoIcdTimer > 0) return;
         if (Math.random() >= this.player.stats.killEcho) return;
+        this.echoIcdTimer = KILL_ECHO_ICD;
 
         const radius = KILL_ECHO_RADIUS * this.player.stats.area;
 
@@ -770,6 +777,7 @@ export class GameManager {
         this.runStats.update(dt);
         if (this.dischargeCooldown > 0) this.dischargeCooldown -= dt;
         if (this.echoPunchTimer > 0) this.echoPunchTimer -= dt;
+        if (this.echoIcdTimer > 0) this.echoIcdTimer -= dt;
         if (this.contactFxTimer > 0) this.contactFxTimer -= dt;
         this.flushHealNumber(dt);
         this.waveTimer += dt;

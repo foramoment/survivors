@@ -22,6 +22,8 @@
  * a rip big enough to matter.
  */
 import { ProjectileWeapon, Projectile, Zone, type ProjectileParams } from '../base';
+import type { Entity } from '../../../engine/Entity';
+import type { HitResult } from '../../core/CollisionSystem';
 import type { Player } from '../../entities/Player';
 import { type Vector2, distance, normalize } from '../../../engine/Utils';
 import { levelSpatialHash } from '../../../engine/SpatialHash';
@@ -100,16 +102,42 @@ export class VoidRip extends Zone {
 // ============================================
 
 export class VoidBolt extends Projectile {
-    /** Called where the bolt finally stops */
+    /** Called where the bolt finally stops, if it hit anything at all */
     onSpent?: (x: number, y: number) => void;
+
+    /**
+     * Where the bolt last bit into something.
+     *
+     * The rip used to be torn wherever the bolt *died*, which includes running
+     * out of flight time over empty floor — and that inverted the whole weapon.
+     * On an easy stage the bolt punches clean through everything, keeps flying,
+     * and drops its rip in a random patch of nothing; on a hard stage it runs
+     * out of pierce inside the pack and drops the rip right on the crowd.
+     *
+     * So the weapon was **at its best when it failed to do the thing it is
+     * named after**, which a play report caught before any test did: "the only
+     * weapon that one-shots things on the Station, and it works because the
+     * bolt cannot get through".
+     *
+     * Anchoring to the last body hit fixes the incentive: punching through more
+     * enemies now moves the rip further INTO the pack instead of past it, and a
+     * shot that connects with nothing leaves nothing behind.
+     */
+    private lastBite: Vector2 | null = null;
 
     constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number) {
         super(x, y, velocity, duration, damage, pierce, '');
         this.radius = 7;
     }
 
+    handleHit(enemy: Entity): HitResult {
+        this.lastBite = { x: enemy.pos.x, y: enemy.pos.y };
+        return super.handleHit(enemy);
+    }
+
     protected onDeath(): void {
-        this.onSpent?.(this.pos.x, this.pos.y);
+        if (!this.lastBite) return;
+        this.onSpent?.(this.lastBite.x, this.lastBite.y);
     }
 
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {

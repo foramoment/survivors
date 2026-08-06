@@ -85,7 +85,7 @@ export const DISCHARGE_CHARGE_CAP = 1.5;
  * chain — it softens, and your weapons finish. That also makes it a companion
  * to a build rather than a replacement for one.
  */
-export const KILL_ECHO_DAMAGE_SHARE = 0.15;
+export const KILL_ECHO_DAMAGE_SHARE = 0.3;
 /**
  * Bosses take a quarter, the same courtesy every stun source gives them. A
  * percent-of-current-health effect is at its strongest against exactly the kind
@@ -99,6 +99,31 @@ export const KILL_ECHO_BOSS_RESIST = 0.25;
 export const KILL_ECHO_RADIUS = 62;
 /** Burn left on survivors, as a share of their own max HP per second */
 export const KILL_ECHO_BURN_SHARE = 0.05;
+
+/**
+ * Minimum seconds between echoes, however fast you are killing.
+ *
+ * **A per-kill chance has no rate.** It has a rate multiplied by your kill
+ * speed, and kill speed swings by 3x between a slow Void Nexus run and a fast
+ * Asteroid Fields one. Measured off two real runs at the same three stacks:
+ *
+ *     18% at  5.8 kills/s  ->  1.0 echoes per second
+ *     18% at 15.7 kills/s  ->  2.8 echoes per second
+ *
+ * The play report was that three stacks on the easy stage sounded as constant
+ * as six stacks on the hard one, which is exactly what those numbers say. An
+ * effect firing three times a second is not an event, it is ambience, and the
+ * perk stops being worth choosing because it stops being noticed.
+ *
+ * This is the same fix `DISCHARGE_COOLDOWN` already applies to Static
+ * Discharge one file over, for the same reason: charge alone was not a rate
+ * limit either. An internal cooldown is a WoW trinket ICD — it bounds the top
+ * without touching how the effect feels when it does land.
+ *
+ * With the rate bounded, the blast is free to be twice as heavy. Rare and loud
+ * beats constant and ignorable.
+ */
+export const KILL_ECHO_ICD = 1.6;
 
 /**
  * How hard the blast throws the bodies it catches, at the epicentre.

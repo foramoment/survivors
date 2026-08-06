@@ -144,7 +144,34 @@ describe('Void Bolt', () => {
         expect(spawned.filter(e => e instanceof VoidBolt)).toHaveLength(3);
     });
 
-    it('tears a rip where the bolt is spent', () => {
+    it('tears the rip on the last body it hit, not where it ran out of flight', () => {
+        // The rip used to be torn wherever the bolt died, flight timeout
+        // included. That inverted the weapon: punching cleanly through a pack
+        // dropped the rip on empty floor past it, while failing to get through
+        // dropped it on the crowd — so the gun was at its best when it failed
+        // at the thing it is named after.
+        const weapon = new VoidRayWeapon(mockOwner());
+        const spawned = collect(weapon);
+        const victim = enemyAt(200, 0);
+        levelSpatialHash.insertAll([victim]);
+
+        weapon.update(0.1);
+        const bolt = spawned[0] as any;
+        spawned.length = 0;
+
+        bolt.handleHit(victim);
+        // Fly well past the body before running out of time
+        bolt.pos.x = 900;
+        bolt.kill();
+
+        const rip = spawned.find(e => e instanceof VoidRip) as VoidRip;
+        expect(rip).toBeDefined();
+        expect(rip.pullStrength).toBeGreaterThan(0);
+        expect(rip.pos.x).toBeCloseTo(victim.pos.x);
+        expect(rip.pos.y).toBeCloseTo(victim.pos.y);
+    });
+
+    it('leaves nothing behind when it connects with nothing', () => {
         const weapon = new VoidRayWeapon(mockOwner());
         const spawned = collect(weapon);
         levelSpatialHash.insertAll([enemyAt(200, 0)]);
@@ -154,9 +181,7 @@ describe('Void Bolt', () => {
         spawned.length = 0;
         bolt.kill();
 
-        const rip = spawned.find(e => e instanceof VoidRip) as VoidRip;
-        expect(rip).toBeDefined();
-        expect(rip.pullStrength).toBeGreaterThan(0);
+        expect(spawned.some(e => e instanceof VoidRip)).toBe(false);
     });
 });
 
