@@ -54,9 +54,15 @@ describe('OrbitalStrikeWeapon', () => {
     let weapon: OrbitalStrikeWeapon;
     let spawned: any[];
 
-    /** Shells launch on a stagger, so a salvo needs a few frames to leave */
+    /**
+     * Shells launch on a stagger, so a salvo needs a few seconds to leave.
+     * The cooldown is pinned after the first frame so draining a long salvo
+     * cannot roll into the next one.
+     */
     function runSalvo(w: any) {
-        for (let t = 0; t < 2; t += 0.05) w.update(0.05);
+        w.update(0.05);
+        w.cooldown = 999;
+        for (let t = 0; t < 5; t += 0.05) w.update(0.05);
     }
 
     beforeEach(() => {
@@ -114,8 +120,8 @@ describe('OrbitalStrikeWeapon', () => {
         // +1 shell every second level, and evolving keeps adding rather than
         // replacing — the trap that had the evolved Plasma Cannon handing back
         // fewer shards than level five
-        expect(salvoAt(3, false)).toBe(salvoAt(1, false) + 1);
-        expect(salvoAt(5, false)).toBe(salvoAt(3, false) + 1);
+        expect(salvoAt(2, false)).toBe(salvoAt(1, false) + 1);
+        expect(salvoAt(4, false)).toBe(salvoAt(2, false) + 1);
         expect(salvoAt(6, true)).toBeGreaterThan(salvoAt(6, false));
         expect(salvoAt(8, true)).toBeGreaterThan(salvoAt(6, true));
     });

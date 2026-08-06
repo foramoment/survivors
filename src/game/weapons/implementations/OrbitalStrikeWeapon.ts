@@ -248,7 +248,12 @@ export class OrbitalStrikeWeapon extends Weapon {
 
     /**
      * Shells in a salvo: one more every second level, three more on evolving.
-     * L1 1, L3 2, L5 3, L6 evolved 6.
+     * L1 1, L2 2, L4 3, L6 4, L6 evolved 7.
+     *
+     * Counted off `level / 2` rather than `(level - 1) / 2` so the second shell
+     * lands on the **second** level. The first form put it at level three,
+     * which meant the first two picks on this weapon still changed nothing you
+     * could see — which is the exact complaint this was meant to answer.
      *
      * Levelling used to buy +7% blast radius, which is structural on paper and
      * invisible in play — you cannot see seven percent, and the weapon sat next
@@ -260,7 +265,7 @@ export class OrbitalStrikeWeapon extends Weapon {
      * had the evolved Plasma Cannon handing back fewer shards than level five.
      */
     private shellCount(): number {
-        const base = 1 + Math.floor((this.level - 1) / 2);
+        const base = 1 + Math.floor(this.level / 2);
         return this.evolved ? base + 3 : base;
     }
 
