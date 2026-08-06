@@ -214,7 +214,7 @@ export const RU: Record<string, string> = {
     'class.null_warden.name': 'Страж Пустоты',
     'class.null_warden.bonus': 'Площадь +15%, Броня +1 · +1% длительности эффектов за уровень',
     'class.berserker.name': 'Берсерк',
-    'class.berserker.bonus': 'HP +50%, Урон +10%, Броня −2 · Адреналин: сильнее и быстрее ниже 35% HP · +1% шанса крита за уровень',
+    'class.berserker.bonus': 'HP +50%, Урон +10%, Броня −2 · +1% шанса крита за уровень',
 
     // --------------------------------------------------------------- powerups
     'powerup.nano_repair.name': 'Наноремонт',
@@ -246,8 +246,6 @@ export const RU: Record<string, string> = {
     'powerup.static_discharge.desc': 'Полученный урон копит заряд, который сдувает толпу с тебя',
     'powerup.kill_echo.name': 'Эхо Смерти',
     'powerup.kill_echo.desc': 'Убитые иногда детонируют и поджигают уцелевших',
-    'powerup.adrenal_surge.name': 'Выброс Адреналина',
-    'powerup.adrenal_surge.desc': 'На последнем издыхании бьёшь сильнее и бежишь быстрее',
     'powerup.first_strike.name': 'Первый Удар',
     'powerup.first_strike.desc': 'Куда больнее бьёт по тем, кого ещё не задели',
     'powerup.vital_siphon.name': 'Сифон Жизни',

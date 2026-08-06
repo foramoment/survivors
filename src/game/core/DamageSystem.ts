@@ -75,7 +75,7 @@ class DamageSystemClass {
         const isCrit = Math.random() < player.stats.critChance;
         const critMultiplier = isCrit ? player.stats.critDamage : 1;
 
-        // `effectiveMight` folds in conditional bonuses (Adrenal Surge); plain
+        // `effectiveMight` is the seam for conditional damage bonuses; plain
         // `stats.might` is the fallback for the mock owners used in tests
         const might = player.effectiveMight ?? player.stats.might;
         const opener = 1 + this.openerBonus(player, target);

@@ -88,15 +88,17 @@ export const CLASSES = [
         perLevel: { stat: 'cooldown', value: -0.01 } as ClassPerLevel,
     },
     {
-        // The only class that starts with a tactic: adrenaline turns its
-        // missing armour into the reason to keep fighting at low HP
+        // Deliberately spare: the biggest HP pool in the game paired with
+        // negative armour, so it survives by being enormous rather than by
+        // being careful. It carried Adrenal Surge as a signature tactic until
+        // that perk was removed.
         id: 'berserker', name: "Berserker", emoji: "🔥",
-        bonus: "HP +50%, Damage +10%, Armor −2 · Adrenaline: harder and faster below 35% HP · +1% crit chance per level",
+        bonus: "HP +50%, Damage +10%, Armor −2 · +1% crit chance per level",
         weaponId: 'spinning_ember', hp: 150,
         // Negative armour runs through the same curve and comes out at +25%
         // damage taken. It is clamped well short of the pole at -K, so no stack
         // of debuffs can ever flip the sign (see armorMultiplier).
-        stats: { armor: -2, might: 1.1, adrenaline: 0.15 },
+        stats: { armor: -2, might: 1.1 },
         perLevel: { stat: 'critChance', value: 0.01 } as ClassPerLevel,
     },
     {
@@ -232,7 +234,6 @@ export const POWERUPS: PowerupData[] = [
     // an opening hit, so it can never help finish anything. See
     // DamageSystem.openerBonus.
     { id: 'first_strike', name: "First Strike", description: "Hit far harder on anything still untouched", type: "firstStrike", value: 0.12, maxStacks: 6, emoji: "🩹" },
-    { id: 'adrenal_surge', name: "Adrenal Surge", description: "Hit harder and move faster while nearly dead", type: "adrenaline", value: 0.1, maxStacks: 8, emoji: "🩸" },
     // Capped at five. At eight it is a 20% drop chance, and a twenty-minute run
     // kills enough to turn that into 3-4 HP/s of free sustain — four times what
     // maxed regen gives, on a perk that is not supposed to be the regen perk.

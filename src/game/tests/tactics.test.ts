@@ -9,9 +9,8 @@ vi.mock('../../engine/Input', () => ({
     },
 }));
 
-import { Player } from '../entities/Player';
 import { RepairCell } from '../entities/RepairCell';
-import { adrenalineMultiplier, dischargeThreshold, dischargeRadius, DISCHARGE_COOLDOWN, ADRENALINE_THRESHOLD, REPAIR_LIFETIME } from '../core/Tactics';
+import { dischargeThreshold, dischargeRadius, DISCHARGE_COOLDOWN, REPAIR_LIFETIME } from '../core/Tactics';
 import { POWERUPS } from '../data/GameData';
 import { VALID_PLAYER_STATS } from '../core/PlayerStats';
 
@@ -23,7 +22,7 @@ describe('Tactics powerups', () => {
     });
 
     it('the four tactics exist', () => {
-        const tactics = ['static_discharge', 'kill_echo', 'adrenal_surge', 'vital_siphon'];
+        const tactics = ['static_discharge', 'kill_echo', 'vital_siphon'];
         for (const id of tactics) {
             expect(POWERUPS.find(p => p.id === id), id).toBeDefined();
         }
@@ -40,35 +39,6 @@ describe('Tactics powerups', () => {
 
     it('projectile speed is gone from the pool', () => {
         expect(POWERUPS.some(p => p.type === 'speed')).toBe(false);
-    });
-});
-
-describe('Adrenal Surge', () => {
-    it('does nothing while healthy', () => {
-        expect(adrenalineMultiplier(100, 100, 0.3)).toBe(1);
-        expect(adrenalineMultiplier(50, 100, 0.3)).toBe(1);
-    });
-
-    it('kicks in below the threshold', () => {
-        const hp = 100 * ADRENALINE_THRESHOLD - 1;
-        expect(adrenalineMultiplier(hp, 100, 0.3)).toBeCloseTo(1.3);
-    });
-
-    it('is inert without the perk', () => {
-        expect(adrenalineMultiplier(5, 100, 0)).toBe(1);
-    });
-
-    it('drives both damage and move speed off one state', () => {
-        const player = new Player(0, 0);
-        player.maxHp = 100;
-        player.stats.adrenaline = 0.5;
-
-        player.hp = 100;
-        expect(player.effectiveMight).toBeCloseTo(player.stats.might);
-
-        player.hp = 20;
-        expect(player.effectiveMight).toBeCloseTo(player.stats.might * 1.5);
-        expect(player.adrenaline).toBeCloseTo(1.5);
     });
 });
 

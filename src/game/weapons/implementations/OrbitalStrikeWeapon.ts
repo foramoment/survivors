@@ -230,8 +230,9 @@ export class OrbitalStrikeWeapon extends Weapon {
 
     update(dt: number) {
         this.cooldown -= dt;
-        if (this.cooldown <= 0) {
-            this.fireBarrage();
+        // Nothing in range means nothing to shell — the cooldown is left alone
+        // so the first enemy to walk into range gets the salvo immediately
+        if (this.cooldown <= 0 && this.fireBarrage()) {
             this.cooldown = (this.evolved ? 8.0 : this.baseCooldown) * this.owner.stats.cooldown;
         }
 
@@ -278,21 +279,28 @@ export class OrbitalStrikeWeapon extends Weapon {
      * broken. Falls back to a random spot near the player when the field is
      * empty.
      */
-    private pickTarget(): Vector2 {
+    /**
+     * Where the next shell lands, or null when there is nothing to shell.
+     *
+     * It used to fall back to a random point around the player, so the weapon
+     * opened every run by bombarding empty floor before a single enemy had
+     * walked on. Artillery firing at nothing does not read as a weapon warming
+     * up, it reads as broken — and on the class whose starting weapon is
+     * already the hardest to understand, that is the worst possible first
+     * impression.
+     *
+     * Holding fire also costs nothing: the cooldown does not start until a
+     * salvo goes out, so the first real target gets shelled immediately.
+     */
+    private pickTarget(): Vector2 | null {
         const candidates = this.findRandomEnemies(1, OrbitalStrikeWeapon.SPREAD);
-        if (candidates.length > 0) {
-            const target = candidates[0];
-            // Lead the target slightly so it isn't a guaranteed hit
-            return {
-                x: target.pos.x + (Math.random() - 0.5) * 40,
-                y: target.pos.y + (Math.random() - 0.5) * 40,
-            };
-        }
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 120 + Math.random() * (OrbitalStrikeWeapon.SPREAD - 120);
+        if (candidates.length === 0) return null;
+
+        const target = candidates[0];
+        // Lead the target slightly so it isn't a guaranteed hit
         return {
-            x: this.owner.pos.x + Math.cos(angle) * dist,
-            y: this.owner.pos.y + Math.sin(angle) * dist,
+            x: target.pos.x + (Math.random() - 0.5) * 40,
+            y: target.pos.y + (Math.random() - 0.5) * 40,
         };
     }
 
@@ -309,18 +317,22 @@ export class OrbitalStrikeWeapon extends Weapon {
      * are spaced by their own blast radius, so they overlap into one advancing
      * wall of fire that visibly crosses the pack.
      */
-    private fireBarrage() {
+    /** @returns whether a salvo actually went out, so the caller can hold fire */
+    private fireBarrage(): boolean {
+        const aim = this.pickTarget();
+        if (!aim) return false;
+
         const shells = this.shellCount();
         const radius = this.blastRadius() * (shells > 1 ? 0.9 : 1);
         const stagger = OrbitalStrikeWeapon.SHELL_STAGGER;
 
         // A single shell has no line to walk, so it just goes where the target is
         if (shells === 1) {
-            this.queue.push({ pos: this.pickTarget(), radius, damage: this.damage, heavy: false, at: 0 });
-            return;
+            this.queue.push({ pos: aim, radius, damage: this.damage, heavy: false, at: 0 });
+            return true;
         }
 
-        const centre = this.findDensestSpot(OrbitalStrikeWeapon.SPREAD, radius * 2) ?? this.pickTarget();
+        const centre = this.findDensestSpot(OrbitalStrikeWeapon.SPREAD, radius * 2) ?? aim;
         const sweep = Math.random() * Math.PI * 2;
         const spacing = radius * OrbitalStrikeWeapon.BARRAGE_SPACING;
 
@@ -350,6 +362,8 @@ export class OrbitalStrikeWeapon extends Weapon {
                 at: shells * stagger + 0.35,
             });
         }
+
+        return true;
     }
 
     private fireShell(pos: Vector2, radius: number, damage: number, delay: number, heavy: boolean) {

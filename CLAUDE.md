@@ -32,7 +32,7 @@ src/game/                 # 🎮 СОБСТВЕННО SURVIVORS
 │   ├── ParticleSystem.ts # ✨ Singleton: эффекты частиц
 │   ├── SpatialHash.ts    # 🗺️ Оптимизация поиска сущностей O(1)
 │   ├── DifficultyDirector.ts # 🎚️ Адаптивная сложность, спавн, волны, мини-боссы
-│   ├── Tactics.ts        # 🧩 Перки-механики: разряд, эхо, адреналин, сифон
+│   ├── Tactics.ts        # 🧩 Перки-механики: разряд, эхо, сифон, реген
 │   ├── Score.ts          # 🏅 Очки за забег + локальный лидерборд (localStorage)
 │   ├── SpriteFactory.ts  # 🎨 Процедурные пиксельные спрайты (враги/игрок/фон) — БЕЗ ассетов
 │   ├── StageBackdrop.ts  # 🌠 Параллакс арены (небула/звёзды/пол/пыль) + свет стейджа
@@ -148,7 +148,7 @@ Engine.loop
 Weapon.update → onSpawn(entity) → GameManager.entities
   → CollisionSystem видит пересечение
   → damageSystem.dealDamage({ baseDamage, source, target })
-      × might (+ адреналин)  × крит  × First Strike
+      × might  × крит  × First Strike
       × (1 + corrosion.amp)                       ← внутри applyDamage
   → target.takeDamage → Enemy.isDead
   → колбэк damage-number → RunStats.recordHit
@@ -709,6 +709,11 @@ ENEMY_CONFIG = {
 - Спавн через аккумулятор (независим от FPS): `spawnRate = min(30, (2 + gameTime/45) × intensity)`
 - **intensity** (0.6–3.0) адаптируется раз в секунду по HP игрока и скорости зачистки (kills/sec vs spawns/sec)
 - HP врагов: `(1 + gameTime/240) × (0.75 + 0.25 × intensity)` × `stage.hpScale` — **кап 3x убран**
+- **`stage.hpScale` вводится не сразу, а за первую минуту** (`STAGE_SCALE_RAMP`), и
+  **опыт за врага едет по той же кривой**. Без второго первая минута самого
+  сложного стейджа стала бы самым быстрым способом качаться: `xpValue` считается
+  только от тира, а пул Void Nexus начинается с тира 3 (×3 опыта). Это **не**
+  «опыт пропорционален HP» — такая версия даёт петлю через `effectiveTime`
 - Контактный урон **не масштабируется вообще**: `getDamageMultiplier` удалён, а
   `stage.damageScale` к нему не применяется. Его собственный комментарий всегда
   говорил «поздняя игра давит количеством, а не укусом одного» — теперь это

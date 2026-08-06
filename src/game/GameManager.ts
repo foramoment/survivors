@@ -69,6 +69,29 @@ const HEAL_INSTANT_EVENT = 3;
 /** Pixels above the damage-taken number, so the two never overlap */
 const HEAL_NUMBER_LIFT = 16;
 
+/**
+ * Seconds over which a stage's `hpScale` fades in from 1.
+ *
+ * **The XP a kill is worth fades in on the same curve**, and that pairing is
+ * not optional. `xpValue` is a pure function of enemy tier and never looked at
+ * health, while the stage pools start at different tiers — Void Nexus opens at
+ * tier 3, worth 3x an Asteroid Fields tier 0. Today that is a fair trade: the
+ * Nexus enemy pays triple because it is nearly twice as tough.
+ *
+ * Softening its health without softening its payout would keep one half of
+ * that trade and delete the other, and the first minute of the HARDEST stage
+ * would become the fastest way in the game to level — roughly 360 XP against
+ * 120, or level 10 by the first minute instead of level 5. Picking the
+ * dangerous arena would be the greedy choice, which is backwards.
+ *
+ * Note this is NOT "XP scales with health" in general. That version has a
+ * feedback loop in it: `DifficultyDirector.effectiveTime` already raises enemy
+ * health from the player's *level*, so paying XP by health would mean level →
+ * health → XP → level. This ramp is a pure function of the clock, so it cannot
+ * feed back into itself.
+ */
+const STAGE_SCALE_RAMP = 60;
+
 /** Knockback on contact: the player barely moves, the enemy is shoved aside */
 const PLAYER_SHOVE_BACK = 55;
 const ENEMY_SHOVE = 190;
@@ -1041,6 +1064,25 @@ export class GameManager {
         };
     }
 
+    /**
+     * The stage's HP multiplier, ramped in over the opening minute.
+     *
+     * A hard stage applied its full `hpScale` from second zero, so the first
+     * thing a Void Nexus run ever showed you was a tier-3 enemy at x1.9 health
+     * against a level-1 weapon. The moment the whole opening minute of a
+     * survivors-like is built around — swing, it dies, swing, it dies — simply
+     * never happened there, and the play report was blunt about it: the easy
+     * stage was more fun because things died to one hit.
+     *
+     * Ramping it in keeps every stage's first minute feeling the same and lets
+     * the difference grow from there. What makes a stage hard is still its
+     * enemy pool, its spawn density and its length — none of which move.
+     */
+    private stageHpScale(): number {
+        const ramp = Math.min(1, this.gameTime / STAGE_SCALE_RAMP);
+        return 1 + (this.currentStage.hpScale - 1) * ramp;
+    }
+
     /** Arena threat used as the score multiplier — see core/Score */
     private get stageThreat(): number {
         return (this.currentStage.hpScale + this.currentStage.damageScale) / 2;
@@ -1177,7 +1219,11 @@ export class GameManager {
         // once used to buy five levels against minute-three enemies — see
         // DifficultyDirector.effectiveTime.
         const level = this.player?.level ?? 0;
-        enemy.maxHp = enemy.maxHp * difficultyDirector.getHpMultiplier(this.gameTime, level) * this.currentStage.hpScale;
+        // The stage's toughness fades IN over the opening minute, and the XP it
+        // is worth fades in with it. See stageHpScale.
+        const stageScale = this.stageHpScale();
+        enemy.maxHp = enemy.maxHp * difficultyDirector.getHpMultiplier(this.gameTime, level) * stageScale;
+        enemy.xpValue = Math.max(1, Math.round(enemy.xpValue * (stageScale / this.currentStage.hpScale)));
         enemy.hp = enemy.maxHp;
 
         // `enemy.damage` is NOT scaled. Contact damage is the one number that

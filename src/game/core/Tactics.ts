@@ -10,7 +10,6 @@
  *                      around you. The one perk that turns being surrounded
  *                      into an advantage.
  *   Kill Echo        — kills sometimes detonate. Rewards clearing fast.
- *   Adrenal Surge    — you hit harder and move faster while nearly dead.
  *   Vital Siphon     — kills sometimes drop a repair pickup. Healing you have
  *                      to walk to, so it can never turn into standing still.
  *
@@ -155,9 +154,6 @@ export const KILL_ECHO_KNOCKBACK = 320;
  */
 export const KILL_ECHO_PUNCH_GAP = 0.18;
 
-/** Below this share of max HP the adrenal bonus is live */
-export const ADRENALINE_THRESHOLD = 0.35;
-
 /** HP restored by one repair pickup, and how long it stays on the ground */
 export const REPAIR_HEAL = 6;
 export const REPAIR_LIFETIME = 12;
@@ -196,17 +192,6 @@ export const REPAIR_LIFETIME = 12;
  * GameData for why the cap is what does the balancing.
  */
 export const REGEN_COMBAT_DELAY = 1;
-
-/**
- * Bonus multiplier from Adrenal Surge — 1 while healthy, 1 + stacks while
- * bloodied. Applied to both damage and move speed so the perk reads as a
- * single "cornered animal" state rather than two effects.
- */
-export function adrenalineMultiplier(hp: number, maxHp: number, adrenaline: number): number {
-    if (adrenaline <= 0 || maxHp <= 0) return 1;
-    if (hp / maxHp >= ADRENALINE_THRESHOLD) return 1;
-    return 1 + adrenaline;
-}
 
 /**
  * Absorbed damage needed before the capacitor fires.

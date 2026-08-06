@@ -244,7 +244,7 @@ describe('Blood Cleaver', () => {
 
     it('hits harder the more health the wielder is missing', () => {
         // The whole reason this weapon belongs to the Berserker: the class has
-        // negative armour and an adrenaline threshold, so it lives down here
+        // negative armour, so it lives down here
         const healthy = swingDamage(1);
         const bloodied = swingDamage(0.35);
         const dying = swingDamage(0.05);

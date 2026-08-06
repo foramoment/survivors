@@ -132,7 +132,7 @@ export function formatPowerupBonus(type: string, value: number): string {
  */
 const PERCENT_TYPES = [
     'might', 'area', 'cooldown', 'speed', 'duration', 'moveSpeed', 'growth',
-    'critChance', 'critDamage', 'killEcho', 'adrenaline', 'siphon', 'firstStrike',
+    'critChance', 'critDamage', 'killEcho', 'siphon', 'firstStrike',
     // A fraction of missing HP per second — "1%" says what it does, "0.01" does not
     'regen',
 ];

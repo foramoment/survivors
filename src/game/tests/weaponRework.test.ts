@@ -67,10 +67,33 @@ describe('OrbitalStrikeWeapon', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([]);
+        // Something in range by default — the weapon holds fire otherwise
+        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([makeEnemy(200, 0)] as any);
         weapon = new OrbitalStrikeWeapon(makeOwner());
         spawned = [];
         weapon.onSpawn = (e: any) => spawned.push(e);
+    });
+
+    it('holds fire when there is nothing to shell', () => {
+        // It used to fall back to a random point around the player, so every
+        // run opened with artillery bombarding empty floor before a single
+        // enemy had walked on. On the class whose starting weapon is already
+        // the hardest to read, that is the worst possible first impression.
+        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([]);
+        weapon.cooldown = 0;
+        runSalvo(weapon);
+        expect(spawned).toHaveLength(0);
+    });
+
+    it('shells the first thing to walk into range without waiting out a cooldown', () => {
+        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([]);
+        weapon.cooldown = 0;
+        weapon.update(0.05);
+        expect(spawned).toHaveLength(0);
+
+        vi.mocked(levelSpatialHash.getWithinRadius).mockReturnValue([makeEnemy(200, 0)] as any);
+        weapon.update(0.05);
+        expect(spawned.length).toBeGreaterThan(0);
     });
 
     it('drops a single shell per cooldown at base tier', () => {

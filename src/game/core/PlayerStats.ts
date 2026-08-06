@@ -25,7 +25,6 @@ export const VALID_PLAYER_STATS = [
     // Tactics
     'discharge',
     'killEcho',
-    'adrenaline',
     'siphon',
     'reroll',
 ] as const;

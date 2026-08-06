@@ -3,7 +3,7 @@ import { type Vector2, normalize, distance } from '../../engine/Utils';
 import { input } from '../../engine/Input';
 import { Weapon } from '../Weapon';
 import { sprites } from '../core/SpriteFactory';
-import { adrenalineMultiplier, REGEN_COMBAT_DELAY } from '../core/Tactics';
+import { REGEN_COMBAT_DELAY } from '../core/Tactics';
 import { armorMultiplier, CONTACT_RAMP_FULL, CONTACT_RAMP_DECAY } from '../core/ContactDamage';
 import type { ClassPerLevel } from '../data/GameData';
 import { addStat } from '../core/PlayerStats';
@@ -66,8 +66,6 @@ export class Player extends Entity {
         discharge: 0,
         /** Chance a killed enemy detonates */
         killEcho: 0,
-        /** Bonus to damage and move speed while below the HP threshold */
-        adrenaline: 0,
         /** Chance a kill drops a repair cell */
         siphon: 0,
         /** Extra level-up rerolls on top of the free one */
@@ -111,20 +109,15 @@ export class Player extends Entity {
     }
 
     /**
-     * Adrenal Surge: one "cornered animal" state driving both damage and move
-     * speed, so the perk reads as a single thing rather than two.
-     */
-    get adrenaline(): number {
-        return adrenalineMultiplier(this.hp, this.maxHp, this.stats.adrenaline);
-    }
-
-    /**
      * Damage multiplier including conditional bonuses.
+     *
      * DamageSystem reads this rather than `stats.might` directly, so anything
-     * that boosts damage situationally has exactly one place to live.
+     * that boosts damage situationally has exactly one place to live. Nothing
+     * does right now — Adrenal Surge was the only such source and it is gone —
+     * but the seam is where the next one goes.
      */
     get effectiveMight(): number {
-        return this.stats.might * this.adrenaline;
+        return this.stats.might;
     }
 
     /**
@@ -161,8 +154,7 @@ export class Player extends Entity {
         if (this.isMoving) this.animTimer += dt;
         if (moveDir.x !== 0) this.facingLeft = moveDir.x < 0;
 
-        // Apply movement (adrenaline speeds you up while bloodied)
-        const moveSpeed = this.speed * this.stats.moveSpeed * this.adrenaline;
+        const moveSpeed = this.speed * this.stats.moveSpeed;
         let moveX = moveDir.x * moveSpeed;
         let moveY = moveDir.y * moveSpeed;
 
