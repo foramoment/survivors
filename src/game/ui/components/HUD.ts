@@ -16,6 +16,8 @@ import { formatScore } from '../../core/Score';
 export interface HUDData {
     hp: number;
     maxHp: number;
+    /** Absorb buffer left, in HP. Drawn against maxHp, so 0 hides the band. */
+    shield?: number;
     xp: number;
     xpToLevel: number;
     level: number;
@@ -28,6 +30,7 @@ export interface HUDData {
 export class HUD {
     private container: HTMLElement | null = null;
     private hpBar: HTMLElement | null = null;
+    private shieldBar: HTMLElement | null = null;
     private xpBar: HTMLElement | null = null;
     private timer: HTMLElement | null = null;
     private killCount: HTMLElement | null = null;
@@ -43,6 +46,7 @@ export class HUD {
             <div class="hud-top">
                 <div class="bar-container">
                     <div class="hp-bar-fill" id="hp-bar"></div>
+                    <div class="shield-bar-fill" id="shield-bar" style="width:0"></div>
                 </div>
                 <div class="stats" id="timer">00:00</div>
                 <div class="stats" id="kill-count">💀 0</div>
@@ -61,6 +65,7 @@ export class HUD {
 
         // Cache DOM references
         this.hpBar = document.getElementById('hp-bar');
+        this.shieldBar = document.getElementById('shield-bar');
         this.xpBar = document.getElementById('xp-bar');
         this.timer = document.getElementById('timer');
         this.killCount = document.getElementById('kill-count');
@@ -73,6 +78,7 @@ export class HUD {
         this.container?.remove();
         this.container = null;
         this.hpBar = null;
+        this.shieldBar = null;
         this.xpBar = null;
         this.timer = null;
         this.killCount = null;
@@ -85,6 +91,11 @@ export class HUD {
         if (this.hpBar) {
             const hpPercent = (data.hp / data.maxHp) * 100;
             this.hpBar.style.width = `${hpPercent}%`;
+        }
+
+        if (this.shieldBar) {
+            const shieldPercent = Math.min(100, ((data.shield ?? 0) / data.maxHp) * 100);
+            this.shieldBar.style.width = `${shieldPercent}%`;
         }
 
         if (this.xpBar) {

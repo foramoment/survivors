@@ -93,6 +93,7 @@ export const EN: Record<string, string> = {
     // Suffixes for flat powerup bonuses (see UpgradePool.formatPowerupBonus)
     'bonus.magnet': 'pull range',
     'bonus.maxHp': 'Max HP',
+    'bonus.shield': 'shield',
     'bonus.armor': 'armor',
         'bonus.discharge': 'charge',
     'bonus.reroll': 'reroll',

@@ -53,10 +53,43 @@ export const POWERUP_STACK_CAP = 8;
 /** Repeat picks are worth exactly the base value unless a powerup opts out */
 export const POWERUP_FLAT_GROWTH = 1;
 
+/**
+ * Draft weight of a weapon you already own, by how far along it is.
+ *
+ * The shape exists because of a measured problem. Two real runs, same player:
+ *
+ *     29 of 48 picks into weapons, 19 into perks  ->  48k DPS, died at 9:00
+ *     27 of 67 picks into weapons, 40 into perks  ->  284k DPS, cleared 15:24
+ *
+ * Weapons **add** (a fifth weapon is a fifth source) and perks **multiply** (a
+ * maxed Cooling System is +67% to all of them at once), so the marginal perk
+ * beats the marginal weapon level from somewhere in the middle of a run
+ * onward. The flat weight of 9 meant a five-weapon player saw weapons on
+ * roughly half of all cards — the draft was steering toward the worse pick and
+ * the losing run was the one that followed it.
+ *
+ * So the weight now falls where the weapon is already carrying its weight, and
+ * nowhere else:
+ *
+ * - **Levels 1–2** keep the old 9. A freshly taken weapon is genuinely weak,
+ *   and starving it is how the pool used to need ~60 levels to evolve anything.
+ * - **Levels 3–4** drop to 6. This is the stretch that was crowding out the
+ *   whole powerup pool, and it is exactly where a weapon needs the draft least.
+ * - **Level 5** spikes to 14, unchanged. The evolution payoff has to stay
+ *   reachable; that was never the part that was broken.
+ */
 const WEIGHT_OWNED_WEAPON = 9;
+const WEIGHT_OWNED_WEAPON_MID = 6;
 const WEIGHT_EVOLVE_READY = 14;
 const WEIGHT_NEW_WEAPON = 2;
 const WEIGHT_POWERUP = 3;
+
+/** Draft weight for an owned weapon at this level (1..5) */
+function ownedWeaponWeight(level: number): number {
+    if (level >= 5) return WEIGHT_EVOLVE_READY;
+    if (level >= 3) return WEIGHT_OWNED_WEAPON_MID;
+    return WEIGHT_OWNED_WEAPON;
+}
 
 export interface UpgradeOption {
     type: 'weapon' | 'powerup';
@@ -113,7 +146,7 @@ export function getPowerupValue(
 }
 
 /** Stat types shown as a flat amount with a unit instead of a percentage */
-const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'discharge', 'reroll'];
+const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'discharge', 'reroll', 'shield'];
 
 /** Human-readable bonus string, e.g. "+8%" or "+15 Max HP" */
 export function formatPowerupBonus(type: string, value: number): string {
@@ -168,7 +201,7 @@ function buildEntries(ctx: OfferContext): WeightedEntry[] {
         if (level > 0) {
             entries.push({
                 option: { type: 'weapon', data: weapon },
-                weight: level === 5 ? WEIGHT_EVOLVE_READY : WEIGHT_OWNED_WEAPON,
+                weight: ownedWeaponWeight(level),
             });
         } else if (ownedWeaponCount < WEAPON_SLOT_CAP && canOfferWeapon(weapon.id, ctx.classId)) {
             // Another class's signature weapon is never offered — see

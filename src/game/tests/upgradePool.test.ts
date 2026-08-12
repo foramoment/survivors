@@ -306,6 +306,147 @@ describe('Player XP curve', () => {
         // Level ~21 should be reachable in a run (cost in the low hundreds)
         expect(costs[20]).toBeLessThan(500);
     });
+
+    /**
+     * Total XP needed to reach a level, by replaying the real curve.
+     */
+    function xpToReach(target: number): number {
+        const player = new Player(0, 0);
+        player.onLevelUp = () => { };
+        let total = 0;
+        while (player.level < target) {
+            total += player.nextLevelXp;
+            player.levelUp();
+        }
+        return total;
+    }
+
+    it('does not touch the early and middle game', () => {
+        // The opening minutes were tuned and are not the complaint. The
+        // transition is where the compounding curve had already outrun income,
+        // so everything below it must be byte-for-byte what it was.
+        expect(xpToReach(10)).toBe(315);
+        expect(xpToReach(20)).toBe(2031);
+        expect(xpToReach(Player.XP_LINEAR_FROM)).toBe(22139);
+    });
+
+    it('joins the linear tail without a step in cost', () => {
+        // The flat step IS the increment the compounding curve had at the
+        // transition, so the curve stops accelerating rather than kinking. A
+        // visible jump here would read to the player as "the game got harder
+        // at level 40".
+        const player = new Player(0, 0);
+        player.onLevelUp = () => { };
+        while (player.level < Player.XP_LINEAR_FROM) player.levelUp();
+
+        const atTransition = player.nextLevelXp;
+        const compounding = Math.floor(atTransition * 1.1 + 6);
+        player.levelUp();
+        expect(Math.abs(player.nextLevelXp - compounding)).toBeLessThanOrEqual(2);
+    });
+
+    it('late levels stay expensive, but stop doubling away from income', () => {
+        // XP income cannot compound — it is bounded by the 400-enemy
+        // population cap and by how fast a build deletes them. Measured on a
+        // real 15-minute Void Nexus clear: ~32.7 XP a kill at 11.8 kills/s,
+        // so roughly 386 XP/s at the end of the longest run in the game.
+        const INCOME = 386;
+        const player = new Player(0, 0);
+        player.onLevelUp = () => { };
+        while (player.level < 83) player.levelUp();
+
+        const seconds = player.nextLevelXp / INCOME;
+        // The old curve charged 93 seconds here and 10% more every level after
+        expect(seconds).toBeGreaterThan(20); // still earned, not handed over
+        expect(seconds).toBeLessThan(45);
+    });
+
+    it('turns a won Void Nexus run into more picks, and a lost one into none', () => {
+        // Two measured runs. The winning one spent its last levels with every
+        // weapon already at 6, so every level the curve gives back is a perk.
+        expect(xpToReach(83)).toBeLessThanOrEqual(355140);
+        expect(xpToReach(84)).toBeGreaterThan(355140);
+
+        // The nine-minute defeat is untouched: same XP, same level
+        expect(xpToReach(49)).toBeLessThanOrEqual(55487);
+        expect(xpToReach(50)).toBeGreaterThan(55487);
+    });
+});
+
+describe('Magnet range', () => {
+    it('grows on its own, so pickup range is never a card you must buy', () => {
+        // Gravity Well was the clearest junk pick in the pool: crystals never
+        // despawn, so range buys convenience and competed at the same draft
+        // weight as damage. A real run spent 3 of its 19 perk picks on it.
+        expect(POWERUPS.some(p => p.type === 'magnet')).toBe(false);
+
+        const player = new Player(0, 0);
+        player.onLevelUp = () => { };
+        const base = player.stats.magnet;
+        while (player.level < 50) player.levelUp();
+
+        // Nearly four of the old picks' worth by level 50, and free
+        expect(player.stats.magnet - base).toBe(98);
+        // Not so far that crystals fly in from off screen
+        expect(player.stats.magnet).toBeLessThan(300);
+    });
+});
+
+describe('Draft weighting', () => {
+    it('stops flooding the draw with weapon cards once they are levelled', () => {
+        // Two measured runs: 29 of 48 picks into weapons ended in defeat at
+        // 9:00, 27 of 67 into weapons (40 into perks) cleared 15:24. Weapons
+        // add and perks multiply, so the draft must not steer into weapons
+        // through the middle of a run.
+        const rng = mulberry32(11);
+        const owned = WEAPONS.slice(0, WEAPON_SLOT_CAP);
+        const weaponLevels = new Map(owned.map(w => [w.id, 4] as [string, number]));
+
+        let weaponCards = 0;
+        const DRAWS = 400;
+        for (let i = 0; i < DRAWS; i++) {
+            const options = buildUpgradeOptions({
+                weaponLevels,
+                powerupLevels: new Map(),
+                count: 3,
+                classId: 'berserker',
+                rng,
+            });
+            weaponCards += options.filter(o => o.type === 'weapon').length;
+        }
+        // Measured on this exact fixture: 50.75% of all cards were weapon
+        // cards under the flat weight of 9, against 45.0% now. Perks are the
+        // majority of the draw through the stretch where they are the better
+        // pick, which they were not before.
+        const share = weaponCards / (DRAWS * 3);
+        expect(share).toBeLessThan(0.48);
+    });
+
+    it('still feeds a fresh weapon and still pays off an evolution', () => {
+        // The weight drop must not reach either end: a level-1 weapon is
+        // genuinely weak, and starving level 5 is how the pool once needed
+        // ~60 levels to evolve anything.
+        const rng = mulberry32(3);
+        const fresh = WEAPONS[0];
+        const ready = WEAPONS[1];
+
+        let freshSeen = 0;
+        let readySeen = 0;
+        const DRAWS = 400;
+        for (let i = 0; i < DRAWS; i++) {
+            const options = buildUpgradeOptions({
+                weaponLevels: new Map([[fresh.id, 1], [ready.id, 5]]),
+                powerupLevels: new Map(),
+                count: 3,
+                classId: 'berserker',
+                rng,
+            });
+            if (options.some(o => o.data.id === fresh.id)) freshSeen++;
+            if (options.some(o => o.data.id === ready.id)) readySeen++;
+        }
+        expect(freshSeen / DRAWS).toBeGreaterThan(0.15);
+        expect(readySeen / DRAWS).toBeGreaterThan(freshSeen / DRAWS);
+    });
 });
 
 describe('Stat ceilings', () => {

@@ -109,11 +109,17 @@ export class RunStatsTracker {
         this.untouchedFor = 0;
     }
 
-    /** This frame's share of the contact drain, and how long it lasted */
+    /**
+     * This frame's share of the contact drain, and how long it lasted.
+     *
+     * Called only while something is actually touching the player, so the
+     * seconds accrue even on a frame that cost no health — a shielded frame is
+     * still a frame spent in the pile, and "in contact" would otherwise stop
+     * counting exactly when a deflector was doing its job.
+     */
     recordContact(damage: number, dt: number): void {
-        if (damage <= 0) return;
-        this.stats.damageTaken += damage;
         this.stats.contactSeconds += dt;
+        if (damage > 0) this.stats.damageTaken += damage;
     }
 
     /** Discrete environmental damage — a meteor, a rift collapsing */

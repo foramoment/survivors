@@ -42,6 +42,29 @@
   transition: width 120ms steps(4);
 }
 
+/*
+ * Kinetic Deflector, drawn as a band across the TOP of the health bar rather
+ * than as a segment appended to it.
+ *
+ * Appending would have made the bar change length when the perk is taken,
+ * which reads as "your max HP went up" — the one thing this perk is not. A
+ * band overlaid on the same track says "this much of the next hit is free"
+ * without redefining what the bar underneath means, and it empties left to
+ * right on the same axis the health does.
+ */
+.shield-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 5px;
+  background:
+    repeating-linear-gradient(90deg,
+      var(--c-cyan) 0 6px,
+      #7ad9ff 6px 8px);
+  box-shadow: 0 var(--px) 0 0 #061a24;
+  transition: width 120ms steps(4);
+}
+
 .xp-bar-container {
   position: absolute;
   top: 0;

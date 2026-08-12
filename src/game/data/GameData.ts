@@ -197,9 +197,6 @@ export const POWERUPS: PowerupData[] = [
     { id: 'cooling_system', name: "Cooling System", description: "Weapons fire and zones tick more often", type: "cooldown", value: -0.05, maxStacks: 8, emoji: "🌬️" },
 
     // Creative
-    // 250px at the cap. A 695px magnet (the old ceiling) collects the whole
-    // screen and deletes the reason to walk anywhere.
-    { id: 'gravity_well', name: "Gravity Well", description: "Crystals fly to you from farther away", type: "magnet", value: 25, maxStacks: 6, emoji: "🧲" },
     { id: 'chain_reaction', name: "Chain Reaction", description: "Bigger blasts, wider zones", type: "area", value: 0.08, maxStacks: 8, emoji: "🎆" },
     { id: 'vampiric_link', name: "Vampiric Link", description: "Drain more XP from every kill", type: "growth", value: 0.1, maxStacks: 6, emoji: "🧛" },
     // Duration times cooldown reduction is what lets a zone weapon cover the
@@ -211,6 +208,20 @@ export const POWERUPS: PowerupData[] = [
     // late-game enemies evaporated.
     { id: 'berserker_rage', name: "Berserker Rage", description: "Crits hit like a freight train", type: "critDamage", value: 0.25, maxStacks: 8, emoji: "😡" },
     { id: 'barrier_field', name: "Barrier Field", description: "Reinforced hull plating", type: "maxHp", value: 20, maxStacks: 8, emoji: "🔮" },
+    // An absorb buffer that refills only out of contact — the rules live in
+    // core/Tactics (SHIELD_RECHARGE_DELAY) and Player.shield.
+    //
+    // **Deliberately tiny: 30 HP over three picks.** A class pool is 75–150,
+    // and a measured 15-minute Void Nexus clear took 1374 damage against a 190
+    // pool while healing 1261 of it back — sustain is already solved, by three
+    // picks of Nano-Repair, on a class with *negative* armour. A generous
+    // shield on top of that would not add a decision, it would remove the one
+    // the contact model is built to pose.
+    //
+    // 30 HP is roughly four seconds of a full ring at the numbers in
+    // core/ContactDamage: enough to make walking through a crowd a plan
+    // instead of a gamble, not enough to make standing in one survivable.
+    { id: 'kinetic_deflector', name: "Kinetic Deflector", description: "A buffer that soaks hits and refills once you break away", type: "shield", value: 10, maxStacks: 3, emoji: "💠" },
     // The player already outruns the fastest enemy by a wide margin at base
     // speed, so this is a nudge, not a build: three picks, +15% total. At the
     // old ceiling (+198%) nothing on the map could reach you and the station

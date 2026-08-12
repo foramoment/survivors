@@ -121,6 +121,7 @@ export const RU: Record<string, string> = {
 
     'bonus.magnet': 'к радиусу притяжения',
     'bonus.maxHp': 'к макс. HP',
+    'bonus.shield': 'к щиту',
     'bonus.armor': 'к броне',
     'bonus.discharge': 'заряд',
     'bonus.reroll': 'переброс',
@@ -225,8 +226,8 @@ export const RU: Record<string, string> = {
     'powerup.plasma_core.desc': 'Чистое усиление урона',
     'powerup.cooling_system.name': 'Система Охлаждения',
     'powerup.cooling_system.desc': 'Оружие стреляет чаще, зоны тикают чаще',
-    'powerup.gravity_well.name': 'Гравитационный Колодец',
-    'powerup.gravity_well.desc': 'Кристаллы летят к тебе издалека',
+    'powerup.kinetic_deflector.name': 'Кинетический Отражатель',
+    'powerup.kinetic_deflector.desc': 'Буфер, который гасит удары и заряжается, когда ты оторвался',
     'powerup.chain_reaction.name': 'Цепная Реакция',
     'powerup.chain_reaction.desc': 'Взрывы больше, зоны шире',
     'powerup.vampiric_link.name': 'Вампирская Связь',

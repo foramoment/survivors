@@ -250,6 +250,15 @@ export class GameManager {
             this.healPending += amount;
             this.healBiggestEvent = Math.max(this.healBiggestEvent, amount);
         };
+        // The moment the buffer runs out is the moment the next hit starts
+        // costing health, and that transition has to be audible — the bar band
+        // emptying is not something you are looking at while a crowd is on you.
+        // No camera shake: being surrounded is exactly when the screen has to
+        // hold still enough to find the gap (see emitContactFeedback).
+        this.player.onShieldBreak = () => {
+            audio.play('hurt');
+            juice.flash('#39d4ff', 0.22, 0.16);
+        };
 
         // Add starting weapon
         this.addWeapon(cls.weaponId);
@@ -374,6 +383,12 @@ export class GameManager {
         const hpBar = document.getElementById('hp-bar');
         if (hpBar) hpBar.style.width = `${(this.player.hp / this.player.maxHp) * 100}%`;
 
+        const shieldBar = document.getElementById('shield-bar');
+        if (shieldBar) {
+            const pct = Math.min(100, (this.player.shield / this.player.maxHp) * 100);
+            shieldBar.style.width = `${pct}%`;
+        }
+
         const xpBar = document.getElementById('xp-bar');
         if (xpBar) xpBar.style.width = `${(this.player.xp / this.player.nextLevelXp) * 100}%`;
 
@@ -496,12 +511,20 @@ export class GameManager {
         const drain = perSecond * dt;
         if (drain <= 0) return;
 
-        this.runStats.recordContact(drain, dt);
-        player.takeContact(drain);
-        this.emitContactFeedback(drain);
+        // The capacitor is charged by what the crowd threw at you, shield or
+        // no shield — Static Discharge is paid for by being surrounded, and
+        // the deflector does not change that you were.
         this.chargeCapacitor(drain);
 
-        this.contactPending += drain;
+        // Everything else follows the *health bar*: a shielded frame costs no
+        // HP, so it must not print a number, deepen the vignette or count as
+        // damage taken. The seconds still count — you were in the pile.
+        const lost = player.takeContact(drain);
+        this.runStats.recordContact(lost, dt);
+        if (lost > 0) {
+            this.emitContactFeedback(lost);
+            this.contactPending += lost;
+        }
         this.flushContactNumber(dt);
     }
 

@@ -21,6 +21,7 @@ export const VALID_PLAYER_STATS = [
     'critDamage',
     'firstStrike',
     'maxHp',
+    'shield',
 
     // Tactics
     'discharge',

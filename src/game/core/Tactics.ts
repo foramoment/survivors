@@ -194,6 +194,24 @@ export const REPAIR_LIFETIME = 12;
 export const REGEN_COMBAT_DELAY = 1;
 
 /**
+ * Seconds clear of all damage before the Kinetic Deflector starts refilling,
+ * and how long a full refill then takes.
+ *
+ * Longer than `REGEN_COMBAT_DELAY` on purpose. Regeneration is a trickle
+ * proportional to what you are missing, so letting it start after a single
+ * quiet second costs little. The shield is a lump sum, and a lump sum that
+ * comes back the instant you step out of a pile turns "dive, spend it, leave"
+ * into "hover at the edge of the pile forever" — the same in-and-out jitter
+ * `CONTACT_RAMP_DECAY` was shaped to discourage.
+ *
+ * Three seconds means one dive per engagement, not one per second. The refill
+ * itself is fast once it starts: the interesting decision is *whether you have
+ * it*, not watching a bar creep.
+ */
+export const SHIELD_RECHARGE_DELAY = 3;
+export const SHIELD_REFILL_TIME = 1.5;
+
+/**
  * Absorbed damage needed before the capacitor fires.
  *
  * Independent of stack count — see DISCHARGE_CHARGE_COST. Zero stacks is
