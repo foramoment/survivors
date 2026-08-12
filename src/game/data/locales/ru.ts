@@ -230,8 +230,6 @@ export const RU: Record<string, string> = {
     'powerup.kinetic_deflector.desc': 'Буфер, который гасит удары и заряжается, когда ты оторвался',
     'powerup.chain_reaction.name': 'Цепная Реакция',
     'powerup.chain_reaction.desc': 'Взрывы больше, зоны шире',
-    'powerup.vampiric_link.name': 'Вампирская Связь',
-    'powerup.vampiric_link.desc': 'Больше опыта с каждого убийства',
     'powerup.temporal_flux.name': 'Временной Поток',
     'powerup.temporal_flux.desc': 'Эффекты держатся дольше',
     'powerup.berserker_rage.name': 'Ярость Берсерка',

@@ -33,6 +33,51 @@ export const VALID_PLAYER_STATS = [
 export type PlayerStatType = typeof VALID_PLAYER_STATS[number];
 
 /**
+ * What every stat is worth before a class, a level or a pick touches it.
+ *
+ * Lives here rather than inline in `Player` so that anything needing to ask
+ * "has this actually moved?" has one answer. The run summary needs exactly
+ * that: `speed` (projectile speed) and `growth` (XP gain) have no source left
+ * in the game at all — Overclock and Vampiric Link were both removed — so
+ * printing them next to the stats a build really shaped is noise dressed as
+ * data. Both are kept as live seams (weapons multiply by `speed`, `gainXp`
+ * multiplies by `growth`), they just have nothing feeding them today.
+ */
+export const DEFAULT_PLAYER_STATS: Record<string, number> = {
+    might: 1,
+    area: 1,
+    cooldown: 1,
+    speed: 1,
+    duration: 1,
+    moveSpeed: 1,
+    magnet: 100,
+    growth: 1,
+    armor: 0,
+    regen: 0,
+    critChance: 0,
+    critDamage: 2,
+    shield: 0,
+
+    // Tactics — behaviour switches, not multipliers (see core/Tactics.ts)
+    /** Capacitor stacks: absorbed damage detonates around the player */
+    discharge: 0,
+    /** Chance a killed enemy detonates */
+    killEcho: 0,
+    /** Chance a kill drops a repair cell */
+    siphon: 0,
+    /** Extra level-up rerolls on top of the free one */
+    reroll: 0,
+    /** Bonus damage against a target still at full health */
+    firstStrike: 0,
+};
+
+/** Has this stat been moved off its starting value? */
+export function isStatModified(type: string, value: number): boolean {
+    const base = DEFAULT_PLAYER_STATS[type];
+    return base === undefined || Math.abs(value - base) > 1e-9;
+}
+
+/**
  * Hard limits that no amount of stacking may cross, applied after every
  * powerup pick and every class level-up.
  *

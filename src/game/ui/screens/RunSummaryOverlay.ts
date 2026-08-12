@@ -10,6 +10,7 @@
 import { WEAPONS, POWERUPS } from '../../data/GameData';
 import type { RunStats } from '../../core/RunStats';
 import { formatScore } from '../../core/Score';
+import { isStatModified } from '../../core/PlayerStats';
 import { formatTime } from '../../../engine/Utils';
 import { audio } from '../../../engine/AudioSystem';
 import { t } from '../../core/I18n';
@@ -63,8 +64,12 @@ function runAsText(d: RunSummaryData): string {
         })
         .join('\n');
 
+    // Only stats the run actually moved. A dump that lists `speed: 1` and
+    // `growth: 1` — neither of which has any source left in the game — reads
+    // like the build touched them and it did not, which is worse than useless
+    // in the one artefact used to reason about balance.
     const stats = Object.entries(d.playerStats)
-        .filter(([, v]) => typeof v === 'number' && v !== 0)
+        .filter(([k, v]) => typeof v === 'number' && isStatModified(k, v))
         .map(([k, v]) => `  ${k}: ${Math.round(v * 1000) / 1000}`)
         .join('\n');
 

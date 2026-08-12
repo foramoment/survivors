@@ -197,8 +197,19 @@ export const POWERUPS: PowerupData[] = [
     { id: 'cooling_system', name: "Cooling System", description: "Weapons fire and zones tick more often", type: "cooldown", value: -0.05, maxStacks: 8, emoji: "🌬️" },
 
     // Creative
+    //
+    // No XP-gain card lives here any more. Vampiric Link (+10% growth a pick,
+    // six picks) was the last one, and a bonus to XP has no honest middle
+    // setting: it is priced against the level curve, and the curve is the one
+    // thing in the game that compounds against itself.
+    //
+    // On the old geometric curve six picks bought about FIVE levels — strictly
+    // a loss, a trap card. On the linear tail (see Player.XP_LINEAR_FROM) the
+    // same six buy fourteen, a net +8 picks, which makes it the obvious first
+    // card in every run. The fix moved it straight from "dumb" to "mandatory"
+    // without ever passing through "a decision", because both of those are the
+    // same card seen from either side of break-even.
     { id: 'chain_reaction', name: "Chain Reaction", description: "Bigger blasts, wider zones", type: "area", value: 0.08, maxStacks: 8, emoji: "🎆" },
-    { id: 'vampiric_link', name: "Vampiric Link", description: "Drain more XP from every kill", type: "growth", value: 0.1, maxStacks: 6, emoji: "🧛" },
     // Duration times cooldown reduction is what lets a zone weapon cover the
     // ground permanently. +80% at the cap keeps a puddle worth stacking without
     // turning the arena into a carpet you never have to re-lay.

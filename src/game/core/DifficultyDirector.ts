@@ -59,7 +59,24 @@ export class DifficultyDirector {
     static readonly WAVE_DURATION = 60;
     static readonly MIN_INTENSITY = 0.6;
     static readonly MAX_INTENSITY = 3.0;
-    static readonly MAX_ENEMIES = 400;
+    /**
+     * Population ceiling. Raised 400 -> 600 to see what a denser arena plays
+     * like.
+     *
+     * This is not a neutral knob. Two things ride on it, and both should be
+     * watched on the next playtest:
+     *
+     *  - **It is the ceiling on XP income**, which is the whole reason the
+     *    level curve had to stop compounding (see `Player.XP_LINEAR_FROM`).
+     *    Raising it raises how fast a strong build levels.
+     *  - **It is worth far more to area weapons than to single-target ones.**
+     *    A zone hits everything standing in it, so its output scales with
+     *    density; a projectile does not. A measured all-AoE clear took 243
+     *    damage across 47 seconds of contact, against 1374 across 2:58 for a
+     *    mixed build on the same stage — density is already the axis that
+     *    separates them, and this widens it.
+     */
+    static readonly MAX_ENEMIES = 600;
 
     /** Adaptive pressure multiplier (1 = baseline) */
     intensity: number = 1;

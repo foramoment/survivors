@@ -24,7 +24,7 @@ import {
 import { CLASSES, WEAPONS, POWERUPS } from '../data/GameData';
 import { i18n } from '../core/I18n';
 import { Player } from '../entities/Player';
-import { addStat } from '../core/PlayerStats';
+import { addStat, DEFAULT_PLAYER_STATS, isStatModified } from '../core/PlayerStats';
 
 function mulberry32(seed: number): () => number {
     let a = seed;
@@ -370,6 +370,32 @@ describe('Player XP curve', () => {
         // The nine-minute defeat is untouched: same XP, same level
         expect(xpToReach(49)).toBeLessThanOrEqual(55487);
         expect(xpToReach(50)).toBeGreaterThan(55487);
+    });
+});
+
+describe('Player stat defaults', () => {
+    it('the reference copy matches what a player actually starts with', () => {
+        // `isStatModified` decides what the run summary prints, so a stat that
+        // drifts from this table silently starts reporting itself as "moved"
+        // in every run — or stops reporting at all.
+        const player = new Player(0, 0);
+        expect(Object.keys(player.stats).sort())
+            .toEqual(Object.keys(DEFAULT_PLAYER_STATS).sort());
+        for (const [key, value] of Object.entries(player.stats)) {
+            expect(DEFAULT_PLAYER_STATS[key], key).toBe(value);
+        }
+    });
+
+    it('hides stats nothing in the game can move', () => {
+        // Overclock and Vampiric Link are both gone, so `speed` and `growth`
+        // are seams with no source. They must not sit in the summary looking
+        // like something the build chose.
+        expect(POWERUPS.some(p => p.type === 'speed')).toBe(false);
+        expect(POWERUPS.some(p => p.type === 'growth')).toBe(false);
+        expect(isStatModified('speed', 1)).toBe(false);
+        expect(isStatModified('growth', 1)).toBe(false);
+        expect(isStatModified('might', 1.34)).toBe(true);
+        expect(isStatModified('armor', -2)).toBe(true);
     });
 });
 
