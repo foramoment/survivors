@@ -1,6 +1,6 @@
 import { Player } from './entities/Player';
 import { Enemy } from './entities/Enemy';
-import { CrystalField } from './entities/CrystalField';
+import { CrystalField, type CrystalAttractor } from './entities/CrystalField';
 import { DamageNumbers } from './core/DamageNumbers';
 import { Entity } from '../engine/Entity';
 import { CLASSES, ENEMIES, WEAPONS } from './data/GameData';
@@ -1069,7 +1069,14 @@ export class GameManager {
             }
         }
 
-        this.crystals.update(dt, this.player, this.canvas.width, this.canvas.height);
+        // Anything on the field that gathers loose crystals says so by carrying
+        // a `crystalPull` — no class list, same duck-typing as `layer`
+        const attractors: CrystalAttractor[] = [];
+        for (const e of this.entities) {
+            const pull = (e as Partial<CrystalAttractor>).crystalPull;
+            if (pull && pull > 0) attractors.push(e as unknown as CrystalAttractor);
+        }
+        this.crystals.update(dt, this.player, this.canvas.width, this.canvas.height, attractors);
 
         if (this.player.isDead) {
             this.state = 'GAME_OVER';

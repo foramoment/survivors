@@ -60,8 +60,8 @@ const EXPECTED_STATS: Record<string, any> = {
     singularity_orb: {
         damage: 50,
         cooldown: 4.0,
-        area: 125,  // speed * duration = 50 * 2.5
-        speed: 50,
+        area: 325,  // speed * duration = 130 * 2.5
+        speed: 130,
         duration: 2.5,
         pierce: 999,
     },

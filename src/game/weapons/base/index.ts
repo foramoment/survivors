@@ -13,7 +13,8 @@ export {
     PlasmaProjectile,
     OrbitingProjectile,
     LobbedProjectile,
-    Nanobot
+    Nanobot,
+    holdOnShell
 } from './Projectile';
 
 // Zone types

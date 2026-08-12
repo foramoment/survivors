@@ -44,7 +44,20 @@ describe('Black Hole gravity', () => {
         return zone;
     }
 
-    it('holds anything past the horizon completely still', () => {
+    /** Radius the caught are held on: HORIZON_RATIO (0.42) of the zone radius */
+    const HORIZON = 200 * 0.42;
+
+    /** Run the hole for `seconds` of frames, refreshing the hash each one */
+    function run(zone: BlackHoleZone, enemies: Enemy[], seconds: number) {
+        const dt = 1 / 60;
+        for (let t = 0; t < seconds; t += dt) {
+            enemies.forEach(e => (e.speedMultiplier = 1));
+            placeEnemies(enemies);
+            zone.update(dt);
+        }
+    }
+
+    it('holds anything it has caught completely still', () => {
         const zone = makeHole(600);
         const caught = makeEnemy(10, 0);
         caught.speedMultiplier = 1;
@@ -54,12 +67,48 @@ describe('Black Hole gravity', () => {
         expect(caught.speedMultiplier).toBe(0);
     });
 
-    it('slingshots enemies whose path runs with it, and drags those climbing out', () => {
+    it('drags anything that touched the rim onto the horizon', () => {
         const zone = makeHole(600);
-        // Both outside the horizon. `behind` walks toward the player *through*
-        // the hole; `ahead` has already passed it and is climbing away.
+        // Sitting just inside the reach of the field (radius * 2), which is the
+        // furthest anything can be and still be caught
+        const grazed = makeEnemy(395, 0);
+        run(zone, [grazed], 1.5);
+
+        expect(Math.hypot(grazed.pos.x, grazed.pos.y)).toBeCloseTo(HORIZON, 0);
+    });
+
+    it('keeps the middle empty, so the player has somewhere to stand', () => {
+        const zone = makeHole(0); // player standing in the eye
+        // The hole collapses on top of a crowd: everything inside is pushed
+        // back out onto the shell rather than swallowed
+        const inside = [makeEnemy(0, 0), makeEnemy(20, 10), makeEnemy(-15, 25)];
+        run(zone, inside, 1);
+
+        for (const enemy of inside) {
+            expect(Math.hypot(enemy.pos.x, enemy.pos.y)).toBeCloseTo(HORIZON, 0);
+        }
+    });
+
+    it('never lets a captured enemy walk back out', () => {
+        const zone = makeHole(600);
+        const caught = makeEnemy(300, 0);
+        run(zone, [caught], 0.5);
+        // Thrown clear of the field by a knockback from something else
+        caught.pos.x = 600;
+        run(zone, [caught], 2);
+
+        expect(Math.hypot(caught.pos.x, caught.pos.y)).toBeCloseTo(HORIZON, 0);
+    });
+
+    it('slingshots a boss whose path runs with it, and drags one climbing out', () => {
+        const zone = makeHole(600);
+        // Bosses are the only thing the hole cannot park, so they are the only
+        // thing the speed-bending assist still applies to. `behind` walks
+        // toward the player *through* the hole; `ahead` is climbing away.
         const behind = makeEnemy(-150, 0);
         const ahead = makeEnemy(150, 0);
+        behind.isBoss = true;
+        ahead.isBoss = true;
         behind.speedMultiplier = 1;
         ahead.speedMultiplier = 1;
         placeEnemies([behind, ahead]);

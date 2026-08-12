@@ -171,6 +171,39 @@ export class BouncingProjectile extends Projectile {
 // ============================================
 // SINGULARITY PROJECTILE - Pulls enemies in
 // ============================================
+
+/**
+ * Reel a body toward `center` and hold it on the shell of radius `hold`.
+ *
+ * The shell is a wall from *both* sides: something outside is dragged in,
+ * something inside is pushed back out to it. That second half is what makes the
+ * middle of a black hole a place the player can stand — the eye is not an
+ * immunity rule, it is simply empty, because nothing is allowed to cross the
+ * horizon. A rule would have to argue with core/ContactDamage; geometry does
+ * not.
+ *
+ * Movement is capped at `speed` in both directions rather than snapped, so the
+ * pocket visibly opens instead of teleporting the crowd off the player.
+ */
+export function holdOnShell(enemy: any, center: Vector2, hold: number, speed: number, dt: number) {
+    const dx = center.x - enemy.pos.x;
+    const dy = center.y - enemy.pos.y;
+    const dist = Math.hypot(dx, dy);
+    const step = speed * dt;
+
+    if (dist < 0.001) {
+        // Dead centre: no direction to work with, so pick one and shove
+        enemy.pos.x += Math.min(step, hold);
+        return;
+    }
+
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const move = Math.min(step, Math.abs(dist - hold)) * (dist > hold ? 1 : -1);
+    enemy.pos.x += nx * move;
+    enemy.pos.y += ny * move;
+}
+
 /**
  * The travelling singularity: a hard core inside a wide field of gravity.
  *
@@ -182,14 +215,24 @@ export class BouncingProjectile extends Projectile {
  *   - the **core** is the event horizon. Passing it through a body is the big
  *     hit, and it lands once per enemy — the orb crawls, so a per-frame check
  *     would tick the same enemy a dozen times on the way through.
- *   - the **halo** drags everything toward the core and grinds it for a small
- *     amount on a slow tick, so steering the core into a pack you have already
- *     gathered is worth doing on purpose.
+ *   - the **halo** captures everything it touches: a caught body stops walking
+ *     and is reeled onto the core, so steering the orb through a pack is how
+ *     you gather one, not just how you damage it.
  */
 export class SingularityProjectile extends Projectile {
     private particleTimer: number = 0;
     private rotation: number = 0;
-    pullStrength: number = 80;
+    /**
+     * How fast a caught body is reeled in, in px/s.
+     *
+     * This used to be `pullStrength / dist` — a force, not a speed — and the
+     * numbers made the whole field inert: 200 across a 150px gap is 1.3 px/s
+     * against an enemy walking at 100. The gravity was drawn, documented and
+     * doing nothing, which is exactly the "the black hole doesn't really suck
+     * them in" complaint. Anything that moves a crowd has to be quoted in the
+     * same unit the crowd moves in.
+     */
+    captureSpeed: number = 240;
     /** Reach of the gravity field, as a multiple of the core radius */
     pullRadiusScale: number = 4;
     /** Share of `damage` the field deals on each grind tick */
@@ -200,6 +243,16 @@ export class SingularityProjectile extends Projectile {
     private fieldTimer: number = 0;
     /** Bodies the core has already torn through */
     private cored: Set<any> = new Set();
+    /**
+     * Everything the field has ever touched, for as long as the field lives.
+     *
+     * Capture is one-way on purpose: a body that brushed the rim is cargo from
+     * that moment, even if a knockback throws it back out. Re-checking the
+     * radius every frame would let the crowd leak out of the far side of a hole
+     * that is still open, and "it grabbed them and then let half of them go" is
+     * the version that reads as a weapon that does not work.
+     */
+    private captured: Set<any> = new Set();
 
     constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number) {
         super(x, y, velocity, duration, damage, pierce, '');
@@ -213,6 +266,16 @@ export class SingularityProjectile extends Projectile {
     /** How far the gravity field reaches */
     get pullRadius(): number {
         return this.radius * this.pullRadiusScale;
+    }
+
+    /** Where the caught are held. For the travelling orb that is the core itself. */
+    protected get holdRadius(): number {
+        return this.radius;
+    }
+
+    /** Loose crystals inside the field are gathered too — see CrystalField */
+    get crystalPull(): number {
+        return this.pullRadius;
     }
 
     update(dt: number) {
@@ -232,17 +295,13 @@ export class SingularityProjectile extends Projectile {
         const reach = this.pullRadius;
         for (const enemy of levelSpatialHash.getWithinRadius(this.pos, reach)) {
             if (enemy.isDead) continue;
-            const dx = this.pos.x - enemy.pos.x;
-            const dy = this.pos.y - enemy.pos.y;
             const dist = distance(this.pos, enemy.pos);
             if (dist > reach) continue;
 
-            // Pull: stronger the closer you already are
-            if (dist > 5) {
-                const pullForce = this.pullStrength / dist;
-                enemy.pos.x += (dx / dist) * pullForce * dt;
-                enemy.pos.y += (dy / dist) * pullForce * dt;
-            }
+            // Bosses are not cargo. They still take everything the field deals,
+            // they just cannot be parked — a weapon on a cooldown is not
+            // allowed to hold the fight's one big body still.
+            if (!enemy.isBoss) this.captured.add(enemy);
 
             // Core: the payoff hit, once per body
             if (dist <= this.radius + enemy.radius && !this.cored.has(enemy)) {
@@ -266,6 +325,30 @@ export class SingularityProjectile extends Projectile {
                     position: enemy.pos,
                 });
             }
+        }
+
+        this.reelIn(dt);
+    }
+
+    /**
+     * Drag the caught onto the shell, wherever they have been pushed to.
+     *
+     * Walked over the capture set rather than over a radius query, so a body
+     * knocked out of the field is still on its way back in.
+     */
+    protected reelIn(dt: number) {
+        for (const enemy of this.captured) {
+            if (enemy.isDead) {
+                this.captured.delete(enemy);
+                continue;
+            }
+            // Not a stun: no recovery window, no immunity, no diminishing
+            // returns (see core/StatusEffects for why those exist). Gravity has
+            // them; it lets go when the field dies. GameManager resets
+            // speedMultiplier every frame before entities update, so this needs
+            // no cleanup of its own.
+            enemy.speedMultiplier = 0;
+            holdOnShell(enemy, this.pos, this.holdRadius, this.captureSpeed, dt);
         }
     }
 

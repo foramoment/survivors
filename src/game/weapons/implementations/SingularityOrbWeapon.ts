@@ -1,21 +1,32 @@
 /**
  * SINGULARITY ORB WEAPON
  *
- * A slow orb that drags everything toward it as it drifts.
+ * An orb that gathers a crowd onto itself as it travels.
  *
  * Evolved — Black Hole. The old evolution collapsed into a fixed 100px zone
  * dealing 20% of the weapon's damage for three seconds: it neither scaled with
  * the weapon nor looked like the thing the name promises, and on a doubled
  * cooldown it was a downgrade you had to work for.
  *
- * The rework gives it the one idea a black hole actually has — an **event
- * horizon**. The outer field only pulls; anything dragged past the horizon is
- * being torn apart and takes heavy damage per second. That makes the weapon a
- * *trap* rather than another damage circle: it is strongest when it has had a
- * second to gather a crowd, and the pull tightens as the hole collapses, so the
- * crowd it gathered is exactly what the final implosion catches.
+ * The rework gave it the one idea a black hole actually has — an **event
+ * horizon** — and this pass finally makes that horizon do both of its jobs.
+ *
+ * It was a wall from the outside only: the field's "pull" was a force divided
+ * by distance, which came out at around one pixel per second against a crowd
+ * walking at a hundred. So the hole never gathered anything; it damaged
+ * whatever happened to walk over it, and the Warden's whole class fantasy —
+ * *make* the crowd, then delete it — was a line of documentation. Capture is
+ * now quoted in px/s and is one-way for the life of the field: brush the rim
+ * and you are cargo.
+ *
+ * The other job is the point of the weapon. Nothing crosses the horizon in
+ * *either* direction, so the crowd packs onto the shell and the middle is
+ * empty — a pocket the player can stand in while the pile they gathered burns
+ * down around them. That safety is geometry, not a rule: no immunity flag, no
+ * argument with core/ContactDamage, and it costs the run's most dangerous
+ * commitment — walking into the middle of your own crowd to get there.
  */
-import { ProjectileWeapon, SingularityProjectile, Zone } from '../base';
+import { ProjectileWeapon, SingularityProjectile, Zone, holdOnShell } from '../base';
 import type { Player } from '../../entities/Player';
 import { Entity } from '../../../engine/Entity';
 import { distance, normalize, type Vector2 } from '../../../engine/Utils';
@@ -104,7 +115,7 @@ export class BlackHoleProjectile extends SingularityProjectile {
     constructor(x: number, y: number, velocity: Vector2, duration: number, damage: number, pierce: number) {
         super(x, y, velocity, duration, damage, pierce);
         this.radius = 32;
-        this.pullStrength = 260;
+        this.captureSpeed = 260;
         // The evolved orb's payoff is the collapse it leaves behind, so its
         // travelling field only grinds lightly on the way in
         this.pullRadiusScale = 3.2;
@@ -207,15 +218,19 @@ export class BlackHoleProjectile extends SingularityProjectile {
 
 export class BlackHoleZone extends Zone {
     /**
-     * How much gravity bends an enemy's speed outside the horizon, at the
-     * centre of the field. Falls off to nothing at the rim, and flips sign for
-     * anything walking away — so the worst case is an enemy at 40% speed and
-     * the best is one arriving 40% early.
+     * How much gravity bends a **boss's** speed inside the field, at its
+     * centre. Falls off to nothing at the rim, and flips sign for one walking
+     * away — so the worst case is a boss at 40% speed and the best is one
+     * arriving 40% early.
+     *
+     * Everything else is captured outright and does not walk at all, so this is
+     * now the boss's version of being caught: the hole leans on it instead of
+     * parking it.
      */
     static readonly GRAVITY_ASSIST = 0.4;
-    /** Pull at the start; it tightens as the hole collapses */
-    pullStrength: number = 340;
-    /** Damage per second to anything past the horizon */
+    /** How fast the caught are reeled onto the horizon, px/s */
+    captureSpeed: number = 300;
+    /** Damage per second to anything held on the horizon */
     horizonDps: number = 0;
     /** Damage of the implosion when the hole finally closes */
     implosionDamage: number = 0;
@@ -227,6 +242,14 @@ export class BlackHoleZone extends Zone {
     private imploded: boolean = false;
     /** Accretion spiral baked in unit space, scaled at draw time */
     private readonly spiral: Vector2[] = [];
+    /**
+     * Everything the field has touched since it opened. One-way for the life of
+     * the hole: brushing the rim is enough, and nothing that has been caught
+     * gets to walk back out. This is the difference between a weapon that
+     * *clears* a spot and one that merely stands in it — see
+     * `holdOnShell` for the other half, which is what makes the middle safe.
+     */
+    private readonly captured: Set<any> = new Set();
 
     constructor(x: number, y: number, radius: number, duration: number, damage: number) {
         super(x, y, radius, duration, damage, 0.25, '', 0);
@@ -242,6 +265,11 @@ export class BlackHoleZone extends Zone {
         return this.radius * HORIZON_RATIO;
     }
 
+    /** The field also gathers loose crystals — see CrystalField */
+    get crystalPull(): number {
+        return this.radius * 2;
+    }
+
     /** 0 at birth → 1 as the hole closes; drives pull and visual tightening */
     private get collapse(): number {
         return 1 - Math.max(0, Math.min(1, this.duration / this.maxDuration));
@@ -252,7 +280,10 @@ export class BlackHoleZone extends Zone {
         this.spin += dt * (2 + 4 * this.collapse);
 
         const pullRadius = this.radius * 2;
-        const pull = this.pullStrength * (1 + this.collapse * 1.4);
+        const horizon = this.horizon;
+        // The pull tightens as the hole closes, so the crowd it gathered is
+        // packed onto the horizon by the time the implosion catches it
+        const reelSpeed = this.captureSpeed * (1 + this.collapse * 0.6);
 
         const playerPos = (this.source as any)?.owner?.pos as Vector2 | undefined;
 
@@ -260,42 +291,49 @@ export class BlackHoleZone extends Zone {
             const dx = this.pos.x - enemy.pos.x;
             const dy = this.pos.y - enemy.pos.y;
             const dist = distance(this.pos, enemy.pos);
-            if (dist > pullRadius || dist < 1) continue;
+            if (dist > pullRadius) continue;
 
-            enemy.pos.x += (dx / dist) * (pull / dist) * dt;
-            enemy.pos.y += (dy / dist) * (pull / dist) * dt;
-
-            if (dist < this.horizon) {
-                // Past the horizon nothing leaves. It is not a stun — no
-                // recovery, no immunity, no diminishing returns — it is the
-                // hole holding what fell in until it closes. Watching enemies
-                // stroll straight through the black part of a black hole was
-                // the thing that broke the illusion.
-                enemy.speedMultiplier = 0;
-
-                // ...and a grave, continuously, so a body held in the middle
-                // melts while one skimming the edge only gets dragged
-                if (this.horizonDps > 0) {
-                    damageSystem.dealDamage({
-                        baseDamage: this.horizonDps * dt,
-                        source: this.source,
-                        target: enemy,
-                        position: enemy.pos,
-                    });
-                }
-            } else if (playerPos) {
-                // Outside the horizon, gravity bends how fast they travel
-                // rather than where they are: an enemy whose path toward the
+            if (!enemy.isBoss) {
+                // Touching the field at all is enough, once
+                this.captured.add(enemy);
+            } else if (playerPos && dist > 1) {
+                // A boss is too big to park, so gravity bends how fast it
+                // travels rather than where it is: one whose path toward the
                 // player runs *with* the hole gets slingshotted along, one
-                // climbing away from it drags. Same physics that makes the
-                // whole thing feel massive, and it means the hole can hand the
-                // crowd to you faster than they came — which is the trade for
-                // parking it between you and them.
+                // climbing away from it drags. That is the trade for dropping
+                // a hole between yourself and the thing chasing you.
                 const heading = normalize({ x: playerPos.x - enemy.pos.x, y: playerPos.y - enemy.pos.y });
                 const alignment = heading.x * (dx / dist) + heading.y * (dy / dist);
                 const falloff = 1 - dist / pullRadius;
                 enemy.speedMultiplier *= 1 + alignment * BlackHoleZone.GRAVITY_ASSIST * falloff;
             }
+
+            // A grave, continuously, for whatever is packed onto the horizon —
+            // a body skimming the rim only gets dragged, and pays the field's
+            // ordinary tick for the trip
+            if (this.horizonDps > 0 && dist <= horizon * 1.15) {
+                damageSystem.dealDamage({
+                    baseDamage: this.horizonDps * dt,
+                    source: this.source,
+                    target: enemy,
+                    position: enemy.pos,
+                });
+            }
+        }
+
+        // Reel the caught onto the horizon and hold them there, wherever they
+        // have been pushed to since. Walked over the capture set rather than a
+        // radius query so a body thrown out by a knockback is still cargo.
+        for (const enemy of this.captured) {
+            if (enemy.isDead) {
+                this.captured.delete(enemy);
+                continue;
+            }
+            // Not a stun — no recovery, no immunity, no diminishing returns
+            // (see core/StatusEffects for why those exist). It is the hole
+            // holding what fell in until it closes.
+            enemy.speedMultiplier = 0;
+            holdOnShell(enemy, this.pos, horizon, reelSpeed, dt);
         }
 
         this.arcTimer += dt;
@@ -432,11 +470,24 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
     projectileEmoji = "";
     pierce = 999;
 
+    /**
+     * `speed` is doing two jobs, and at 50 it failed both.
+     *
+     * Flight distance is `speed * duration` (125px), and that same number is
+     * the weapon's search range — so the orb refused to fire until something
+     * was already within about one body-length of the player, then crawled out
+     * at half the speed of the crowd it was supposed to be gathering. On the
+     * class whose starting weapon this is, that reads as "the orb makes me
+     * stand next to enemies", which is exactly the opposite of what it is for.
+     * At 130 it outruns everything on the arena and opens the pile roughly
+     * 325px out — far enough that the gather happens away from you, near
+     * enough that you can choose to walk into it.
+     */
     readonly stats = {
         damage: 50,
         cooldown: 4,
         area: 600,
-        speed: 50,
+        speed: 130,
         duration: 2.5,
         pierce: 999,
     };
@@ -508,11 +559,13 @@ export class SingularityOrbWeapon extends ProjectileWeapon {
             );
             // Two regions, matching the two things it draws: a heavy core that
             // tears through whatever it passes over, and a wide field that
-            // drags the pack onto it and grinds them meanwhile. Steering the
-            // core through a crowd you already gathered is the play.
+            // takes hold of the pack and reels it onto that core. The
+            // unevolved orb is a plough — it drags what it caught away with it
+            // — and the evolution is what turns the same idea into a place you
+            // can stand.
             proj.radius = (16 + this.level * 2) * this.owner.stats.area;
-            proj.pullStrength = 200;
-            proj.pullRadiusScale = 4;
+            proj.captureSpeed = 220;
+            proj.pullRadiusScale = 5;
             proj.fieldDamageShare = 0.18;
             proj.source = this;
             this.onSpawn(proj);
