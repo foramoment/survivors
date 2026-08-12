@@ -255,6 +255,23 @@ describe('UpgradePool', () => {
             expect(formatPowerupBonus('magnet', 30)).toBe('+30 pull range');
         });
 
+        it('says so when a percentage is a chance rather than a size', () => {
+            i18n.setLang('en');
+            // Kill Echo's card number is the odds of it firing; the blast
+            // itself is half the target's current health. A bare "+10%" next
+            // to a pool where every other bare percentage IS a size read as
+            // the damage, which is the one thing it is not.
+            expect(formatPowerupBonus('killEcho', 0.1)).toBe('+10% chance');
+            expect(formatPowerupBonus('siphon', 0.025)).toBe('+3% chance');
+            // A size stays bare
+            expect(formatPowerupBonus('firstStrike', 0.12)).toBe('+12%');
+        });
+
+        it('calls a Static Discharge stack a tier, because that is what it buys', () => {
+            i18n.setLang('en');
+            expect(formatPowerupBonus('discharge', 1)).toBe('+1 tier');
+        });
+
         it('flat bonus units follow the active language', () => {
             i18n.setLang('ru');
             expect(formatPowerupBonus('maxHp', 15)).toBe('+15 к макс. HP');

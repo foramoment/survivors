@@ -123,7 +123,8 @@ export const RU: Record<string, string> = {
     'bonus.maxHp': 'к макс. HP',
     'bonus.shield': 'к щиту',
     'bonus.armor': 'к броне',
-    'bonus.discharge': 'заряд',
+    'bonus.discharge': 'ступень',
+    'bonus.chance': 'шанс',
     'bonus.reroll': 'переброс',
 
     'arena.meteors': 'МЕТЕОРИТНЫЙ ДОЖДЬ',
@@ -244,7 +245,7 @@ export const RU: Record<string, string> = {
     'powerup.static_discharge.name': 'Статический Разряд',
     'powerup.static_discharge.desc': 'Полученный урон копит заряд. 1: сдувает толпу с тебя · 2: и станит её · 3: и поджигает',
     'powerup.kill_echo.name': 'Эхо Смерти',
-    'powerup.kill_echo.desc': 'Убитые иногда детонируют, разбрасывая пачку и поджигая её',
+    'powerup.kill_echo.desc': 'Убитые иногда детонируют, вырывая кусок из всех вокруг и поджигая их',
     'powerup.first_strike.name': 'Первый Удар',
     'powerup.first_strike.desc': 'Куда больнее бьёт по тем, кого ещё не задели',
     'powerup.vital_siphon.name': 'Сифон Жизни',

@@ -17,6 +17,7 @@ import {
 } from '../core/Tactics';
 import { POWERUPS } from '../data/GameData';
 import { VALID_PLAYER_STATS } from '../core/PlayerStats';
+import { RU } from '../data/locales/ru';
 
 describe('Tactics powerups', () => {
     it('every powerup type is a declared player stat', () => {
@@ -75,9 +76,14 @@ describe('Static Discharge', () => {
         expect(DISCHARGE_BURN_AT).toBeGreaterThan(DISCHARGE_STUN_AT);
         expect(DISCHARGE_BURN_AT).toBeLessThanOrEqual(DISCHARGE_MAX_STACKS);
 
-        // The card has to name them, or the tiers are invisible
+        // The card has to name them, or the tiers are invisible — in EVERY
+        // language. Game-data strings have no English twin in the locale file
+        // (GameData is the fallback), so a translation is exactly the place a
+        // tier can silently go missing.
+        const ru = RU['powerup.static_discharge.desc'];
         for (const tier of [1, DISCHARGE_STUN_AT, DISCHARGE_BURN_AT]) {
-            expect(perk.description).toContain(`${tier}:`);
+            expect(perk.description, 'en').toContain(`${tier}:`);
+            expect(ru, 'ru').toContain(`${tier}:`);
         }
     });
 });

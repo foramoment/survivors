@@ -95,8 +95,12 @@ export const EN: Record<string, string> = {
     'bonus.maxHp': 'Max HP',
     'bonus.shield': 'shield',
     'bonus.armor': 'armor',
-        'bonus.discharge': 'charge',
+    // Static Discharge stacks are tiers of behaviour, not units of charge —
+    // see DISCHARGE_MAX_STACKS in core/Tactics
+    'bonus.discharge': 'tier',
     'bonus.reroll': 'reroll',
+    // Suffix for percentages that are a probability rather than a size
+    'bonus.chance': 'chance',
 
     // Arena event banners — drawn with the pixel font, uppercase only
     'arena.meteors': 'METEOR SHOWER',

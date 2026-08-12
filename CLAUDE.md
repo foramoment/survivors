@@ -783,7 +783,7 @@ upgrade(): void {
 
 ```typescript
 ENEMY_CONFIG = {
-    baseHp: 10,
+    baseHp: 5,            // понижен с 10 вместе с удалением GLOBAL_DAMAGE — см. DamageSystem
     hpMultiplier: 2,      // HP удваивается для каждого следующего типа
     baseDamage: 2.2,       // Контактный урон В СЕКУНДУ, почти плоский (см. ContactDamage)
     damageMultiplier: 1.08, // Урон ×1.08 для следующего типа — 2.2 у первого, 4.7 у последнего

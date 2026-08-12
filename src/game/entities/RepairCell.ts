@@ -13,8 +13,9 @@ import { REPAIR_HEAL, REPAIR_LIFETIME } from '../core/Tactics';
  */
 /**
  * How close you must get before a cell starts drifting to you, and how fast it
- * comes. Compare the XP magnet, which starts at 100 and is upgradable to 250 —
- * this is deliberately smaller and cannot be upgraded at all.
+ * comes. Compare the XP magnet, which starts at 100 and grows every level
+ * (`Player.MAGNET_PER_LEVEL`) — this is deliberately smaller and never grows,
+ * so a repair cell is always something you walk to.
  */
 const PULL_RADIUS = 95;
 const PULL_SPEED = 150;

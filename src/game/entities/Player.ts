@@ -14,8 +14,8 @@ export class Player extends Entity {
      * fixed step instead.
      *
      * The old curve was `x1.1 + 6` forever. XP *income* cannot compound — it is
-     * bounded by `DifficultyDirector.MAX_ENEMIES` (400 bodies on the arena at
-     * once) and by how fast a build can delete them — so a geometric
+     * bounded by `DifficultyDirector.MAX_ENEMIES` (the population ceiling on
+     * the arena) and by how fast a build can delete them — so a geometric
      * requirement against a sublinear income diverges by construction. Measured
      * on a real 15-minute Void Nexus clear: level 69 cost 35,893 XP, about 1100
      * kills, **93 seconds**, and the next one was 10% worse again. Which is the

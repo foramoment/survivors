@@ -148,13 +148,27 @@ export function getPowerupValue(
 /** Stat types shown as a flat amount with a unit instead of a percentage */
 const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'discharge', 'reroll', 'shield'];
 
-/** Human-readable bonus string, e.g. "+8%" or "+15 Max HP" */
+/**
+ * Percentages that are a **probability of the effect firing**, not a size.
+ *
+ * These have to say so. A bare "+10%" on Kill Echo is the one number on the
+ * card that is not what the perk is about — the blast itself is half the
+ * target's current health — and the player read it as the damage. Every other
+ * bare percentage in the pool (might, area, crit damage…) *is* a size, so the
+ * unadorned form quietly promises the wrong kind of thing here.
+ */
+const CHANCE_TYPES = ['killEcho', 'siphon'];
+
+/** Human-readable bonus string, e.g. "+8%", "+15 Max HP" or "+10% chance" */
 export function formatPowerupBonus(type: string, value: number): string {
     const sign = value >= 0 ? '+' : '−';
     const abs = Math.abs(value);
     if (FLAT_TYPES.includes(type)) {
         const rounded = abs >= 10 ? Math.round(abs) : Math.round(abs * 10) / 10;
         return `${sign}${rounded} ${t(`bonus.${type}`)}`;
+    }
+    if (CHANCE_TYPES.includes(type)) {
+        return `${sign}${Math.round(abs * 100)}% ${t('bonus.chance')}`;
     }
     return `${sign}${Math.round(abs * 100)}%`;
 }
