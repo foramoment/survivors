@@ -148,9 +148,9 @@ export const RU: Record<string, string> = {
     'weapon.plasma_cannon.evoDesc': 'Каждый осколок, попав во врага, рвётся на новые осколки',
 
     'weapon.nanobot_swarm.name': 'Рой Нанитов',
-    'weapon.nanobot_swarm.desc': 'Аура нанитов с дронами, что бросаются на всё рядом',
+    'weapon.nanobot_swarm.desc': 'Дроны сопровождения бросаются на всё рядом, +1 дрон за уровень',
     'weapon.nanobot_swarm.evoName': 'Улей Нанитов',
-    'weapon.nanobot_swarm.evoDesc': 'Вдвое больше дронов, и каждый удар сеет нанитную гниль',
+    'weapon.nanobot_swarm.evoDesc': 'Ещё два дрона, и каждый прошивает толпу насквозь, оставляя гниль',
 
     'weapon.spore_cloud.name': 'Облако Спор',
     'weapon.spore_cloud.desc': 'Грибница заражает всех внутри и ширится с каждым уровнем',

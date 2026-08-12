@@ -871,38 +871,6 @@ export class SporeZone extends Zone {
 }
 
 // ============================================
-// NANOBOT CLOUD - Follows owner
-// ============================================
-export class NanobotCloud extends Zone {
-    owner: any;
-
-    constructor(owner: any, radius: number, duration: number, damage: number, interval: number) {
-        super(owner.pos.x, owner.pos.y, radius, duration, damage, interval, '', 0);
-        this.owner = owner;
-    }
-
-    update(dt: number) {
-        this.pos.x = this.owner.pos.x;
-        this.pos.y = this.owner.pos.y;
-
-        super.update(dt);
-    }
-
-    /**
-     * Deliberately draws nothing.
-     *
-     * The cloud used to paint a dashed ring, a radial haze and twelve orbiting
-     * dots centred on the player — a permanent disc of glow sitting under the
-     * one thing you need to keep track of, and doing it for the whole run. The
-     * drones the weapon actually flies (see NaniteHiveCloud) read far better on
-     * their own, so the aura is invisible and only its effect is felt.
-     */
-    draw(_ctx: CanvasRenderingContext2D, _camera: Vector2) {
-        // intentionally empty — see the comment above
-    }
-}
-
-// ============================================
 // DELAYED EXPLOSION ZONE - For orbital strike
 // ============================================
 export class DelayedExplosionZone extends Zone {

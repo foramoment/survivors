@@ -3,12 +3,11 @@
  *
  * Проверяют:
  * 1. Zone - длительность, таймер урона, slowEffect
- * 2. NanobotCloud - следование за owner
  * 3. DelayedExplosionZone - задержка, взрыв, урон врагам
  * 4. MindBlastZone - фазы (warning → charge → blast), урон, stun
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Zone, NanobotCloud, DelayedExplosionZone, MindBlastZone } from '../weapons/base/Zone';
+import { Zone, DelayedExplosionZone, MindBlastZone } from '../weapons/base/Zone';
 
 // Mock dependencies
 vi.mock('../../engine/ParticleSystem', () => ({
@@ -109,43 +108,6 @@ describe('Zone', () => {
             expect(zone.emoji).toBe('💥');
             expect(zone.slowEffect).toBe(0.3);
         });
-    });
-});
-
-describe('NanobotCloud', () => {
-    let mockOwner: any;
-
-    beforeEach(() => {
-        mockOwner = { pos: { x: 100, y: 100 } };
-    });
-
-    it('should follow owner position', () => {
-        const cloud = new NanobotCloud(mockOwner, 50, 5, 10, 0.5);
-
-        expect(cloud.pos.x).toBe(100);
-        expect(cloud.pos.y).toBe(100);
-
-        mockOwner.pos = { x: 300, y: 400 };
-        cloud.update(0.1);
-
-        expect(cloud.pos.x).toBe(300);
-        expect(cloud.pos.y).toBe(400);
-    });
-
-    it('should still decrease duration', () => {
-        const cloud = new NanobotCloud(mockOwner, 50, 2, 10, 0.5);
-
-        cloud.update(1);
-
-        expect(cloud.duration).toBeCloseTo(1);
-    });
-
-    it('should die when duration expires', () => {
-        const cloud = new NanobotCloud(mockOwner, 50, 1, 10, 0.5);
-
-        cloud.update(1.5);
-
-        expect(cloud.isDead).toBe(true);
     });
 });
 

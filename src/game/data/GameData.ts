@@ -318,12 +318,12 @@ export const WEAPONS = [
         id: 'nanobot_swarm',
         name: "Nanobot Swarm",
         emoji: "🦠",
-        description: "Aura of nanites with drones that lunge at what comes close",
+        description: "Escort drones that dart out at what comes near, one more each level",
         class: NanobotSwarmWeapon,
         evolution: {
             name: "Nanite Hive",
             emoji: "☣️",
-            description: "Twice the drones, and every strike seeds a nanite rot"
+            description: "Two more drones, and each one strafes clean through the crowd, leaving rot"
         }
     },
     {

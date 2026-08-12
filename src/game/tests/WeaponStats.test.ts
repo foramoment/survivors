@@ -44,11 +44,11 @@ const EXPECTED_STATS: Record<string, any> = {
         duration: 1.5,
     },
     nanobot_swarm: {
-        damage: 5,
-        cooldown: 4,
+        damage: 20,
+        cooldown: 0.6,  // seconds a docked drone waits between sorties
         area: 1.0,
-        speed: 0,
-        duration: 5,
+        speed: 620,
+        duration: 2.5,
     },
     spore_cloud: {
         damage: 10,

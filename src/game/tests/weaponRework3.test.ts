@@ -463,7 +463,18 @@ describe('Nanobot Swarm', () => {
         placeEnemies([]);
 
         weapon.update(0.1);
-        expect(spawned[0].constructor.name).toBe('NaniteHiveCloud');
+        expect(spawned[0].constructor.name).toBe('NanoSwarm');
+    });
+
+    it('keeps exactly one escort alive, however long the run goes', () => {
+        const player = new Player(0, 0);
+        const weapon = new NanobotSwarmWeapon(player);
+        const spawned: any[] = [];
+        weapon.onSpawn = e => spawned.push(e);
+        placeEnemies([]);
+
+        for (let i = 0; i < 600; i++) weapon.update(1 / 60);
+        expect(spawned.length).toBe(1);
     });
 });
 

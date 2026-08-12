@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SporeCloudWeapon, FungalBloomZone } from '../weapons/implementations/SporeCloudWeapon';
-import { NanobotSwarmWeapon, NaniteHiveCloud } from '../weapons/implementations/NanobotSwarmWeapon';
+import { NanobotSwarmWeapon, NanoSwarm } from '../weapons/implementations/NanobotSwarmWeapon';
 import { VoidRayWeapon, VoidBolt, VoidRip } from '../weapons/implementations/VoidRayWeapon';
 import { PlasmaGrenadeWeapon } from '../weapons/implementations/PlasmaGrenadeWeapon';
 import { MindBlastWeapon, PsiBlastZone } from '../weapons/implementations/MindBlastWeapon';
@@ -80,32 +80,75 @@ describe('Spore Cloud', () => {
 });
 
 describe('Nanobot Swarm', () => {
-    it('evolved spawns a hive whose drones strike nearby enemies', () => {
-        const weapon = new NanobotSwarmWeapon(mockOwner());
-        weapon.level = 6;
-        weapon.evolved = true;
+    /** Spawn the escort and run it for `seconds`, keeping the hash filled */
+    function flySwarm(weapon: NanobotSwarmWeapon, enemies: any[], seconds: number) {
         const spawned = collect(weapon);
         weapon.update(0.1);
+        const swarm = spawned[0] as NanoSwarm;
 
-        const cloud = spawned[0];
-        expect(cloud).toBeInstanceOf(NaniteHiveCloud);
+        const dt = 1 / 60;
+        for (let t = 0; t < seconds; t += dt) {
+            levelSpatialHash.clear();
+            levelSpatialHash.insertAll(enemies);
+            swarm.update(dt);
+        }
+        return swarm;
+    }
 
-        const enemy = enemyAt(40, 0);
-        levelSpatialHash.insertAll([enemy]);
+    it('sends drones out at whatever comes near', () => {
+        const weapon = new NanobotSwarmWeapon(mockOwner());
         const spy = vi.spyOn(damageSystem, 'dealDamage').mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
 
-        for (let i = 0; i < 30; i++) cloud.update(1 / 60);
+        flySwarm(weapon, [enemyAt(120, 0)], 1.5);
         expect(spy).toHaveBeenCalled();
     });
 
-    it('area scales the whole radius, not just the per-level part', () => {
-        const owner = mockOwner();
-        owner.stats.area = 2;
-        const weapon = new NanobotSwarmWeapon(owner);
-        const spawned = collect(weapon);
-        weapon.update(0.1);
-        // (60 + level*10) * 2 with level 1 = 140
-        expect(spawned[0].radius).toBe(140);
+    it('grows by one drone per level, and two more for the hive', () => {
+        const count = (level: number, evolved = false) => {
+            const weapon = new NanobotSwarmWeapon(mockOwner());
+            weapon.level = level;
+            weapon.evolved = evolved;
+            const swarm = flySwarm(weapon, [], 0.2);
+            return (swarm as any).bots.length;
+        };
+
+        expect(count(1)).toBe(2);
+        expect(count(2)).toBe(3);
+        expect(count(5)).toBe(6);
+        expect(count(6, true)).toBe(9);
+    });
+
+    it('only the hive strafes through a line of bodies', () => {
+        const line = [enemyAt(120, 0), enemyAt(170, 0), enemyAt(220, 0)];
+        const hits = (evolved: boolean) => {
+            const weapon = new NanobotSwarmWeapon(mockOwner());
+            weapon.level = 6;
+            weapon.evolved = evolved;
+            const spy = vi.spyOn(damageSystem, 'dealDamage').mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
+            spy.mockClear();
+            flySwarm(weapon, line, 0.8);
+            return new Set(spy.mock.calls.map(c => (c[0] as any).target)).size;
+        };
+
+        // The base drone pokes the nearest body and turns for home; the hive's
+        // carries on down the line, which is the whole point of the evolution
+        expect(hits(false)).toBe(1);
+        expect(hits(true)).toBeGreaterThan(1);
+    });
+
+    it('area widens how far a drone will go hunting', () => {
+        const wide = mockOwner();
+        wide.stats.area = 2;
+        const spy = vi.spyOn(damageSystem, 'dealDamage').mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
+
+        // Out of reach at area 1 (170 + 8), comfortably inside it at area 2
+        spy.mockClear();
+        flySwarm(new NanobotSwarmWeapon(mockOwner()), [enemyAt(250, 0)], 1.5);
+        expect(spy).not.toHaveBeenCalled();
+
+        spy.mockClear();
+        flySwarm(new NanobotSwarmWeapon(wide), [enemyAt(250, 0)], 1.5);
+        expect(spy).toHaveBeenCalled();
     });
 });
 

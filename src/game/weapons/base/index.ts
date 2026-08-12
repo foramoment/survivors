@@ -24,7 +24,6 @@ export {
     AcidZone,
     BurningTrailZone,
     SporeZone,
-    NanobotCloud,
     DelayedExplosionZone,
     MindBlastZone,
     PlasmaExplosionZone,
