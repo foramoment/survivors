@@ -18,6 +18,38 @@
  */
 
 /**
+ * ## Static Discharge stacks unlock behaviour, they do not scale a number
+ *
+ * Three picks, and each one adds a *thing the blast does*:
+ *
+ *   1. **Shove** — damage and knockback. The pack comes off you.
+ *   2. **Stun** — and it stays off you, for DISCHARGE_STUN seconds.
+ *   3. **Burn** — and it walks away on fire.
+ *
+ * The player's objection was structural rather than numeric: "I don't much
+ * like that we're taking stacks of this thing." They were right, and this perk
+ * is the one where it stings most. It sits in the file whose opening comment
+ * says these are *tactics* — powerups with a behaviour attached, so a build
+ * starts to have a shape — and then asked to be bought eight times for a
+ * larger version of the same event. Eight picks of +damage is the flat
+ * multiplier this file exists to be an alternative to.
+ *
+ * Tiers also fix something the old shape could not. A rate-capped blast has a
+ * hard ceiling on damage per second no matter what the number says (see
+ * DISCHARGE_COOLDOWN), so late stacks ran into that wall. Stun and burn are
+ * not damage per second, so they keep paying after the damage stops mattering.
+ */
+export const DISCHARGE_MAX_STACKS = 3;
+/** Stack at which the blast starts stunning, and at which it starts burning */
+export const DISCHARGE_STUN_AT = 2;
+export const DISCHARGE_BURN_AT = 3;
+/** How long the caught pack is held, and how long it burns */
+export const DISCHARGE_STUN = 0.9;
+export const DISCHARGE_BURN_TIME = 3;
+/** Burn strength, as a share of the target's own max HP per second */
+export const DISCHARGE_BURN_SHARE = 0.06;
+
+/**
  * HP that must be absorbed before the capacitor fires. **Flat**, not per stack.
  *
  * It used to be `26 x stacks`, which made the perk's damage-per-second exactly
@@ -26,16 +58,21 @@
  * internal cooldown below arrived and made it worse — with firing rate capped,
  * a bigger threshold could only ever be a downgrade.
  *
- * Flat threshold + scaling blast + a hard rate cap gives the perk one readable
- * promise: **every stack is a bigger bang, never a faster one.**
+ * Flat threshold + a hard rate cap gives the perk one readable promise: **a
+ * stack is a bigger event, never a more frequent one.**
  */
 export const DISCHARGE_CHARGE_COST = 26;
 /** Blast radius, and its damage as a multiple of the stack count */
 export const DISCHARGE_RADIUS = 190;
-export const DISCHARGE_DAMAGE = 34;
+/**
+ * Raised 34 -> 70 because the stack cap fell from eight to three. Eight stacks
+ * used to reach 272; three now reach 210, and the missing 62 is paid for by
+ * the stun and the burn that the old version never had.
+ */
+export const DISCHARGE_DAMAGE = 70;
 export const DISCHARGE_KNOCKBACK = 420;
 /** Extra blast radius per stack past the first, so the growth is visible */
-export const DISCHARGE_RADIUS_PER_STACK = 0.07;
+export const DISCHARGE_RADIUS_PER_STACK = 0.12;
 
 /**
  * Internal cooldown, in seconds — the capacitor cannot fire again inside this
@@ -83,8 +120,19 @@ export const DISCHARGE_CHARGE_CAP = 1.5;
  * below that an echo can never land a killing blow, the perk physically cannot
  * chain — it softens, and your weapons finish. That also makes it a companion
  * to a build rather than a replacement for one.
+ *
+ * **Raised 0.3 -> 0.5 alongside a cut from six stacks to three.** Play report:
+ * it proc'd often enough to be background and hit softly enough that nothing
+ * about it registered. Six stacks bought 36% of kills; the internal cooldown
+ * below meant that in a late-game run the *chance* was not even the binding
+ * constraint, so most of those stacks were buying nothing you could feel.
+ *
+ * Three stacks at 10% each, a longer cooldown and half the target's health per
+ * blast is the same perk with its budget moved from frequency to size. Which
+ * is the direction KILL_ECHO_ICD already argued for and did not go far enough
+ * on: rare and loud beats constant and ignorable.
  */
-export const KILL_ECHO_DAMAGE_SHARE = 0.3;
+export const KILL_ECHO_DAMAGE_SHARE = 0.5;
 /**
  * Bosses take a quarter, the same courtesy every stun source gives them. A
  * percent-of-current-health effect is at its strongest against exactly the kind
@@ -92,12 +140,18 @@ export const KILL_ECHO_DAMAGE_SHARE = 0.3;
  */
 export const KILL_ECHO_BOSS_RESIST = 0.25;
 /**
- * Tightened from 84. Enemies travel packed together, so a generous radius here
- * is not "a blast" — it is "everything on top of the corpse", every time.
+ * Back up to 84, having been tightened to 62 for a reason that no longer
+ * holds.
+ *
+ * The tightening was about frequency, not size: enemies travel packed, so a
+ * generous radius on an effect firing about once a second was "everything on
+ * top of the corpse, every time". At one blast per KILL_ECHO_ICD it is an
+ * event, and an event is allowed to be big — a blast you can see the edges of
+ * is most of what makes it readable.
  */
-export const KILL_ECHO_RADIUS = 62;
+export const KILL_ECHO_RADIUS = 84;
 /** Burn left on survivors, as a share of their own max HP per second */
-export const KILL_ECHO_BURN_SHARE = 0.05;
+export const KILL_ECHO_BURN_SHARE = 0.09;
 
 /**
  * Minimum seconds between echoes, however fast you are killing.
@@ -121,8 +175,13 @@ export const KILL_ECHO_BURN_SHARE = 0.05;
  *
  * With the rate bounded, the blast is free to be twice as heavy. Rare and loud
  * beats constant and ignorable.
+ *
+ * **Lengthened 1.6 -> 2.6** when the perk's budget moved from frequency to
+ * size. At three stacks and 2.6 seconds the ceiling is roughly one blast every
+ * three seconds however fast you are killing, which is slow enough that you
+ * look up when it happens.
  */
-export const KILL_ECHO_ICD = 1.6;
+export const KILL_ECHO_ICD = 2.6;
 
 /**
  * How hard the blast throws the bodies it catches, at the epicentre.
@@ -141,7 +200,7 @@ export const KILL_ECHO_ICD = 1.6;
  * deals no damage, cannot kill, and therefore cannot feed the cascade the
  * non-lethal rule exists to prevent.
  */
-export const KILL_ECHO_KNOCKBACK = 320;
+export const KILL_ECHO_KNOCKBACK = 460;
 
 /**
  * Minimum seconds between the echo's camera kick.

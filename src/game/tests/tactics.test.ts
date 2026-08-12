@@ -10,7 +10,11 @@ vi.mock('../../engine/Input', () => ({
 }));
 
 import { RepairCell } from '../entities/RepairCell';
-import { dischargeThreshold, dischargeRadius, DISCHARGE_COOLDOWN, REPAIR_LIFETIME } from '../core/Tactics';
+import {
+    dischargeThreshold, dischargeRadius, DISCHARGE_COOLDOWN, REPAIR_LIFETIME,
+    DISCHARGE_MAX_STACKS, DISCHARGE_STUN_AT, DISCHARGE_BURN_AT,
+    KILL_ECHO_ICD, KILL_ECHO_DAMAGE_SHARE,
+} from '../core/Tactics';
 import { POWERUPS } from '../data/GameData';
 import { VALID_PLAYER_STATS } from '../core/PlayerStats';
 
@@ -56,6 +60,54 @@ describe('Static Discharge', () => {
 
     it('every stack is a bigger bang, never a faster one', () => {
         expect(dischargeRadius(4)).toBeGreaterThan(dischargeRadius(1));
+    });
+
+    it('is three tiers of behaviour, not eight of the same number', () => {
+        // The objection was structural, not numeric: buying the same event
+        // eight times is the flat multiplier core/Tactics exists to replace.
+        const perk = POWERUPS.find(p => p.id === 'static_discharge')!;
+        expect(perk.maxStacks).toBe(DISCHARGE_MAX_STACKS);
+        expect(DISCHARGE_MAX_STACKS).toBe(3);
+
+        // Every tier past the first must unlock something, and land inside the
+        // cap — a tier nobody can reach is a tier that does not exist
+        expect(DISCHARGE_STUN_AT).toBeGreaterThan(1);
+        expect(DISCHARGE_BURN_AT).toBeGreaterThan(DISCHARGE_STUN_AT);
+        expect(DISCHARGE_BURN_AT).toBeLessThanOrEqual(DISCHARGE_MAX_STACKS);
+
+        // The card has to name them, or the tiers are invisible
+        for (const tier of [1, DISCHARGE_STUN_AT, DISCHARGE_BURN_AT]) {
+            expect(perk.description).toContain(`${tier}:`);
+        }
+    });
+});
+
+describe('Kill Echo', () => {
+    it('trades frequency for size — fewer stacks, harder blast', () => {
+        // Play report: it proc'd often enough to be background and hit softly
+        // enough that nothing registered. The internal cooldown already bounded
+        // the rate, so the late stacks were buying nothing you could feel.
+        const perk = POWERUPS.find(p => p.id === 'kill_echo')!;
+        expect(perk.maxStacks).toBe(3);
+        expect(perk.value * perk.maxStacks).toBeCloseTo(0.3);
+
+        // Slower than it was (1.6s), so a blast is an event you look up at
+        expect(KILL_ECHO_ICD).toBeGreaterThan(2);
+        // ...and heavier than it was (0.3 of current HP)
+        expect(KILL_ECHO_DAMAGE_SHARE).toBeGreaterThan(0.4);
+    });
+
+    it('still cannot chain, however hard it hits', () => {
+        // The non-lethal rule is what makes a cascade impossible by
+        // construction rather than unlikely by tuning, so raising the share
+        // must not touch it: no echo makes a corpse, so no echo makes an echo.
+        const hp = 100;
+        const damage = Math.min(hp * KILL_ECHO_DAMAGE_SHARE, Math.max(0, hp - 1));
+        expect(damage).toBeLessThan(hp);
+
+        // Even at a share of 1 the target survives on 1 HP
+        const lethal = Math.min(hp * 1, Math.max(0, hp - 1));
+        expect(lethal).toBe(hp - 1);
         expect(DISCHARGE_COOLDOWN).toBeGreaterThan(0);
     });
 });

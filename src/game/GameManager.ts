@@ -30,6 +30,8 @@ import { RepairCell } from './entities/RepairCell';
 import {
     dischargeThreshold, dischargeRadius, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
     DISCHARGE_COOLDOWN, DISCHARGE_CHARGE_CAP,
+    DISCHARGE_STUN_AT, DISCHARGE_BURN_AT, DISCHARGE_STUN,
+    DISCHARGE_BURN_SHARE, DISCHARGE_BURN_TIME,
     KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE, KILL_ECHO_BOSS_RESIST,
     KILL_ECHO_KNOCKBACK, KILL_ECHO_PUNCH_GAP, KILL_ECHO_ICD,
 } from './core/Tactics';
@@ -615,6 +617,8 @@ export class GameManager {
         const radius = dischargeRadius(this.player.stats.discharge) * this.player.stats.area;
         const damage = DISCHARGE_DAMAGE * this.player.stats.discharge;
 
+        const stacks = this.player.stats.discharge;
+
         audio.play('explosion');
         juice.addTrauma(0.35);
         juice.shockwave(this.player.pos.x, this.player.pos.y, radius * 1.4, '#8ce8ff', 0.45, 6);
@@ -632,6 +636,23 @@ export class GameManager {
             const dy = enemy.pos.y - this.player.pos.y;
             const len = Math.hypot(dx, dy) || 1;
             enemy.applyKnockback(dx / len, dy / len, DISCHARGE_KNOCKBACK);
+
+            // Each stack past the first adds something the blast DOES rather
+            // than making it bigger — see the tier comment in core/Tactics.
+            // Both ride existing systems, so both inherit their safety rules:
+            // stun carries the downtime ratio from StatusEffects, and the burn
+            // resolves over seconds instead of inside this frame.
+            if (stacks >= DISCHARGE_STUN_AT) {
+                status.stun(enemy, DISCHARGE_STUN);
+            }
+            if (stacks >= DISCHARGE_BURN_AT) {
+                status.infect(enemy, {
+                    dps: enemy.maxHp * DISCHARGE_BURN_SHARE,
+                    duration: DISCHARGE_BURN_TIME,
+                    source: undefined,
+                    kind: 'burn',
+                });
+            }
         }
     }
 
@@ -684,8 +705,15 @@ export class GameManager {
 
         const radius = KILL_ECHO_RADIUS * this.player.stats.area;
 
+        // Two rings rather than one: a fast white core and a slower amber
+        // front behind it. A single expanding circle reads as "a circle
+        // appeared"; two travelling at different speeds read as a blast front,
+        // and this perk's whole problem was that it did not register.
+        // Affordable now that the internal cooldown holds it near one blast
+        // every three seconds — see KILL_ECHO_ICD.
         particles.emitExplosion(enemy.pos.x, enemy.pos.y, radius, ['#ffd166', '#ff6b35', '#ffffff']);
-        juice.shockwave(enemy.pos.x, enemy.pos.y, radius * 2, '#ffb03c', 0.28, 6);
+        juice.shockwave(enemy.pos.x, enemy.pos.y, radius * 1.2, '#ffffff', 0.16, 4);
+        juice.shockwave(enemy.pos.x, enemy.pos.y, radius * 2.6, '#ffb03c', 0.42, 9);
 
         // The blast has to be heard and felt, not just seen. Before this the
         // echo drew particles and a thin ring and stopped there, so a perk sold
@@ -699,8 +727,8 @@ export class GameManager {
         audio.play('explosion');
         if (this.echoPunchTimer <= 0) {
             this.echoPunchTimer = KILL_ECHO_PUNCH_GAP;
-            juice.hitStop(0.035);
-            juice.addTrauma(0.14);
+            juice.hitStop(0.07);
+            juice.addTrauma(0.3);
         }
 
         for (const other of levelSpatialHash.getWithinRadius(enemy.pos, radius)) {

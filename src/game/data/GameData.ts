@@ -4,6 +4,10 @@ import {
     ChronoDiscWeapon, AcidPoolWeapon, LightningChainWeapon, SpinningEmberWeapon,
     FrostNovaWeapon, PlasmaGrenadeWeapon
 } from '../weapons/implementations';
+// The stack cap IS the tier count — see the Static Discharge block in
+// core/Tactics. Imported rather than repeated so the card and the behaviour
+// cannot disagree about how many tiers exist.
+import { DISCHARGE_MAX_STACKS } from '../core/Tactics';
 
 /**
  * Playable characters.
@@ -248,10 +252,19 @@ export const POWERUPS: PowerupData[] = [
     // and numbers live in core/Tactics.ts. Overclock (+projectile speed) was
     // removed because it was the one powerup whose effect you could not feel;
     // Rapid Tick (+zone tick rate) followed it into Cooling System.
-    { id: 'static_discharge', name: "Static Discharge", description: "Damage taken charges a capacitor that blows the crowd off you", type: "discharge", value: 1, maxStacks: 8, emoji: "🔌" },
+    // Each stack unlocks a behaviour instead of enlarging the same one — the
+    // tiers and the argument are in core/Tactics (DISCHARGE_MAX_STACKS). The
+    // description spells them out because a tier the card does not name is a
+    // tier the player never finds.
+    { id: 'static_discharge', name: "Static Discharge", description: "Damage taken charges a capacitor. 1: blows the crowd off you · 2: and stuns it · 3: and sets it alight", type: "discharge", value: 1, maxStacks: DISCHARGE_MAX_STACKS, emoji: "🔌" },
     // Capped at six: at eight, half of everything you killed was detonating,
     // which is visual noise on top of a perk that already had to be defused
-    { id: 'kill_echo', name: "Kill Echo", description: "The dead sometimes detonate and set the survivors alight", type: "killEcho", value: 0.06, maxStacks: 6, emoji: "☠️" },
+    // Three stacks at 10%, not six at 6%. Play report: it went off often enough
+    // to be background and hit softly enough that nothing about it registered.
+    // The internal cooldown (KILL_ECHO_ICD) meant the last stacks were not even
+    // the binding constraint on how often it fired, so they bought nothing.
+    // The budget moved from frequency to size — see KILL_ECHO_DAMAGE_SHARE.
+    { id: 'kill_echo', name: "Kill Echo", description: "The dead sometimes detonate, blowing the pack apart and setting it alight", type: "killEcho", value: 0.1, maxStacks: 3, emoji: "☠️" },
     // The one damage bonus that cannot feed a cascade: it only ever applies to
     // an opening hit, so it can never help finish anything. See
     // DamageSystem.openerBonus.
