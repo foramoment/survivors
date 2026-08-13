@@ -71,7 +71,7 @@ export const RU: Record<string, string> = {
     'result.bestHit': 'ЛУЧШИЙ УДАР',
     'result.bestCrit': 'ЛУЧШИЙ КРИТ',
     'result.untouched': 'БЕЗ УРОНА',
-    'result.multikill': 'ЛУЧШАЯ СЕРИЯ',
+    'result.multikill': 'ЛУЧШЕЕ КОМБО',
     'result.totalDamage': 'УРОНА НАНЕСЕНО',
     'result.timeToKill': 'ВРЕМЯ НА УБИЙСТВО',
     'result.converted': '{percent}% урона стало убийствами',

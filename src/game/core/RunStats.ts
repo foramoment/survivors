@@ -119,6 +119,25 @@ export interface RunStats {
 /** Kills this far apart still count as one multikill */
 export const MULTIKILL_WINDOW = 0.35;
 
+/**
+ * ...and however tightly they keep coming, one multikill may not run longer
+ * than this.
+ *
+ * Without the ceiling the counter measured the wrong thing. Each kill refreshed
+ * the 0.35s window, so a build clearing 15 enemies a second never left a gap
+ * long enough to close it — a real 10:36 clear reported "best combo x485",
+ * which was not one blast but **thirty-two seconds during which the arena never
+ * went quiet**. Early in a run it meant what it said; late in a run it had
+ * quietly become a streak counter, and the label still said multikill.
+ *
+ * 1.2s is chosen against the weapons, not against the number: chained and
+ * staggered effects spread their damage across frames on purpose (Lightning
+ * hops on `hopInterval`, Orbital Strike fires its volley in sequence), and a
+ * cascade should still read as one moment. Anything longer than this is a good
+ * minute of play, not a moment.
+ */
+export const MULTIKILL_MAX = 1.2;
+
 export function createRunStats(): RunStats {
     return {
         bestHit: 0,
@@ -149,6 +168,8 @@ export class RunStatsTracker {
     private untouchedFor: number = 0;
     private multikillCount: number = 0;
     private multikillTimer: number = 0;
+    /** How long the multikill in progress has been running (see MULTIKILL_MAX) */
+    private multikillAge: number = 0;
 
     /** Damage this second, folded into `dpsAvg` when the second closes */
     private secondDamage: number = 0;
@@ -162,6 +183,7 @@ export class RunStatsTracker {
         this.untouchedFor = 0;
         this.multikillCount = 0;
         this.multikillTimer = 0;
+        this.multikillAge = 0;
         this.secondDamage = 0;
         this.secondTimer = 0;
         this.dpsAvg = 0;
@@ -176,6 +198,7 @@ export class RunStatsTracker {
 
         if (this.multikillTimer > 0) {
             this.multikillTimer -= dt;
+            this.multikillAge += dt;
             if (this.multikillTimer <= 0) this.multikillCount = 0;
         }
 
@@ -281,6 +304,14 @@ export class RunStatsTracker {
      * kills, which is why the shares below are shares of attributed kills.
      */
     recordKill(maxHp: number = 0, weaponId: string | null = null): void {
+        // A new multikill starts when the last one has gone quiet OR when it has
+        // run its full length. The second half is what stops a sustained clear
+        // from refreshing the same combo forever — see MULTIKILL_MAX.
+        if (this.multikillTimer <= 0 || this.multikillAge >= MULTIKILL_MAX) {
+            this.multikillCount = 0;
+            this.multikillAge = 0;
+        }
+
         this.multikillCount++;
         this.multikillTimer = MULTIKILL_WINDOW;
         if (this.multikillCount > this.stats.bestMultikill) {

@@ -20,7 +20,7 @@ import {
     ACHIEVEMENTS, AchievementTracker, loadUnlocked, resetAchievements,
     type RunSnapshot,
 } from '../core/Achievements';
-import { RunStatsTracker, MULTIKILL_WINDOW } from '../core/RunStats';
+import { RunStatsTracker, MULTIKILL_WINDOW, MULTIKILL_MAX } from '../core/RunStats';
 import { XPCrystal } from '../entities/XPCrystal';
 
 function snapshot(overrides: Partial<RunSnapshot> = {}): RunSnapshot {
@@ -117,6 +117,45 @@ describe('RunStatsTracker', () => {
         tracker.update(MULTIKILL_WINDOW * 2);
         tracker.recordKill();
         expect(tracker.stats.bestMultikill).toBe(4);
+    });
+
+    /**
+     * A build clearing 15 enemies a second never leaves a 0.35s gap, so the
+     * refreshing window never closed and the counter stopped meaning multikill.
+     * A real 10:36 clear reported x485 — thirty-two seconds of the arena never
+     * going quiet, printed under a label that promised one blast.
+     */
+    it('a sustained stream cannot refresh one combo forever', () => {
+        const tracker = new RunStatsTracker();
+        // Two minutes at fifteen kills a second, no gap ever long enough to
+        // break the window
+        for (let i = 0; i < 1800; i++) {
+            tracker.recordKill();
+            tracker.update(1 / 15);
+        }
+
+        // Bounded by MULTIKILL_MAX, not by the two minutes
+        expect(tracker.stats.bestMultikill).toBeLessThanOrEqual(Math.ceil(MULTIKILL_MAX * 15) + 1);
+        // ...and still a real number, not a reset-to-one every frame
+        expect(tracker.stats.bestMultikill).toBeGreaterThan(10);
+    });
+
+    it('one blast still counts every body in it', () => {
+        const tracker = new RunStatsTracker();
+        // Kill Echo popping a held pile: no time passes between them at all
+        for (let i = 0; i < 200; i++) tracker.recordKill();
+        expect(tracker.stats.bestMultikill).toBe(200);
+    });
+
+    it('a staggered cascade is still one moment', () => {
+        const tracker = new RunStatsTracker();
+        // Lightning hopping on its interval — damage spread across frames on
+        // purpose, and it must not be split into separate combos
+        for (let i = 0; i < 12; i++) {
+            tracker.recordKill();
+            tracker.update(0.08);
+        }
+        expect(tracker.stats.bestMultikill).toBe(12);
     });
 
     it('reset clears everything', () => {
