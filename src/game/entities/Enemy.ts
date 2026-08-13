@@ -24,6 +24,11 @@ export class Enemy extends Entity {
     facingLeft: boolean = false;
     isElite: boolean = false;
     isBoss: boolean = false;
+    /**
+     * Weapon id of the last thing that hit this enemy — i.e. who gets the kill.
+     * Written by DamageSystem on every hit; null means the arena did it.
+     */
+    lastHitBy: string | null = null;
     eliteSizeMultiplier: number = 1;
     eliteOutlineColor: string = '';
 

@@ -6,11 +6,40 @@
  * miniboss, the four minutes without being touched, the eleven enemies that
  * died in one blast.
  *
- * Deliberately NOT tracked: damage per weapon. A leaderboard of your own
- * weapons turns build variety into a solved problem — everyone would just read the
- * table and take the top one every run. The best crit names its weapon because
- * that is a *moment*, not a ranking.
+ * Damage per weapon used to be deliberately absent here, on the grounds that a
+ * leaderboard of your own weapons turns build variety into a solved problem.
+ * That reasoning still holds for a *ranking*, and it is why the per-weapon table
+ * is written into the copy-stats dump and not onto the end screen.
+ *
+ * What forced it in anyway: a run where the Singularity Orb held a huge crowd,
+ * the damage counter ran to 442k at 2123/s, and almost nothing died — enemies
+ * that deep into Void Nexus carry roughly 3000 HP against a best hit of 81. The
+ * summary said "damage" and the player read "output", and the two had come
+ * apart. **Damage is an input; kills are the output.** A weapon with 40% of the
+ * damage and 3% of the killing blows is not strong and not weak — it is spread,
+ * and no single number could say so.
+ *
+ * Hence the three additions below: killing blows per weapon, how much enemy
+ * health the run actually destroyed, and how long one incoming enemy takes to
+ * kill right now.
  */
+
+/**
+ * Smoothing for the two live averages behind `ttk`, applied once per second.
+ *
+ * 0.9 is a ten-second memory: long enough that a single lucky volley does not
+ * swing it, short enough that the number at the end of the run describes the
+ * end of the run. A run average would be useless here — the wall the player
+ * hits is a late-run event, and averaging it against the opening minute is
+ * exactly how it stayed invisible.
+ */
+export const TTK_SMOOTHING = 0.9;
+
+/** Damage dealt and killing blows landed, for one weapon */
+export interface WeaponTally {
+    damage: number;
+    kills: number;
+}
 
 export interface RunStats {
     /** Biggest single hit of the run, and what threw it */
@@ -54,6 +83,37 @@ export interface RunStats {
     contactSeconds: number;
     /** Most enemies touching the player at once */
     worstPileUp: number;
+
+    /**
+     * Per weapon id: damage dealt and killing blows landed. Weapons appear here
+     * the first time they connect, so a weapon that never hit anything is
+     * absent — which is itself the answer to "was that pick worth it".
+     */
+    weapons: Map<string, WeaponTally>;
+
+    /**
+     * Total `maxHp` of everything that died.
+     *
+     * Against `totalDamage` this is the conversion rate: how much of the damage
+     * became a corpse rather than being spread across a crowd that walked away.
+     * It is never 100% — the killing blow overshoots, and damage-over-time on
+     * survivors is real work — but a build sitting at 20% is being told
+     * something the damage total cannot tell it.
+     */
+    hpDestroyed: number;
+
+    /**
+     * Seconds to kill one enemy of the kind currently arriving, as of the end
+     * of the run: smoothed incoming enemy HP over smoothed damage per second.
+     *
+     * The one number that says "your damage curve has fallen off the enemy HP
+     * curve", which is the failure this whole block exists to catch. Zero until
+     * the run has dealt any damage at all.
+     */
+    ttk: number;
+    /** The two halves of `ttk`, kept because the ratio alone is unfalsifiable */
+    arenaHp: number;
+    dps: number;
 }
 
 /** Kills this far apart still count as one multikill */
@@ -71,6 +131,11 @@ export function createRunStats(): RunStats {
         damageTaken: 0,
         contactSeconds: 0,
         worstPileUp: 0,
+        weapons: new Map(),
+        hpDestroyed: 0,
+        ttk: 0,
+        arenaHp: 0,
+        dps: 0,
     };
 }
 
@@ -85,11 +150,22 @@ export class RunStatsTracker {
     private multikillCount: number = 0;
     private multikillTimer: number = 0;
 
+    /** Damage this second, folded into `dpsAvg` when the second closes */
+    private secondDamage: number = 0;
+    private secondTimer: number = 0;
+    private dpsAvg: number = 0;
+    /** Smoothed `maxHp` of enemies as they spawn — how tough the arena is now */
+    private arenaHpAvg: number = 0;
+
     reset(): void {
         this.stats = createRunStats();
         this.untouchedFor = 0;
         this.multikillCount = 0;
         this.multikillTimer = 0;
+        this.secondDamage = 0;
+        this.secondTimer = 0;
+        this.dpsAvg = 0;
+        this.arenaHpAvg = 0;
     }
 
     update(dt: number): void {
@@ -102,6 +178,52 @@ export class RunStatsTracker {
             this.multikillTimer -= dt;
             if (this.multikillTimer <= 0) this.multikillCount = 0;
         }
+
+        // Damage is smoothed by the second rather than by the frame: a volley
+        // that lands in one frame is not 40k DPS, it is one volley.
+        this.secondTimer += dt;
+        if (this.secondTimer >= 1) {
+            const dps = this.secondDamage / this.secondTimer;
+            this.dpsAvg = this.dpsAvg === 0
+                ? dps
+                : this.dpsAvg * TTK_SMOOTHING + dps * (1 - TTK_SMOOTHING);
+            this.secondDamage = 0;
+            this.secondTimer = 0;
+            this.refreshTtk();
+        }
+    }
+
+    /**
+     * How tough one arriving enemy is, sampled at spawn.
+     *
+     * Measured on spawns rather than on kills, because the case worth catching
+     * is the one where nothing is dying — a kill-based average goes blank
+     * exactly when the player most needs the number. Bosses are excluded by the
+     * caller: a single body worth twelve enemies would swamp the average and
+     * turn TTK into a boss-fight statistic.
+     */
+    recordSpawn(maxHp: number): void {
+        if (maxHp <= 0) return;
+        this.arenaHpAvg = this.arenaHpAvg === 0
+            ? maxHp
+            : this.arenaHpAvg * TTK_SMOOTHING + maxHp * (1 - TTK_SMOOTHING);
+        this.refreshTtk();
+    }
+
+    private refreshTtk(): void {
+        this.stats.arenaHp = this.arenaHpAvg;
+        this.stats.dps = this.dpsAvg;
+        this.stats.ttk = this.dpsAvg > 0 ? this.arenaHpAvg / this.dpsAvg : 0;
+    }
+
+    /** The running tally for one weapon, created on first contact */
+    private tally(weaponId: string): WeaponTally {
+        let entry = this.stats.weapons.get(weaponId);
+        if (!entry) {
+            entry = { damage: 0, kills: 0 };
+            this.stats.weapons.set(weaponId, entry);
+        }
+        return entry;
     }
 
     /** Any damage to the player breaks the untouched streak */
@@ -139,6 +261,9 @@ export class RunStatsTracker {
 
     recordHit(damage: number, isCrit: boolean, weaponId: string | null): void {
         this.stats.totalDamage += damage;
+        this.secondDamage += damage;
+        if (weaponId) this.tally(weaponId).damage += damage;
+
         if (damage <= this.stats.bestHit) return;
         this.stats.bestHit = damage;
         this.stats.bestHitCrit = isCrit;
@@ -148,12 +273,21 @@ export class RunStatsTracker {
     /**
      * A kill extends the multikill window rather than restarting it from zero,
      * so a chain of explosions reads as one big moment instead of several.
+     *
+     * `maxHp` is the enemy's full health, not what was left of it: the question
+     * `hpDestroyed` answers is how much health the run removed from the arena,
+     * and an enemy is worth its whole bar however many weapons chipped it.
+     * `weaponId` is whoever landed the last hit — null for the arena's own
+     * kills, which is why the shares below are shares of attributed kills.
      */
-    recordKill(): void {
+    recordKill(maxHp: number = 0, weaponId: string | null = null): void {
         this.multikillCount++;
         this.multikillTimer = MULTIKILL_WINDOW;
         if (this.multikillCount > this.stats.bestMultikill) {
             this.stats.bestMultikill = this.multikillCount;
         }
+
+        this.stats.hpDestroyed += Math.max(0, maxHp);
+        if (weaponId) this.tally(weaponId).kills++;
     }
 }

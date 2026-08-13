@@ -69,6 +69,8 @@ export const EN: Record<string, string> = {
     'result.untouched': 'UNTOUCHED FOR',
     'result.multikill': 'BEST MULTIKILL',
     'result.totalDamage': 'DAMAGE DEALT',
+    'result.timeToKill': 'TIME TO KILL',
+    'result.converted': '{percent}% of damage became kills',
     'result.healed': 'HP RESTORED',
     'result.damageTaken': 'DAMAGE TAKEN',
     'result.inContact': 'over {time} in contact',

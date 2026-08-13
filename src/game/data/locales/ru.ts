@@ -73,6 +73,8 @@ export const RU: Record<string, string> = {
     'result.untouched': 'БЕЗ УРОНА',
     'result.multikill': 'ЛУЧШАЯ СЕРИЯ',
     'result.totalDamage': 'УРОНА НАНЕСЕНО',
+    'result.timeToKill': 'ВРЕМЯ НА УБИЙСТВО',
+    'result.converted': '{percent}% урона стало убийствами',
     'result.healed': 'HP ВОССТАНОВЛЕНО',
     'result.damageTaken': 'УРОНА ПОЛУЧЕНО',
     'result.inContact': 'за {time} в контакте',

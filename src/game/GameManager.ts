@@ -8,7 +8,7 @@ import { checkCollision, type Vector2, distance, formatTime } from '../engine/Ut
 import { levelSpatialHash } from '../engine/SpatialHash';
 import { particles } from '../engine/ParticleSystem';
 import { stateMachine, type GameState } from './core/StateMachine';
-import { damageSystem } from './core/DamageSystem';
+import { damageSystem, weaponIdOf } from './core/DamageSystem';
 import { debugOverlay } from '../engine/DebugOverlay';
 import { collisionSystem } from './core/CollisionSystem';
 import { difficultyDirector } from './core/DifficultyDirector';
@@ -199,10 +199,7 @@ export class GameManager {
         // Connect DamageSystem to damage number display
         damageSystem.setDamageNumberCallback((pos, amount, isCrit, source) => {
             this.damageNumbers.spawn(pos, amount, isCrit);
-            // The weapon id lives on the weapon, but the hit may come from a
-            // projectile or a zone it spawned — hence the two hops
-            const weaponId = source?.weaponId ?? source?.source?.weaponId ?? null;
-            this.runStats.recordHit(amount, isCrit, weaponId);
+            this.runStats.recordHit(amount, isCrit, weaponIdOf(source));
         });
 
         // Note: class selection is owned by ui/screens/ClassSelectionScreen
@@ -1050,7 +1047,7 @@ export class GameManager {
                 this.enemies.splice(i, 1);
                 this.killCount++;
                 this.killScore += enemy.xpValue;
-                this.runStats.recordKill();
+                this.runStats.recordKill(enemy.maxHp, enemy.lastHitBy);
             }
         }
 
@@ -1302,6 +1299,11 @@ export class GameManager {
                 this.finalBoss = enemy;
             }
         }
+
+        // How tough the arena is right now, for the run's time-to-kill. Bosses
+        // are left out: one body worth twelve would swamp the average and turn
+        // the number into a boss-fight statistic.
+        if (!options.boss) this.runStats.recordSpawn(enemy.maxHp);
 
         this.enemies.push(enemy);
     }

@@ -51,6 +51,18 @@ export interface DamageResult {
     killed: boolean;
 }
 
+/**
+ * Which weapon a hit came from.
+ *
+ * The id lives on the weapon, but the thing that landed the hit is usually a
+ * projectile or a zone the weapon spawned — hence the two hops. Environmental
+ * damage (a meteor, a rift collapsing) has no weapon and returns null, which is
+ * a real answer: the arena killed that one, not the build.
+ */
+export function weaponIdOf(source: any): string | null {
+    return source?.weaponId ?? source?.source?.weaponId ?? null;
+}
+
 class DamageSystemClass {
     /**
      * Deal damage from a weapon/projectile to an enemy
@@ -119,6 +131,12 @@ class DamageSystemClass {
         // `skipModifiers` hit still benefits. That is what makes acid a setup
         // tool instead of just another damage-over-time.
         const finalDamage = damage * (1 + (target.corrosion?.amp ?? 0));
+
+        // Stamped on every hit, so whatever is here when the target dies is the
+        // weapon that landed the killing blow. This is the only place that sees
+        // both the source and the target; the run's kill attribution reads it
+        // out of the death loop in GameManager.
+        target.lastHitBy = weaponIdOf(source);
 
         target.takeDamage(finalDamage);
         const killed = wasAlive && target.isDead;

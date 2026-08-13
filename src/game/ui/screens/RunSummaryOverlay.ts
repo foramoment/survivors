@@ -49,13 +49,33 @@ export interface RunSummaryData {
 function runAsText(d: RunSummaryData): string {
     const perSecond = (n: number) => (d.seconds > 0 ? n / d.seconds : 0).toFixed(1);
 
+    // Shares rather than raw totals: what matters is how the run's output was
+    // split, and the totals are two lines above. Damage share against kill
+    // share is the whole point — a weapon at 60% of the damage and 10% of the
+    // killing blows is spread across a crowd, not carrying the run.
+    const attributedKills = [...d.stats.weapons.values()].reduce((n, w) => n + w.kills, 0);
+    const share = (part: number, whole: number) =>
+        whole > 0 ? `${Math.round((part / whole) * 100)}%`.padStart(4) : '   —';
+
     const weapons = [...d.weaponLevels]
         .map(([id, level]) => {
             const w = WEAPONS.find(x => x.id === id);
             const name = w ? (level >= 6 ? w.evolution.name : w.name) : id;
-            return `  ${name} ${level >= 6 ? '(evolved)' : `lv${level}`}`;
+            const tally = d.stats.weapons.get(id);
+            const label = `${name} ${level >= 6 ? '(evolved)' : `lv${level}`}`.padEnd(30);
+            const dmg = share(tally?.damage ?? 0, d.stats.totalDamage);
+            const kills = share(tally?.kills ?? 0, attributedKills);
+            return `  ${label} dmg ${dmg}   kills ${kills}`;
         })
         .join('\n');
+
+    // Perks and hazards land killing blows too (Static Discharge, meteors), and
+    // they carry no weapon id. Saying so keeps the shares above honest instead
+    // of quietly renormalising the difference away.
+    const unattributed = Math.max(0, d.kills - attributedKills);
+    const weaponsBlock = unattributed > 0
+        ? `${weapons}\n  (perks and hazards: ${unattributed} kills)`
+        : weapons;
 
     const perks = [...d.powerupLevels]
         .map(([name, stacks]) => {
@@ -84,6 +104,9 @@ function runAsText(d: RunSummaryData): string {
         `max HP       ${Math.round(d.maxHp)}`,
         '',
         `damage       ${Math.round(d.stats.totalDamage)}  (${perSecond(d.stats.totalDamage)}/s)`,
+        // Damage is what you put in; these two are what came out of it
+        `time to kill ${d.stats.ttk > 0 ? `${d.stats.ttk.toFixed(1)}s per enemy  (${Math.round(d.stats.arenaHp)} HP incoming vs ${Math.round(d.stats.dps)} dps)` : '—'}`,
+        `converted    ${d.stats.totalDamage > 0 ? `${Math.round((d.stats.hpDestroyed / d.stats.totalDamage) * 100)}% of damage became kills  (${Math.round(d.stats.hpDestroyed)} enemy HP destroyed)` : '—'}`,
         `best hit     ${Math.round(d.stats.bestHit)}${d.stats.bestHitCrit ? ' (crit)' : ''}`,
         `healed       ${Math.round(d.stats.totalHealed)}  (${perSecond(d.stats.totalHealed)}/s)`,
         `taken        ${Math.round(d.stats.damageTaken)}  (${perSecond(d.stats.damageTaken)}/s)`,
@@ -93,7 +116,7 @@ function runAsText(d: RunSummaryData): string {
         `best combo   x${d.stats.bestMultikill}`,
         '',
         'WEAPONS',
-        weapons || '  (none)',
+        weaponsBlock || '  (none)',
         '',
         'PERKS',
         perks || '  (none)',
@@ -148,6 +171,23 @@ function createHighlights(data: RunSummaryData): HTMLElement {
             <strong>${formatScore(Math.round(stats.totalDamage))}</strong>
         </div>`);
 
+    // What the damage total above cannot say on its own: how long one of the
+    // enemies still arriving took to kill, and how much of the damage became a
+    // corpse rather than being spread over a crowd that walked away. The
+    // per-weapon split behind these lives in the copy-stats dump — on screen it
+    // would be a ranking of your own weapons, which is a different thing.
+    if (stats.ttk > 0) {
+        const converted = stats.totalDamage > 0
+            ? Math.round((stats.hpDestroyed / stats.totalDamage) * 100)
+            : 0;
+        rows.push(`
+            <div class="highlight">
+                <span>${t('result.timeToKill')}</span>
+                <strong>${stats.ttk.toFixed(1)}s</strong>
+                <em>${t('result.converted', { percent: converted })}</em>
+            </div>`);
+    }
+
     // Shown even at zero, on purpose: "you healed nothing all run" is a fact
     // about the build, and one the player can act on next time
     rows.push(`
@@ -171,8 +211,10 @@ function createHighlights(data: RunSummaryData): HTMLElement {
 /**
  * What you actually built, spelled out — the same icons the in-run panel shows,
  * so the end screen answers "what was that run" rather than making you
- * remember. Deliberately no per-weapon damage: ranking your own weapons would
- * turn build variety into a solved problem.
+ * remember. Still no per-weapon damage here: ranking your own weapons on the
+ * screen every run turns build variety into a solved problem. The split lives
+ * in the copy-stats dump, which is read when someone is asking a balance
+ * question rather than every time someone dies.
  */
 function createBuildSummary(data: RunSummaryData): HTMLElement {
     const box = document.createElement('div');
