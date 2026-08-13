@@ -531,7 +531,7 @@ tf('weapon.void_ray.name', w.name)      // данные: английский о
 
 | Перк | стат | итог на капе |
 | --- | --- | --- |
-| Plasma Core | `might` | +25% (5 пиков) |
+| Plasma Core | `might` | +36% (6 пиков) |
 | Targeting HUD | `critChance` | 40% |
 | Berserker Rage | `critDamage` | 2.0 → ×4 |
 | Cooling System | `cooldown` | ×0.60 |
