@@ -105,6 +105,47 @@ describe('JuiceSystem', () => {
         expect(juice.timeScale).toBe(1);
         expect(juice.getShakeOffset()).toEqual({ x: 0, y: 0 });
     });
+
+    /**
+     * The engine stops painting frames when the world is frozen and juice is
+     * idle, so a source of animation missing from `idle` does not cost a few
+     * cycles — it stops being drawn. Every setter is checked here for that
+     * reason, and a new one belongs in this list.
+     */
+    describe('idle', () => {
+        const settle = (j: JuiceSystem) => { for (let i = 0; i < 400; i++) j.update(0.05); };
+
+        it('is true on a fresh system', () => {
+            expect(juice.idle).toBe(true);
+        });
+
+        const sources: Array<[string, (j: JuiceSystem) => void]> = [
+            ['trauma', j => j.addTrauma(0.8)],
+            ['hit-stop', j => j.hitStop(0.1)],
+            ['slow motion', j => j.slowMo(0.3, 0.5)],
+            ['flash', j => j.flash('#fff', 0.5, 0.3)],
+            ['zoom punch', j => j.zoomPunch(0.8)],
+            ['shockwave', j => j.shockwave(0, 0, 300, '#fff')],
+            ['vignette', j => j.pulseVignette(1)],
+        ];
+
+        for (const [name, start] of sources) {
+            it(`is false while a ${name} is running, and true once it resolves`, () => {
+                start(juice);
+                expect(juice.idle, `${name} should keep the frame live`).toBe(false);
+                settle(juice);
+                expect(juice.idle, `${name} should resolve`).toBe(true);
+            });
+        }
+
+        it('is true with effects disabled, because nothing can start', () => {
+            juice.enabled = false;
+            juice.addTrauma(1);
+            juice.flash('#fff', 1, 1);
+            juice.shockwave(0, 0, 300, '#fff');
+            expect(juice.idle).toBe(true);
+        });
+    });
 });
 
 describe('JuiceSystem rendering', () => {

@@ -176,6 +176,27 @@ export class JuiceSystem {
         }
     }
 
+    /**
+     * Nothing left to resolve: no shake, no flash, no ring, no zoom spring,
+     * and time running at its normal speed.
+     *
+     * The host uses this to decide whether a frame is worth painting at all.
+     * When the world is frozen (a level-up panel, the result screen) and juice
+     * is idle, the next frame is pixel-identical to the one already on screen —
+     * so **anything that can change what a frame looks like has to be listed
+     * here**, or it will silently stop animating.
+     */
+    get idle(): boolean {
+        return this.trauma <= 0
+            && this.flashes.length === 0
+            && this.shockwaves.length === 0
+            && this.vignette <= 0
+            && this.zoom === 0
+            && this.zoomVelocity === 0
+            && this.hitStopTimer <= 0
+            && this.slowMoTimer <= 0;
+    }
+
     /** Multiplier the engine applies to gameplay delta time */
     get timeScale(): number {
         if (this.hitStopTimer > 0) return 0;

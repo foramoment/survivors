@@ -29,6 +29,8 @@ export class Engine {
     ctx: CanvasRenderingContext2D;
     gameManager: GameManager;
     lastTime: number = 0;
+    /** Set when something outside the loop invalidates the canvas — see resize */
+    private needsRepaint: boolean = false;
 
     constructor() {
         this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
@@ -103,11 +105,38 @@ export class Engine {
     resize() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
+        // Setting canvas.width wipes the canvas. A frozen frame is not being
+        // repainted, so without this a resize on the pause or result screen
+        // leaves a black hole where the battlefield was.
+        this.needsRepaint = true;
     }
 
-    /** A paused run freezes the whole loop; menus keep animating */
-    private isPaused(): boolean {
-        return screenManager.currentScreenId === 'game' && this.gameManager.state === 'PAUSED';
+    /**
+     * Whether the frame on screen would survive unchanged.
+     *
+     * `PAUSED` freezes unconditionally, juice included — a pause is meant to
+     * stop the clock, not to let flashes drain behind the menu.
+     *
+     * `LEVEL_UP` and `GAME_OVER` freeze the *world* but not the presentation:
+     * the panel slams in with a flash and a shockwave, and the death screen
+     * wants its red wash. So they stay live only until juice has nothing left
+     * to resolve, and then stop — at which point every further frame would be
+     * a pixel-for-pixel repaint of the same still arena.
+     *
+     * That last part is not a micro-optimisation. `GameManager.draw` renders
+     * the whole battlefield — backdrop, props, every entity, every particle —
+     * and the result screen sits there until the player clicks something. It
+     * was doing that sixty times a second, indefinitely, with the fans up, to
+     * produce the identical image each time.
+     */
+    private isFrozen(): boolean {
+        if (screenManager.currentScreenId !== 'game') return false;   // menus animate
+        switch (this.gameManager.state) {
+            case 'PAUSED': return true;
+            case 'LEVEL_UP':
+            case 'GAME_OVER': return juice.idle;
+            default: return false;
+        }
     }
 
     loop(timestamp: number) {
@@ -117,10 +146,17 @@ export class Engine {
         // Cap dt to prevent huge jumps if tab is inactive
         const safeDt = Math.min(dt, 0.1);
 
-        // Paused: do no work at all. The canvas is left untouched, so the last
-        // rendered frame stays on screen under the DOM overlay — nothing to
-        // clear, nothing to redraw, no juice timers draining.
-        if (this.isPaused()) {
+        if (this.isFrozen()) {
+            // Nothing on the canvas can change, but the screen's own clock still
+            // has to run: achievement toasts are DOM and tick from there, and a
+            // run ends with unlocks queued — freezing that clock would leave one
+            // toast stuck on screen and the rest never shown. A pause is the
+            // exception, because a pause is meant to stop everything.
+            if (this.gameManager.state !== 'PAUSED') screenManager.update(safeDt);
+
+            // The canvas keeps the last frame under the DOM overlay; only an
+            // invalidated canvas (a resize) earns a repaint.
+            if (this.needsRepaint) this.paint(0);
             requestAnimationFrame((t) => this.loop(t));
             return;
         }
@@ -130,18 +166,11 @@ export class Engine {
         juice.update(safeDt);
         const gameDt = safeDt * juice.timeScale;
 
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Draw background
-        this.drawBackground(safeDt);
-
-        // Update and draw current screen
         screenManager.update(safeDt);
 
-        // GameManager handles its own update/draw when game is active
+        // GameManager handles its own update when the game is active
         if (screenManager.currentScreenId === 'game') {
             this.gameManager.update(gameDt);
-            this.gameManager.draw(this.ctx);
 
             // Update HUD via GameScreen
             const gameScreen = screenManager.get('game') as GameScreen;
@@ -159,12 +188,26 @@ export class Engine {
             }
         }
 
+        this.paint(safeDt);
+
+        requestAnimationFrame((t) => this.loop(t));
+    }
+
+    /** One frame onto the canvas. Draws only — advances nothing. */
+    private paint(dt: number) {
+        this.needsRepaint = false;
+
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.drawBackground(dt);
+
+        if (screenManager.currentScreenId === 'game') {
+            this.gameManager.draw(this.ctx);
+        }
+
         screenManager.draw(this.ctx);
 
         // Flashes / vignette sit above everything drawn on the canvas
         juice.drawOverlay(this.ctx, this.canvas.width, this.canvas.height);
-
-        requestAnimationFrame((t) => this.loop(t));
     }
 
     drawBackground(dt: number) {
