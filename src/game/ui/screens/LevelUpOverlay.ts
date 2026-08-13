@@ -44,6 +44,26 @@ export class LevelUpOverlay {
     private focused: number = 0;
     private keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
+    /**
+     * Levels earned but not yet spent, and the panel currently on screen.
+     *
+     * These exist because levelling is **not** one-at-a-time. `CrystalField`
+     * walks its whole list in a single frame, so a pile gathered by a black
+     * hole is collected all at once and every pickup can level the player —
+     * five, ten `show()` calls before the frame ends.
+     *
+     * Each of those built its own panel and appended it to `uiLayer`, stacked.
+     * Picking a card removed *that* panel and set the state back to PLAYING, so
+     * the panels underneath stayed on screen with the world already running:
+     * the player kept choosing cards while the crowd walked in and killed them.
+     * That is the whole bug — not the cards, the state.
+     *
+     * One panel at a time; the queue drains a level per pick and only the last
+     * one hands the world back.
+     */
+    private pending: number = 0;
+    private screenEl: HTMLElement | null = null;
+
     private readonly host: LevelUpHost;
 
     constructor(host: LevelUpHost) {
@@ -51,14 +71,25 @@ export class LevelUpOverlay {
     }
 
     /**
-     * Tear down the keyboard cursor. Called when a run starts, so a panel
-     * abandoned by a restart cannot leave a listener on `window`.
+     * Tear down the keyboard cursor and any panel left standing. Called when a
+     * run starts, so a restart mid-choice cannot leave a listener on `window`
+     * or bank levels earned by the previous run.
      */
     detach() {
         this.detachKeys();
+        this.screenEl?.remove();
+        this.screenEl = null;
+        this.pending = 0;
     }
 
+    /** One earned level. Queues if a panel is already up. */
     show() {
+        this.pending++;
+        if (this.screenEl) return;
+        this.openPanel();
+    }
+
+    private openPanel() {
         this.host.state = 'LEVEL_UP';
         audio.play('levelup');
         audio.play('crash');
@@ -76,10 +107,20 @@ export class LevelUpOverlay {
         const screen = document.createElement('div');
         screen.className = 'screen level-up-screen crash-in';
         screen.appendChild(this.createImpactOverlay());
+        this.screenEl = screen;
 
         // Heading is appended (not innerHTML) so the crack overlay survives
         const heading = document.createElement('h2');
         screen.appendChild(heading);
+
+        // A dumped pile is worth several levels at once. Say so, or the second
+        // panel reads as the first one failing to close.
+        if (this.pending > 1) {
+            const queued = document.createElement('div');
+            queued.className = 'level-up-queue';
+            queued.textContent = t('levelup.queued', { n: this.pending - 1 });
+            screen.appendChild(queued);
+        }
 
         if (this.host.devMode) {
             this.buildDevPanel(screen, heading);
@@ -116,12 +157,12 @@ export class LevelUpOverlay {
             rerollsLeft--;
             audio.play('uiSelect');
             renderReroll();
-            this.fillGrid(grid, screen, upgradeCount);
+            this.fillGrid(grid, upgradeCount);
         };
         reroll.addEventListener('pointerenter', () => audio.play('uiHover'));
         renderReroll();
 
-        this.fillGrid(grid, screen, upgradeCount);
+        this.fillGrid(grid, upgradeCount);
         // Six cards wrap into two rows of three, so vertical steps move by 3
         this.attachKeys(isLucky ? 3 : upgradeCount);
         screen.appendChild(reroll);
@@ -178,7 +219,7 @@ export class LevelUpOverlay {
     }
 
     /** (Re)draw the level-up offers into `grid` */
-    private fillGrid(grid: HTMLElement, screen: HTMLElement, count: number) {
+    private fillGrid(grid: HTMLElement, count: number) {
         grid.innerHTML = '';
         const cards: HTMLElement[] = [];
 
@@ -225,7 +266,7 @@ export class LevelUpOverlay {
                 ${this.weaponPreview(weaponData, currentLevel, canEvolve)}
               `;
 
-                this.bindPick(card, screen, () => this.host.addWeapon(weaponData.id));
+                this.bindPick(card, () => this.host.addWeapon(weaponData.id));
             } else {
                 const powerup = opt.data;
                 const stack = this.host.powerupLevels.get(powerup.name) ?? 0;
@@ -245,7 +286,7 @@ export class LevelUpOverlay {
                 <p>${powerupDesc(powerup)}</p>
                 ${this.powerupPreview(eff.type, value)}
               `;
-                this.bindPick(card, screen, () => this.host.applyPowerup(powerup));
+                this.bindPick(card, () => this.host.applyPowerup(powerup));
             }
 
             card.addEventListener('pointerenter', () => this.focusCard(cards.indexOf(card)));
@@ -268,7 +309,7 @@ export class LevelUpOverlay {
      * moment of weight, and the world is frozen during LEVEL_UP so the delay
      * costs nothing.
      */
-    private bindPick(card: HTMLElement, screen: HTMLElement, apply: () => void) {
+    private bindPick(card: HTMLElement, apply: () => void) {
         let taken = false;
         card.onclick = () => {
             if (taken) return;
@@ -278,12 +319,31 @@ export class LevelUpOverlay {
             juice.flash('#ffffff', 0.18, 0.16);
 
             setTimeout(() => {
-                this.detachKeys();
                 apply();
-                screen.remove();
-                this.host.state = 'PLAYING';
+                this.commit();
             }, 160);
         };
+    }
+
+    /**
+     * Spend one queued level and hand the world back — but only once the queue
+     * is empty. The state goes to PLAYING exactly once, on the last pick.
+     *
+     * `state === 'LEVEL_UP'` is checked because a pick resolves 160ms late: if
+     * anything else has claimed the state by then (a restart, GAME_OVER), it
+     * must not be overwritten with PLAYING.
+     */
+    private commit() {
+        this.detachKeys();
+        this.screenEl?.remove();
+        this.screenEl = null;
+        this.pending = Math.max(0, this.pending - 1);
+
+        if (this.pending > 0) {
+            this.openPanel();
+            return;
+        }
+        if (this.host.state === 'LEVEL_UP') this.host.state = 'PLAYING';
     }
 
     /** Move the keyboard cursor; clamped, never wraps */
@@ -420,10 +480,7 @@ export class LevelUpOverlay {
         if (!grid) return;
         grid.innerHTML = '';
 
-        const close = () => {
-            screen.remove();
-            this.host.state = 'PLAYING';
-        };
+        const close = () => this.commit();
 
         if (tabId === 'powerups') {
             POWERUPS.forEach(powerup => {

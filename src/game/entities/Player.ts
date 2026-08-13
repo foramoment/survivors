@@ -471,9 +471,19 @@ export class Player extends Entity {
         }
     }
 
+    /**
+     * One pickup can be worth more than one level, and used to pay out only
+     * the first: a single crystal from a black-hole pile could carry ten times
+     * the bar, and the remaining nine levels sat in the bank until nine more
+     * crystals happened to be walked over. Levels arrived long after the XP
+     * that bought them, which is exactly when the player is no longer in a
+     * position to spend them.
+     *
+     * The overlay queues the panels, so paying out the whole debt here is safe.
+     */
     gainXp(amount: number) {
         this.xp += amount * this.stats.growth;
-        if (this.xp >= this.nextLevelXp) {
+        while (this.xp >= this.nextLevelXp) {
             this.levelUp();
         }
     }

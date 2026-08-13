@@ -49,6 +49,7 @@ export const RU: Record<string, string> = {
     'levelup.title': 'НОВЫЙ УРОВЕНЬ!',
     'levelup.lucky': '✨ УДАЧНЫЙ УРОВЕНЬ! ✨',
     'levelup.evolve': 'ЭВОЛЮЦИЯ!',
+    'levelup.queued': 'ЕЩЁ +{n} В ОЧЕРЕДИ',
     'levelup.level': 'ур. {from} → {to}',
     'levelup.devMode': '🛠️ РЕЖИМ РАЗРАБОТЧИКА 🛠️',
     'levelup.tabPowerups': '⚡ Бонусы',

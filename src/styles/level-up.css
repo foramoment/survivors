@@ -201,3 +201,22 @@
   text-shadow: 0 0 10px rgba(255, 63, 164, 0.9);
 }
 
+
+/* How many levels are still owed. Shown only when a pile of crystals paid for
+   more than one at once — without it the next panel reads as the previous one
+   refusing to close. */
+.level-up-queue {
+  position: relative;
+  z-index: 2;
+  margin: -4px 0 10px;
+  font-size: 0.72em;
+  letter-spacing: 0.12em;
+  color: var(--c-yellow);
+  text-shadow: 0 0 10px rgba(255, 210, 63, 0.6);
+  animation: queue-blink 900ms steps(2, end) infinite;
+}
+
+@keyframes queue-blink {
+  0%, 60% { opacity: 1; }
+  61%, 100% { opacity: 0.45; }
+}

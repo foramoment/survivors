@@ -45,6 +45,7 @@ export const EN: Record<string, string> = {
     'levelup.title': 'LEVEL UP!',
     'levelup.lucky': '✨ LUCKY LEVEL UP! ✨',
     'levelup.evolve': 'EVOLVE!',
+    'levelup.queued': '+{n} MORE WAITING',
     'levelup.level': 'lv {from} → {to}',
     'levelup.devMode': '🛠️ DEVELOPER MODE 🛠️',
     'levelup.tabPowerups': '⚡ Powerups',
