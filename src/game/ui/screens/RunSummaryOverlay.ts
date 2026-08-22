@@ -58,6 +58,11 @@ function runAsText(d: RunSummaryData): string {
     const share = (part: number, whole: number) =>
         whole > 0 ? `${Math.round((part / whole) * 100)}%`.padStart(4) : '   —';
 
+    // Both shares are against the WHOLE run, never against "what we managed to
+    // attribute". A kill share renormalised over weapons alone is the line that
+    // hid the last balance problem: five weapons printed 45/26/15/9/5 and read
+    // as an even spread, when between them they had landed 17% of the run's
+    // killing blows and two unnamed perks had the rest.
     const weapons = [...d.weaponLevels]
         .map(([id, level]) => {
             const w = WEAPONS.find(x => x.id === id);
@@ -65,17 +70,32 @@ function runAsText(d: RunSummaryData): string {
             const tally = d.stats.weapons.get(id);
             const label = `${name} ${level >= 6 ? '(evolved)' : `lv${level}`}`.padEnd(30);
             const dmg = share(tally?.damage ?? 0, d.stats.totalDamage);
-            const kills = share(tally?.kills ?? 0, attributedKills);
+            const kills = share(tally?.kills ?? 0, d.kills);
             return `  ${label} dmg ${dmg}   kills ${kills}`;
         })
         .join('\n');
 
-    // Perks and hazards land killing blows too (Static Discharge, meteors), and
-    // they carry no weapon id. Saying so keeps the shares above honest instead
-    // of quietly renormalising the difference away.
+    // Perks and hazards deal damage and land killing blows too, and they are
+    // not weapons — so they get their own block with their own names rather
+    // than one nameless "perks and hazards" line at the bottom of the weapons.
+    const perkTallies = [...d.stats.weapons]
+        .filter(([id]) => !d.weaponLevels.has(id))
+        .sort((a, b) => b[1].damage - a[1].damage)
+        .map(([id, tally]) => {
+            const perk = POWERUPS.find(p => p.id === id);
+            const label = (perk ? powerupName(perk) : id).padEnd(30);
+            const dmg = share(tally.damage, d.stats.totalDamage);
+            const kills = share(tally.kills, d.kills);
+            return `  ${label} dmg ${dmg}   kills ${kills}`;
+        })
+        .join('\n');
+
+    // Whatever is still nameless: anything that landed a killing blow without
+    // carrying a source at all. Saying so keeps the shares honest instead of
+    // quietly renormalising the difference away.
     const unattributed = Math.max(0, d.kills - attributedKills);
     const weaponsBlock = unattributed > 0
-        ? `${weapons}\n  (perks and hazards: ${unattributed} kills)`
+        ? `${weapons}\n  (unattributed: ${unattributed} kills)`
         : weapons;
 
     const perks = [...d.powerupLevels]
@@ -124,6 +144,9 @@ function runAsText(d: RunSummaryData): string {
         'WEAPONS',
         weaponsBlock || '  (none)',
         '',
+        'PERKS & HAZARDS',
+        perkTallies || '  (none)',
+        '',
         'PERKS',
         perks || '  (none)',
         '',
@@ -146,9 +169,13 @@ function createHighlights(data: RunSummaryData): HTMLElement {
     if (stats.bestHit > 0) {
         const weapon = WEAPONS.find(w => w.id === stats.bestHitWeaponId);
         const evolved = weapon && (data.weaponLevels.get(weapon.id) ?? 0) >= 6;
+        // A perk can throw the biggest hit of a run — Kill Echo's blast is a
+        // share of a late-game health pool — so the line has to be able to name
+        // one. It said nothing at all before, which read as a bug.
+        const perk = weapon ? undefined : POWERUPS.find(p => p.id === stats.bestHitWeaponId);
         const via = weapon
             ? `${evolved ? weapon.evolution.emoji : weapon.emoji} ${evolved ? weaponEvoName(weapon) : weaponName(weapon)}`
-            : '';
+            : (perk ? `${perk.emoji} ${powerupName(perk)}` : '');
         rows.push(`
             <div class="highlight">
                 <span>${stats.bestHitCrit ? t('result.bestCrit') : t('result.bestHit')}</span>

@@ -33,6 +33,7 @@ import {
     DISCHARGE_STUN_AT, DISCHARGE_BURN_AT, DISCHARGE_STUN,
     DISCHARGE_BURN_SHARE, DISCHARGE_BURN_TIME,
     KILL_ECHO_RADIUS, killEchoDamage, killEchoBurnDps,
+    KILL_ECHO_SOURCE, DISCHARGE_SOURCE,
     KILL_ECHO_KNOCKBACK, KILL_ECHO_PUNCH_GAP, KILL_ECHO_ICD,
 } from './core/Tactics';
 import { screenManager } from '../engine/ui/ScreenManager';
@@ -621,11 +622,16 @@ export class GameManager {
         juice.shockwave(this.player.pos.x, this.player.pos.y, radius * 1.4, '#8ce8ff', 0.45, 6);
         particles.emitLightning(this.player.pos.x, this.player.pos.y);
 
+        // Carries the owner so the blast still scales with the build, and the
+        // perk's id so the run summary can name what dealt it — see
+        // DISCHARGE_SOURCE. Built once rather than per enemy caught.
+        const blastSource = { owner: this.player, weaponId: DISCHARGE_SOURCE.weaponId };
+
         for (const enemy of levelSpatialHash.getWithinRadius(this.player.pos, radius)) {
             if (distance(this.player.pos, enemy.pos) > radius) continue;
             damageSystem.dealDamage({
                 baseDamage: damage,
-                source: { owner: this.player },
+                source: blastSource,
                 target: enemy,
                 position: enemy.pos,
             });
@@ -646,7 +652,7 @@ export class GameManager {
                 status.infect(enemy, {
                     dps: enemy.maxHp * DISCHARGE_BURN_SHARE,
                     duration: DISCHARGE_BURN_TIME,
-                    source: undefined,
+                    source: DISCHARGE_SOURCE,
                     kind: 'burn',
                     // A share of the target's own health — see InfectParams
                     flat: true,
@@ -751,7 +757,7 @@ export class GameManager {
             if (damage > 0) {
                 damageSystem.dealDamage({
                     baseDamage: damage,
-                    source: null,
+                    source: KILL_ECHO_SOURCE,
                     target: other,
                     position: other.pos,
                     skipModifiers: true,
@@ -765,7 +771,7 @@ export class GameManager {
             status.infect(other, {
                 dps: killEchoBurnDps(enemy.maxHp, other.maxHp),
                 duration: 2.5,
-                source: undefined,
+                source: KILL_ECHO_SOURCE,
                 kind: 'burn',
                 // Measured against the target, so it must not be measured
                 // against the player's damage stats as well — see InfectParams

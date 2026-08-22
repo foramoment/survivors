@@ -203,6 +203,27 @@ export const KILL_ECHO_ICD = 2.6;
 export const KILL_ECHO_KNOCKBACK = 460;
 
 /**
+ * Attribution tags for damage that comes from a perk rather than a weapon.
+ *
+ * `DamageSystem.weaponIdOf` reads `weaponId` off whatever dealt the hit, and
+ * everything a perk deals used to pass `source: null` — so it landed in the run
+ * summary's "perks and hazards" line, which is one bucket with no names in it.
+ *
+ * That bucket was hiding the answer to the question the summary exists to
+ * answer. A measured 17-minute clear read as beautifully balanced across five
+ * weapons — 45%/26%/15%/9%/5% of kills — until you noticed the weapons had
+ * **11% of the damage and 17% of the kills between them**, and the other
+ * 83% was two perks nobody could see.
+ *
+ * These carry no `owner`, so `DamageSystem.getPlayer` still finds nothing and
+ * no modifier can leak in through the tag. They exist purely to be counted.
+ */
+export const KILL_ECHO_SOURCE = { weaponId: 'kill_echo' };
+export const DISCHARGE_SOURCE = { weaponId: 'static_discharge' };
+/** The arena itself — meteors, a rift collapsing */
+export const HAZARD_SOURCE = { weaponId: 'arena' };
+
+/**
  * What one echo takes off a body caught in the blast.
  *
  * Three rules, and each one exists because of a way this perk broke:

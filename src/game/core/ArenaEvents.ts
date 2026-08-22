@@ -19,6 +19,7 @@
 
 import { t } from './I18n';
 import { damageSystem } from './DamageSystem';
+import { HAZARD_SOURCE } from './Tactics';
 import { levelSpatialHash } from '../../engine/SpatialHash';
 import { particles } from '../../engine/ParticleSystem';
 import { juice } from '../../engine/JuiceSystem';
@@ -195,7 +196,7 @@ export class ArenaEventSystem {
                 // Environmental damage: no weapon, so no crit/might modifiers
                 damageSystem.dealDamage({
                     baseDamage: damage,
-                    source: null,
+                    source: HAZARD_SOURCE,
                     target: enemy,
                     position: enemy.pos,
                     skipModifiers: true,
