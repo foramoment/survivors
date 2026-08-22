@@ -156,9 +156,9 @@ export const RU: Record<string, string> = {
     'weapon.nanobot_swarm.evoDesc': 'Ещё два дрона, и каждый прошивает толпу насквозь, оставляя гниль',
 
     'weapon.spore_cloud.name': 'Облако Спор',
-    'weapon.spore_cloud.desc': 'Грибница заражает всех внутри и ширится с каждым уровнем',
+    'weapon.spore_cloud.desc': 'Грибница заражает всех внутри; смерть на ней продлевает ей жизнь',
     'weapon.spore_cloud.evoName': 'Грибной Цвет',
-    'weapon.spore_cloud.evoDesc': 'Инфекция становится заразной и расходится от погибших',
+    'weapon.spore_cloud.evoDesc': 'Инфекция заразна, и грибница держит на одну больше',
 
     'weapon.singularity_orb.name': 'Сфера Сингулярности',
     'weapon.singularity_orb.desc': 'Медленная сфера, тянущая всё к себе',

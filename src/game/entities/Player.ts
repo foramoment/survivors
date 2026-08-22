@@ -41,6 +41,34 @@ export class Player extends Entity {
     static readonly XP_LINEAR_STEP = 250;
 
     /**
+     * How much the step itself grows per level past the transition.
+     *
+     * The flat step was half a fix. It got the shape right — a compounding
+     * requirement against a bounded income diverges by construction — and then
+     * overshot into the other failure: a *constant* step against an income that
+     * still rises with the clock means levels arrive faster and faster, and a
+     * run that is going well simply drains the upgrade pool. Measured: a
+     * 15-minute Void Nexus clear reached level 111 and had taken 110 of the 120
+     * picks that exist in the game. There was nothing left to offer.
+     *
+     * Income over a run is roughly linear in time (bounded by
+     * `DifficultyDirector.MAX_ENEMIES` and rising with enemy tier), so the cost
+     * that matches it is a linearly growing step — quadratic total, sitting
+     * exactly between the flat line that empties the pool and the geometric
+     * curve that charged 93 seconds a level and stopped handing out decisions.
+     *
+     * What it does to the three measured runs:
+     *
+     *     died at 9:00, 55,487 XP     ->  49  (unchanged, the tail never starts)
+     *     cleared 15:24, 355,140 XP   ->  76  (was 83)
+     *     the 600-enemy run, 816,346  ->  95  (was 111)
+     *
+     * At level 80 a level costs about 25 seconds of a strong run's income
+     * rather than 14, which is still a decision every half-minute.
+     */
+    static readonly XP_STEP_GROWTH = 10;
+
+    /**
      * Pickup radius gained per level, on top of the base 100.
      *
      * Magnet range used to be a powerup (Gravity Well, +25 a pick, six picks).
@@ -505,9 +533,13 @@ export class Player extends Entity {
         // Past it the cost grows by a fixed step, because income cannot
         // compound and a compounding requirement therefore runs away from it.
         // See XP_LINEAR_FROM for the measurement that forced this.
+        //
+        // The step grows by XP_STEP_GROWTH each level, starting at zero growth
+        // on the first linear level so the transition still does not kink.
         this.nextLevelXp = this.level <= Player.XP_LINEAR_FROM
             ? Math.floor(this.nextLevelXp * 1.1 + 6)
-            : this.nextLevelXp + Player.XP_LINEAR_STEP;
+            : this.nextLevelXp + Player.XP_LINEAR_STEP
+                + Player.XP_STEP_GROWTH * (this.level - Player.XP_LINEAR_FROM - 1);
 
         this.onLevelUp();
     }

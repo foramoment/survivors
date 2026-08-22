@@ -60,23 +60,29 @@ export class DifficultyDirector {
     static readonly MIN_INTENSITY = 0.6;
     static readonly MAX_INTENSITY = 3.0;
     /**
-     * Population ceiling. Raised 400 -> 600 to see what a denser arena plays
-     * like.
+     * Population ceiling. Raised 400 -> 600 as an experiment, and **put back**.
      *
-     * This is not a neutral knob. Two things ride on it, and both should be
-     * watched on the next playtest:
+     * The comment here used to list the two things that ride on this number and
+     * ask for them to be watched on the next playtest. They were, and both came
+     * back negative:
      *
      *  - **It is the ceiling on XP income**, which is the whole reason the
-     *    level curve had to stop compounding (see `Player.XP_LINEAR_FROM`).
-     *    Raising it raises how fast a strong build levels.
+     *    level curve had to stop compounding (see `Player.XP_LINEAR_FROM`). At
+     *    600 a measured Void Nexus clear generated 816,000 XP against 355,000
+     *    for the same stage at 400 — level 111, which is 110 of the 120 picks
+     *    that exist in the entire game. The run ran out of upgrades to hand
+     *    out.
      *  - **It is worth far more to area weapons than to single-target ones.**
      *    A zone hits everything standing in it, so its output scales with
-     *    density; a projectile does not. A measured all-AoE clear took 243
-     *    damage across 47 seconds of contact, against 1374 across 2:58 for a
-     *    mixed build on the same stage — density is already the axis that
-     *    separates them, and this widens it.
+     *    density; a projectile does not. Raising the cap does not make the
+     *    arena 50% denser, it makes every zone weapon 50% stronger and nothing
+     *    else, which is the axis the pool was already leaning down.
+     *
+     * And it costs frames: 600 bodies plus their separation queries plus the
+     * particles of killing them at 20+ per second visibly drops the frame rate
+     * on hardware that has no business struggling with a 2D canvas.
      */
-    static readonly MAX_ENEMIES = 600;
+    static readonly MAX_ENEMIES = 400;
 
     /** Adaptive pressure multiplier (1 = baseline) */
     intensity: number = 1;

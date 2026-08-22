@@ -159,6 +159,11 @@ const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'discharge', 'reroll', 'shield']
  */
 const CHANCE_TYPES = ['killEcho', 'siphon'];
 
+/** Is this stat a probability of something firing rather than a size? */
+export function isChanceStat(type: string): boolean {
+    return CHANCE_TYPES.includes(type);
+}
+
 /** Human-readable bonus string, e.g. "+8%", "+15 Max HP" or "+10% chance" */
 export function formatPowerupBonus(type: string, value: number): string {
     const sign = value >= 0 ? '+' : '−';

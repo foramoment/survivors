@@ -11,6 +11,7 @@ import { WEAPONS, POWERUPS } from '../../data/GameData';
 import type { RunStats } from '../../core/RunStats';
 import { formatScore } from '../../core/Score';
 import { isStatModified } from '../../core/PlayerStats';
+import { isChanceStat } from '../../core/UpgradePool';
 import { formatTime } from '../../../engine/Utils';
 import { audio } from '../../../engine/AudioSystem';
 import { t } from '../../core/I18n';
@@ -90,7 +91,12 @@ function runAsText(d: RunSummaryData): string {
     // in the one artefact used to reason about balance.
     const stats = Object.entries(d.playerStats)
         .filter(([k, v]) => typeof v === 'number' && isStatModified(k, v))
-        .map(([k, v]) => `  ${k}: ${Math.round(v * 1000) / 1000}`)
+        // A chance says so. `killEcho: 0.3` in this dump was read as "the echo
+        // deals 30% damage" — it is the one line here where the raw number is
+        // actively misleading, because every other stat in the list IS a size.
+        .map(([k, v]) => isChanceStat(k)
+            ? `  ${k}: ${Math.round(v * 1000) / 10}% chance`
+            : `  ${k}: ${Math.round(v * 1000) / 1000}`)
         .join('\n');
 
     return [

@@ -51,7 +51,8 @@ const EXPECTED_STATS: Record<string, any> = {
         duration: 2.5,
     },
     spore_cloud: {
-        damage: 10,
+        // Raised against the mat cap — see SporeCloudWeapon.MAX_MATS
+        damage: 16,
         cooldown: 4,
         area: 50,
         speed: 0,

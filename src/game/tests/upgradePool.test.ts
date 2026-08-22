@@ -338,6 +338,18 @@ describe('Player XP curve', () => {
         return total;
     }
 
+    /** Highest level a run generating `xp` total would reach */
+    function levelFor(xp: number): number {
+        const player = new Player(0, 0);
+        player.onLevelUp = () => { };
+        let spent = 0;
+        while (spent + player.nextLevelXp <= xp) {
+            spent += player.nextLevelXp;
+            player.levelUp();
+        }
+        return player.level;
+    }
+
     it('does not touch the early and middle game', () => {
         // The opening minutes were tuned and are not the complaint. The
         // transition is where the compounding curve had already outrun income,
@@ -370,21 +382,34 @@ describe('Player XP curve', () => {
         const INCOME = 386;
         const player = new Player(0, 0);
         player.onLevelUp = () => { };
-        while (player.level < 83) player.levelUp();
+        while (player.level < 76) player.levelUp();
 
         const seconds = player.nextLevelXp / INCOME;
         // The old curve charged 93 seconds here and 10% more every level after
         expect(seconds).toBeGreaterThan(20); // still earned, not handed over
-        expect(seconds).toBeLessThan(45);
+        expect(seconds).toBeLessThan(60);
+    });
+
+    it('a whole run cannot drain the upgrade pool', () => {
+        // The flat step's own failure, measured: a denser arena pushed a
+        // 15-minute clear to 816,346 XP and level 111 — and there are only 120
+        // picks in the entire game (30 weapon levels + 90 perk stacks). The run
+        // had taken 110 of them. Whatever the curve does, the end of a run must
+        // still be a build rather than a full set.
+        const TOTAL_PICKS_IN_GAME = 120;
+        expect(levelFor(816346)).toBeLessThan(TOTAL_PICKS_IN_GAME * 0.85);
     });
 
     it('turns a won Void Nexus run into more picks, and a lost one into none', () => {
         // Two measured runs. The winning one spent its last levels with every
         // weapon already at 6, so every level the curve gives back is a perk.
-        expect(xpToReach(83)).toBeLessThanOrEqual(355140);
-        expect(xpToReach(84)).toBeGreaterThan(355140);
+        // 76 picks out of 120: enough that the late game keeps handing out
+        // decisions, not so many that it hands out everything.
+        expect(xpToReach(76)).toBeLessThanOrEqual(355140);
+        expect(xpToReach(77)).toBeGreaterThan(355140);
 
-        // The nine-minute defeat is untouched: same XP, same level
+        // The nine-minute defeat is untouched: same XP, same level. The tail
+        // starts at 40 and a run that ends there never reaches it.
         expect(xpToReach(49)).toBeLessThanOrEqual(55487);
         expect(xpToReach(50)).toBeGreaterThan(55487);
     });

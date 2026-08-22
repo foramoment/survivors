@@ -437,20 +437,98 @@ describe('Plasma Grenade stun', () => {
     });
 });
 
-describe('Spore Cloud growth', () => {
-    it('the patch gets wider with every level, not just stronger', () => {
+describe('Spore Cloud is a colony with a size limit', () => {
+    /** Run the weapon for `seconds` of game time and collect what it drops */
+    function runFor(weapon: SporeCloudWeapon, seconds: number, spawned: Entity[]) {
+        for (let t = 0; t < seconds; t += 0.1) {
+            weapon.update(0.1);
+            for (const e of spawned) (e as any).update?.(0.1);
+        }
+    }
+
+    /**
+     * The stats of the run that forced this rework: every duration and cooldown
+     * powerup maxed. That is the only configuration where the cap binds at all
+     * — at base stats a mat rots before the next one is due — which is exactly
+     * the point. The cap exists for the build that was breaking the game.
+     */
+    function maxedBuild(): Player {
+        const player = new Player(0, 0);
+        player.stats.duration = 1.8;
+        player.stats.cooldown = 0.6;
+        return player;
+    }
+
+    it('never holds more mats than the colony can sustain', () => {
+        // THE guard on this weapon. A mat lived up to 48 seconds against a 2.4
+        // second cooldown, so a maxed build kept twenty screen-sized patches on
+        // the ground at once and reported 66% of a run's entire damage. The
+        // cooldown is not what limits this weapon — the ground is.
+        const player = maxedBuild();
+        const weapon = new SporeCloudWeapon(player);
+        const spawned: Entity[] = [];
+        weapon.onSpawn = e => spawned.push(e);
+
+        runFor(weapon, 60, spawned);
+
+        const alive = spawned.filter(e => !e.isDead);
+        expect(alive.length).toBeLessThanOrEqual(2);
+        // ...and it does keep working: holding fire must not mean firing once
+        expect(spawned.length).toBeGreaterThan(3);
+    });
+
+    it('the evolved colony sustains one more', () => {
+        const player = maxedBuild();
+        const weapon = new SporeCloudWeapon(player);
+        const spawned: Entity[] = [];
+        weapon.onSpawn = e => spawned.push(e);
+        for (let i = 0; i < 5; i++) weapon.upgrade();
+        expect(weapon.evolved).toBe(true);
+
+        runFor(weapon, 60, spawned);
+
+        const alive = spawned.filter(e => !e.isDead);
+        expect(alive.length).toBeLessThanOrEqual(3);
+        expect(alive.length).toBeGreaterThan(2);
+    });
+
+    it('levelling buys seconds of held ground, and the ceiling is flat', () => {
+        // What a level buys now that the radius bonus is gone. Flat seconds, so
+        // the ceiling does not move when duration powerups do — the old form
+        // was a multiple of the mat's own life and reached 37 seconds.
         const player = new Player(0, 0);
         const weapon = new SporeCloudWeapon(player);
         const spawned: Entity[] = [];
         weapon.onSpawn = e => spawned.push(e);
 
         weapon.spawnZone();
-        const level1 = spawned[0].radius;
+        const atLevel1 = (spawned[0] as any).extensionBudget;
 
-        weapon.upgrade();
-        weapon.upgrade();
+        for (let i = 0; i < 5; i++) weapon.upgrade();
         weapon.spawnZone();
-        expect(spawned[1].radius).toBeGreaterThan(level1);
+        const atLevel6 = (spawned[1] as any).extensionBudget;
+
+        expect(atLevel6).toBeGreaterThan(atLevel1);
+        expect(atLevel6).toBeLessThanOrEqual(8);
+    });
+
+    it('a maxed patch stays smaller than the screen', () => {
+        // 517 radius is what three multipliers on one circle produced: +8% a
+        // level, x2.84 of area powerups and a x2 growth ramp. Two of the three
+        // are gone.
+        const player = new Player(0, 0);
+        player.stats.area = 2.84;   // every area powerup in the game, maxed
+        const weapon = new SporeCloudWeapon(player);
+        const spawned: Entity[] = [];
+        weapon.onSpawn = e => spawned.push(e);
+        for (let i = 0; i < 5; i++) weapon.upgrade();
+        weapon.area *= 1.3;         // evolution, applied by GameManager
+
+        weapon.spawnZone();
+        const mat = spawned[0] as any;
+        for (let t = 0; t < 20; t += 0.1) mat.update(0.1);
+
+        expect(mat.radius).toBeLessThan(320);
     });
 });
 

@@ -330,12 +330,12 @@ export const WEAPONS = [
         id: 'spore_cloud',
         name: "Spore Cloud",
         emoji: "🍄",
-        description: "Fungal patch that infects, and widens with every level",
+        description: "Fungal patch that infects; kills on it buy it time",
         class: SporeCloudWeapon,
         evolution: {
             name: "Fungal Bloom",
             emoji: "🍄‍🟫",
-            description: "The infection turns contagious and spreads from the dead"
+            description: "Contagious infection, and one more patch on the ground"
         }
     },
     {
