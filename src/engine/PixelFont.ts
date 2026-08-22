@@ -143,6 +143,84 @@ export function hasPixelGlyph(char: string): boolean {
  * Draw pixel text. `x`/`y` is the top-left of the text block (or top-center /
  * top-right depending on `align`).
  */
+/**
+ * One horizontal span of lit pixels inside a glyph: `[row, startCol, length]`.
+ *
+ * A glyph used to be drawn a pixel at a time — up to 35 `fillRect` calls per
+ * character per pass. Rows are mostly solid runs ('#####' is one rect, not
+ * five), so collapsing them cuts the call count by roughly three with no change
+ * to what lands on the canvas. This is the hot loop of every damage number, HP
+ * bar label and arena banner in the game.
+ */
+type Run = [row: number, col: number, len: number];
+
+/** Lit spans per glyph, and the same for its outline, both built once */
+const GLYPH_RUNS = new Map<string, Run[]>();
+const OUTLINE_RUNS = new Map<string, Run[]>();
+const NO_RUNS: Run[] = [];
+
+/** Collapse a boolean bitmap into horizontal runs */
+function toRuns(rows: boolean[][], rowOffset: number, colOffset: number): Run[] {
+    const runs: Run[] = [];
+    for (let r = 0; r < rows.length; r++) {
+        let start = -1;
+        for (let c = 0; c <= rows[r].length; c++) {
+            const lit = c < rows[r].length && rows[r][c];
+            if (lit && start < 0) start = c;
+            if (!lit && start >= 0) {
+                runs.push([r + rowOffset, start + colOffset, c - start]);
+                start = -1;
+            }
+        }
+    }
+    return runs;
+}
+
+function runsOf(ch: string): Run[] {
+    let runs = GLYPH_RUNS.get(ch);
+    if (runs) return runs;
+    const glyph = GLYPHS[ch];
+    if (!glyph) return NO_RUNS;
+
+    const bits: boolean[][] = glyph.map(line => {
+        const row: boolean[] = [];
+        for (let c = 0; c < GLYPH_W; c++) row.push(line[c] === '#');
+        return row;
+    });
+    runs = toRuns(bits, 0, 0);
+    GLYPH_RUNS.set(ch, runs);
+    return runs;
+}
+
+/**
+ * The glyph grown by one pixel up, down, left and right — the exact shape four
+ * shifted copies used to paint between them, on a grid one pixel wider on every
+ * side. Diagonals are deliberately absent: the old outline shifted along the
+ * axes only, and matching it keeps the look identical.
+ */
+function outlineRunsOf(ch: string): Run[] {
+    let runs = OUTLINE_RUNS.get(ch);
+    if (runs) return runs;
+    const glyph = GLYPHS[ch];
+    if (!glyph) return NO_RUNS;
+
+    const grown: boolean[][] = [];
+    for (let r = 0; r < GLYPH_H + 2; r++) grown.push(new Array(GLYPH_W + 2).fill(false));
+    const lit = (r: number, c: number) =>
+        r >= 0 && r < GLYPH_H && c >= 0 && c < GLYPH_W && glyph[r][c] === '#';
+
+    for (let r = -1; r <= GLYPH_H; r++) {
+        for (let c = -1; c <= GLYPH_W; c++) {
+            if (lit(r - 1, c) || lit(r + 1, c) || lit(r, c - 1) || lit(r, c + 1)) {
+                grown[r + 1][c + 1] = true;
+            }
+        }
+    }
+    runs = toRuns(grown, -1, -1);
+    OUTLINE_RUNS.set(ch, runs);
+    return runs;
+}
+
 export function drawPixelText(
     ctx: CanvasRenderingContext2D,
     text: string,
@@ -170,32 +248,42 @@ export function drawPixelText(
         fill = grad;
     }
 
-    const drawPass = (offsetX: number, offsetY: number, style: string | CanvasGradient) => {
+    const drawPass = (
+        offsetX: number,
+        offsetY: number,
+        style: string | CanvasGradient,
+        runsOf: (ch: string) => Run[],
+    ) => {
         ctx.fillStyle = style;
         chars.forEach((ch, i) => {
-            const glyph = GLYPHS[ch];
-            if (!glyph) return;
+            const runs = runsOf(ch);
+            if (runs.length === 0) return;
             const gx = startX + i * (GLYPH_W + spacing) * scale + offsetX;
             const waveY = options.wave ? options.wave(i) * scale : 0;
             const gy = y + offsetY + waveY;
-            for (let row = 0; row < GLYPH_H; row++) {
-                const line = glyph[row];
-                for (let col = 0; col < GLYPH_W; col++) {
-                    if (line[col] !== '#') continue;
-                    ctx.fillRect(gx + col * scale, gy + row * scale, scale, scale);
-                }
+            for (let r = 0; r < runs.length; r++) {
+                const run = runs[r];
+                ctx.fillRect(gx + run[1] * scale, gy + run[0] * scale, run[2] * scale, scale);
             }
         });
     };
 
     if (options.outline) {
-        // 4-way outline (cheap, and enough at pixel scale)
-        const o = scale;
-        drawPass(-o, 0, options.outline);
-        drawPass(o, 0, options.outline);
-        drawPass(0, -o, options.outline);
-        drawPass(0, o, options.outline);
+        // One dilated pass, not four shifted copies of the glyph.
+        //
+        // The four-way outline drew the whole string four extra times, so an
+        // outlined number cost SIX passes against two for a plain one. Damage
+        // numbers style themselves as crits once crit damage carries half the
+        // total (see DamageNumbers.mergeInto), which a run with crit damage and
+        // 30% crit chance crosses — so taking one crit-damage perk quietly
+        // tripled the cost of the busiest text on screen, and the player
+        // reported exactly that: "I took the crit bonus and the frame rate
+        // dropped when a crowd is on me".
+        //
+        // The union of four plus-shifted copies IS the plus-dilation of the
+        // glyph, so this draws the identical shape in one pass.
+        drawPass(0, 0, options.outline, outlineRunsOf);
     }
-    if (shadow > 0) drawPass(shadow * scale, shadow * scale, shadowColor);
-    drawPass(0, 0, fill);
+    if (shadow > 0) drawPass(shadow * scale, shadow * scale, shadowColor, runsOf);
+    drawPass(0, 0, fill, runsOf);
 }
