@@ -13,7 +13,8 @@ import { RepairCell } from '../entities/RepairCell';
 import {
     dischargeThreshold, dischargeRadius, DISCHARGE_COOLDOWN, REPAIR_LIFETIME,
     DISCHARGE_MAX_STACKS, DISCHARGE_STUN_AT, DISCHARGE_BURN_AT,
-    KILL_ECHO_ICD, KILL_ECHO_DAMAGE_SHARE,
+    KILL_ECHO_ICD, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE,
+    killEchoDamage, killEchoBurnDps,
 } from '../core/Tactics';
 import { POWERUPS } from '../data/GameData';
 import { VALID_PLAYER_STATS } from '../core/PlayerStats';
@@ -107,14 +108,41 @@ describe('Kill Echo', () => {
         // The non-lethal rule is what makes a cascade impossible by
         // construction rather than unlikely by tuning, so raising the share
         // must not touch it: no echo makes a corpse, so no echo makes an echo.
-        const hp = 100;
-        const damage = Math.min(hp * KILL_ECHO_DAMAGE_SHARE, Math.max(0, hp - 1));
-        expect(damage).toBeLessThan(hp);
-
-        // Even at a share of 1 the target survives on 1 HP
-        const lethal = Math.min(hp * 1, Math.max(0, hp - 1));
-        expect(lethal).toBe(hp - 1);
+        // The invariant, at every health a target can be at: whatever the
+        // corpse was worth, the body it caught walks away with at least 1 HP.
+        for (const hp of [1, 2, 7, 100, 48_000]) {
+            expect(hp - killEchoDamage(1e9, hp, false)).toBeGreaterThanOrEqual(1);
+        }
         expect(DISCHARGE_COOLDOWN).toBeGreaterThan(0);
+    });
+
+    it('cannot be worth more than the body that produced it', () => {
+        // Failure mode #2, which had moved rather than been fixed: a share of
+        // the target's health is enormous when the target is a boss, so a
+        // player melted a boss by farming the trash walking around it. Measured
+        // on a real run — the boss bar visibly collapsed while the player
+        // fought its escort.
+        const TRASH = 48_000;      // a late Void Nexus body
+        const BOSS = 2_500_000;    // the same body times a boss multiplier
+
+        const onTrash = killEchoDamage(TRASH, TRASH, false);
+        const onBoss = killEchoDamage(TRASH, BOSS, true);
+
+        // A trash corpse cannot take a boss-sized bite out of a boss
+        expect(onBoss).toBeLessThanOrEqual(onTrash);
+        expect(onBoss / BOSS).toBeLessThan(0.02);
+
+        // ...and the same ceiling applies to the burn it leaves behind, which
+        // is where the boss melt actually came from
+        expect(killEchoBurnDps(TRASH, BOSS)).toBe(killEchoBurnDps(TRASH, TRASH));
+    });
+
+    it('is unchanged when everything on the field is the same size', () => {
+        // The corpse cap must be invisible in the case it was not written for:
+        // trash killing trash is where this perk spends its whole life.
+        const HP = 500;
+        expect(killEchoDamage(HP, HP, false)).toBeCloseTo(HP * KILL_ECHO_DAMAGE_SHARE);
+        expect(killEchoBurnDps(HP, HP)).toBeCloseTo(HP * KILL_ECHO_BURN_SHARE);
     });
 });
 

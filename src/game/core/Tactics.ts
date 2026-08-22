@@ -203,6 +203,44 @@ export const KILL_ECHO_ICD = 2.6;
 export const KILL_ECHO_KNOCKBACK = 460;
 
 /**
+ * What one echo takes off a body caught in the blast.
+ *
+ * Three rules, and each one exists because of a way this perk broke:
+ *
+ *   - **A share of the target's CURRENT health** — the damage shrinks as the
+ *     target weakens, which is backwards from what a cascade needs. See
+ *     KILL_ECHO_DAMAGE_SHARE for the two designs before this one.
+ *   - **Never more than the corpse was worth.** The share alone still let a
+ *     pack of trash melt a boss, because a percentage of a health pool built to
+ *     be enormous is enormous. The blast's fuel is the body that produced it,
+ *     so that body is also its ceiling — one rule that covers bosses,
+ *     minibosses and elites instead of naming them one at a time.
+ *   - **Never lethal.** No echo makes a corpse, so no echo makes another echo.
+ *     A cascade is impossible by construction rather than unlikely by tuning.
+ *
+ * Lives here rather than inline in GameManager so the rule and its numbers sit
+ * together — and so a test can call the thing the game calls, instead of
+ * re-typing the formula and agreeing with itself.
+ */
+export function killEchoDamage(corpseMaxHp: number, targetHp: number, targetIsBoss: boolean): number {
+    const share = targetIsBoss ? KILL_ECHO_DAMAGE_SHARE * KILL_ECHO_BOSS_RESIST : KILL_ECHO_DAMAGE_SHARE;
+    return Math.min(targetHp * share, corpseMaxHp * share, Math.max(0, targetHp - 1));
+}
+
+/**
+ * The burn left on survivors, in HP per second.
+ *
+ * Same ceiling as the blast, for the same reason — and this is where the boss
+ * problem actually lived. `KILL_ECHO_BOSS_RESIST` only ever guarded the direct
+ * hit, so the burn was taking a flat 9% of a boss's maximum every second while
+ * the player farmed the trash standing around it. It is applied as a `flat`
+ * infection (see core/StatusEffects), so it also never picks up might or crit.
+ */
+export function killEchoBurnDps(corpseMaxHp: number, targetMaxHp: number): number {
+    return Math.min(targetMaxHp, corpseMaxHp) * KILL_ECHO_BURN_SHARE;
+}
+
+/**
  * Minimum seconds between the echo's camera kick.
  *
  * Late game kills arrive several a second and the perk caps at six stacks, so

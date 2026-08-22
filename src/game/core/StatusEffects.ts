@@ -39,12 +39,34 @@ const MAX_GENERATIONS = 3;
  */
 export const STUN_RECOVERY_RATIO = 2;
 
+/**
+ * What is left of a `flat` (percent-of-max-HP) burn when it lands on a boss.
+ *
+ * A boss is a health pool an order of magnitude past anything else on the
+ * field, which is exactly what a percentage of max health is worst against:
+ * Kill Echo's burn alone was 22% of a boss's total per proc, and it did not go
+ * through `KILL_ECHO_BOSS_RESIST` because that only guards the direct blast.
+ * The player watched a boss bar collapse while farming the trash around it —
+ * failure mode #2 from KILL_ECHO_DAMAGE_SHARE, which had simply moved from the
+ * blast into the burn.
+ *
+ * The same courtesy every stun source gives a boss, and the same rule League
+ * applies to max-health damage against monsters.
+ */
+export const BOSS_FLAT_RESIST = 0.25;
+
 /** Purely cosmetic — picks the colour of the orbiting motes on the enemy */
 export type InfectionKind = 'spore' | 'acid' | 'burn';
 
 export interface Infection {
     /** Base damage per second (goes through DamageSystem, so might/crit apply) */
     dps: number;
+    /**
+     * This dps is already measured against the target (a share of its max HP),
+     * so it must NOT be multiplied by the player's damage stats. See
+     * `InfectParams.flat`.
+     */
+    flat: boolean;
     /** Seconds left */
     timer: number;
     /** Countdown to the next damage tick */
@@ -64,6 +86,20 @@ export interface InfectParams {
     spreadRadius?: number;
     generation?: number;
     kind?: InfectionKind;
+    /**
+     * The dps is a share of the target's own max HP (Kill Echo's burn, Static
+     * Discharge's burn) rather than a weapon number.
+     *
+     * Such a burn is **already** scaled to whatever it landed on, so running it
+     * through might and crit on top scales it twice. Against a late-game body
+     * that is the difference between a perk and the entire build: a 48k-HP
+     * enemy burning at 9% of its own maximum is 4320 dps, next to the 37 dps
+     * the fungal mat that infected it actually deals.
+     *
+     * Flat infections are dealt with `skipModifiers` and are cut against bosses
+     * — see BOSS_FLAT_RESIST.
+     */
+    flat?: boolean;
 }
 
 /**
@@ -82,21 +118,45 @@ export interface CorrodeParams {
 }
 
 export class StatusSystem {
-    /** Apply (or refresh) an infection. The stronger dps and longer timer win. */
+    /**
+     * Apply (or refresh) an infection. **The stronger one wins, whole.**
+     *
+     * This used to merge field by field — `dps` and `timer` took the maximum,
+     * and `source` took whatever arrived last — and the combination was the
+     * single worst balance bug the game has had. It built infections that never
+     * existed:
+     *
+     *   1. Kill Echo leaves a burn at 9% of the target's **max HP** per second.
+     *      On a late Void Nexus body that is 4320 dps, and it is `flat`, so it
+     *      is meant to land unmodified.
+     *   2. The fungal mat the enemy is standing in re-infects it a tick later
+     *      with its own 37 dps and **its own source**.
+     *   3. The merge kept the burn's 4320 dps, took the mat's source, and
+     *      dropped the flat marker. From then on the perk's burn ran through
+     *      might and crit — and was credited to the mushroom.
+     *
+     * A measured run: Fungal Bloom reported 66% of all damage and 71% of all
+     * kills, with a best hit of 718,348. Almost none of that was the mushroom.
+     *
+     * Taking the whole effect from one side removes the class of bug rather
+     * than this instance of it: no borrowed timers, no borrowed source, no
+     * borrowed modifier rule. A weaker infection simply does not land — the
+     * standard "strongest DoT applies" rule from every ARPG that has ever
+     * shipped two damage-over-time effects.
+     */
     infect(enemy: Enemy, params: InfectParams) {
         const current = enemy.infection;
-        if (current) {
-            current.dps = Math.max(current.dps, params.dps);
-            current.timer = Math.max(current.timer, params.duration);
-            current.contagious = current.contagious || !!params.contagious;
-            current.spreadRadius = Math.max(current.spreadRadius, params.spreadRadius ?? 0);
-            current.generation = Math.min(current.generation, params.generation ?? 0);
-            current.kind = params.kind ?? current.kind;
-            current.source = params.source;
-            return;
-        }
+        // `>=` so a mat refreshing its own infection still renews the timer
+        if (current && current.dps > params.dps) return;
+
+        const flat = !!params.flat;
+        // Percent-of-max-HP damage is at its most absurd against the one health
+        // pool built to be enormous — see BOSS_FLAT_RESIST
+        const dps = flat && enemy.isBoss ? params.dps * BOSS_FLAT_RESIST : params.dps;
+
         enemy.infection = {
-            dps: params.dps,
+            dps,
+            flat,
             timer: params.duration,
             tick: TICK,
             contagious: !!params.contagious,
@@ -182,6 +242,9 @@ export class StatusSystem {
                     source: infection.source,
                     target: enemy,
                     position: enemy.pos,
+                    // A share of the target's own health is already the right
+                    // size; might and crit on top would scale it twice
+                    skipModifiers: infection.flat,
                 });
             }
             if (infection.timer <= 0) enemy.infection = null;
@@ -209,6 +272,7 @@ export class StatusSystem {
                 // Each jump is a little weaker, so a chain fades instead of
                 // growing without bound
                 dps: infection.dps * 0.85,
+                flat: infection.flat,
                 duration: infection.timer > 0 ? Math.max(2, infection.timer) : 3,
                 source: infection.source,
                 contagious: true,

@@ -35,13 +35,85 @@ describe('StatusSystem — infection', () => {
         expect(enemy.infection).toBeNull();
     });
 
-    it('re-infecting keeps the stronger dps and the longer timer', () => {
+    it('a weaker infection does not land on top of a stronger one', () => {
         const enemy = makeEnemy();
         status.infect(enemy, { dps: 10, duration: 5, source: null });
         status.infect(enemy, { dps: 4, duration: 1, source: null });
 
         expect(enemy.infection?.dps).toBe(10);
         expect(enemy.infection?.timer).toBe(5);
+    });
+
+    it('the stronger infection replaces the weaker one whole', () => {
+        // Including the timer. Merging field by field is what built infections
+        // that never existed — see the next test.
+        const enemy = makeEnemy();
+        status.infect(enemy, { dps: 4, duration: 9, source: null, kind: 'spore' });
+        status.infect(enemy, { dps: 40, duration: 2, source: null, kind: 'burn' });
+
+        expect(enemy.infection?.dps).toBe(40);
+        expect(enemy.infection?.timer).toBe(2);   // not the 9 it walked in with
+        expect(enemy.infection?.kind).toBe('burn');
+    });
+
+    it('a mat re-infecting a burning enemy cannot adopt the burn', () => {
+        // THE bug this rule exists for, reproduced.
+        //
+        // Kill Echo leaves a burn worth 9% of the target's MAX HP per second —
+        // on a late Void Nexus body, 4320 dps — and it is flat, so it is meant
+        // to land unmodified. The fungal mat the enemy is standing in then
+        // re-infects it with its own 37 dps and its own source. The old merge
+        // kept the burn's dps, took the mat's source and dropped the flat
+        // marker, so the perk's burn started running through might and crit and
+        // was billed to the mushroom.
+        //
+        // Measured consequence: Fungal Bloom reported 66% of all damage and 71%
+        // of all kills in a run, with a best hit of 718,348. Almost none of it
+        // was the mushroom.
+        const weapon = { weaponId: 'spore_cloud', owner: { stats: { might: 1.36, critChance: 1, critDamage: 4 } } };
+        const enemy = makeEnemy();
+        enemy.maxHp = 48000;
+        enemy.hp = 48000;
+
+        status.infect(enemy, {
+            dps: enemy.maxHp * 0.09, duration: 2.5, source: undefined, kind: 'burn', flat: true,
+        });
+        status.infect(enemy, { dps: 37, duration: 9, source: weapon, kind: 'spore' });
+
+        expect(enemy.infection?.source).toBeUndefined();
+        expect(enemy.infection?.flat).toBe(true);
+        expect(enemy.infection?.timer).toBe(2.5);
+
+        const spy = vi.spyOn(damageSystem, 'dealDamage').mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
+        status.update(0.7, [enemy]);
+        expect(spy).toHaveBeenCalledWith(expect.objectContaining({ skipModifiers: true }));
+    });
+
+    it('a percent-of-max-HP burn is cut against a boss', () => {
+        // A boss is a health pool an order of magnitude past anything else on
+        // the field, which is what a percentage of max health is worst against.
+        const trash = makeEnemy();
+        const boss = makeEnemy();
+        boss.makeBoss();
+
+        status.infect(trash, { dps: trash.maxHp * 0.09, duration: 3, source: null, flat: true });
+        status.infect(boss, { dps: boss.maxHp * 0.09, duration: 3, source: null, flat: true });
+
+        const trashShare = (trash.infection?.dps ?? 0) / trash.maxHp;
+        const bossShare = (boss.infection?.dps ?? 0) / boss.maxHp;
+        expect(bossShare).toBeCloseTo(trashShare * 0.25);
+    });
+
+    it('a weapon infection is still modified by the build', () => {
+        // The flip side: only `flat` infections skip the pipeline. A weapon's
+        // own damage-over-time has to keep scaling with might and crit, or
+        // levelling the weapon that applied it would do nothing.
+        const spy = vi.spyOn(damageSystem, 'dealDamage').mockReturnValue({ finalDamage: 0, isCrit: false, killed: false });
+        const enemy = makeEnemy();
+        status.infect(enemy, { dps: 10, duration: 3, source: null });
+
+        status.update(0.7, [enemy]);
+        expect(spy).toHaveBeenCalledWith(expect.objectContaining({ skipModifiers: false }));
     });
 
     it('a non-contagious carrier infects nobody when it dies', () => {

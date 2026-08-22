@@ -32,7 +32,7 @@ import {
     DISCHARGE_COOLDOWN, DISCHARGE_CHARGE_CAP,
     DISCHARGE_STUN_AT, DISCHARGE_BURN_AT, DISCHARGE_STUN,
     DISCHARGE_BURN_SHARE, DISCHARGE_BURN_TIME,
-    KILL_ECHO_RADIUS, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE, KILL_ECHO_BOSS_RESIST,
+    KILL_ECHO_RADIUS, killEchoDamage, killEchoBurnDps,
     KILL_ECHO_KNOCKBACK, KILL_ECHO_PUNCH_GAP, KILL_ECHO_ICD,
 } from './core/Tactics';
 import { screenManager } from '../engine/ui/ScreenManager';
@@ -648,6 +648,8 @@ export class GameManager {
                     duration: DISCHARGE_BURN_TIME,
                     source: undefined,
                     kind: 'burn',
+                    // A share of the target's own health — see InfectParams
+                    flat: true,
                 });
             }
         }
@@ -741,13 +743,10 @@ export class GameManager {
             const len = Math.hypot(dx, dy) || 1;
             const falloff = 1 - gap / radius;
             other.applyKnockback(dx / len, dy / len, KILL_ECHO_KNOCKBACK * falloff);
-            // A share of the target's CURRENT health, so the blast fades as it
-            // weakens — see KILL_ECHO_DAMAGE_SHARE
-            const share = other.isBoss ? KILL_ECHO_DAMAGE_SHARE * KILL_ECHO_BOSS_RESIST : KILL_ECHO_DAMAGE_SHARE;
-            // ...and it may never land the killing blow. That is what makes a
-            // cascade impossible rather than merely unlikely: no echo produces
-            // a corpse, so no echo produces another echo.
-            const damage = Math.min(other.hp * share, Math.max(0, other.hp - 1));
+            // A share of the target's current health, capped by what the
+            // corpse was worth and never lethal — all three rules, and why
+            // each one is there, live in killEchoDamage
+            const damage = killEchoDamage(enemy.maxHp, other.hp, other.isBoss);
 
             if (damage > 0) {
                 damageSystem.dealDamage({
@@ -764,10 +763,13 @@ export class GameManager {
             // inside this frame, so it is a kill the perk earned rather than a
             // chain reaction.
             status.infect(other, {
-                dps: other.maxHp * KILL_ECHO_BURN_SHARE,
+                dps: killEchoBurnDps(enemy.maxHp, other.maxHp),
                 duration: 2.5,
                 source: undefined,
                 kind: 'burn',
+                // Measured against the target, so it must not be measured
+                // against the player's damage stats as well — see InfectParams
+                flat: true,
             });
         }
     }
