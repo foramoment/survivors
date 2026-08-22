@@ -129,6 +129,9 @@ export const RU: Record<string, string> = {
     'bonus.discharge': 'ступень',
     'bonus.chance': 'шанс',
     'bonus.reroll': 'переброс',
+    'bonus.secondWind': 'спасение',
+    'bonus.timeStop': 'с стазиса',
+    'bonus.salvo': 'залп',
 
     'arena.meteors': 'МЕТЕОРИТНЫЙ ДОЖДЬ',
     'arena.blackout': 'ОТКАЗ ПИТАНИЯ',
@@ -255,6 +258,12 @@ export const RU: Record<string, string> = {
     'powerup.vital_siphon.desc': 'С убитых иногда падает ремкомплект',
     'powerup.extra_roll.name': 'Запасной Патрон',
     'powerup.extra_roll.desc': 'Ещё один переброс на каждом уровне',
+    'powerup.second_wind.name': 'Второе Дыхание',
+    'powerup.second_wind.desc': 'Переживи один смертельный удар. Спасение сдувает толпу и станит её',
+    'powerup.time_stop.name': 'Стазис',
+    'powerup.time_stop.desc': 'Раз в 24с арена замирает. С каждым пиком — дольше',
+    'powerup.salvo.name': 'Залп',
+    'powerup.salvo.desc': 'Раз в 14с всё твоё оружие стреляет разом',
 
     // ----------------------------------------------------------------- stages
     'stage.asteroid_fields.name': 'Пояс Астероидов',

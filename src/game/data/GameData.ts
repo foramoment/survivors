@@ -275,6 +275,21 @@ export const POWERUPS: PowerupData[] = [
     // Hard-capped at two: every level-up already comes with one free reroll, and
     // past three the draw stops being a decision and becomes a menu you shop in
     { id: 'extra_roll', name: "Spare Cartridge", description: "One more reroll on every level-up", type: "reroll", value: 1, maxStacks: 2, emoji: "🎲" },
+
+    // The three below are events rather than numbers, asked for by name: "it
+    // was nice when the discharge went off". None of them deals damage of its
+    // own — the run summary had just shown perks holding 89% of a run's damage,
+    // and the answer to that is not a fourth source of it.
+    //
+    // One pick, no stacks. A perk you can only own one of is the purest form of
+    // a moment: it fires once a run and you remember where.
+    { id: 'second_wind', name: "Second Wind", description: "Survive one lethal blow. The save blows the crowd off you and stuns it", type: "secondWind", value: 1, maxStacks: 1, emoji: "🫀" },
+    // Hands you time instead of damage — the one resource nothing else in the
+    // pool gives. Stacks buy length, never frequency (see TIME_STOP_INTERVAL).
+    { id: 'time_stop', name: "Stasis", description: "Every 24s the arena freezes. Longer with every pick", type: "timeStop", value: 1, maxStacks: 3, emoji: "⏸️" },
+    // The perk that makes the weapons you picked matter more instead of less:
+    // it adds no damage of its own, it fires the build you already have.
+    { id: 'salvo', name: "Salvo", description: "Every 14s every weapon you own fires at once", type: "salvo", value: 1, maxStacks: 3, emoji: "🚀" },
 ];
 
 export const WEAPONS = [

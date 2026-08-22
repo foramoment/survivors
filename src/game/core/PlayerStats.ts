@@ -28,6 +28,9 @@ export const VALID_PLAYER_STATS = [
     'killEcho',
     'siphon',
     'reroll',
+    'secondWind',
+    'timeStop',
+    'salvo',
 ] as const;
 
 export type PlayerStatType = typeof VALID_PLAYER_STATS[number];
@@ -69,6 +72,12 @@ export const DEFAULT_PLAYER_STATS: Record<string, number> = {
     reroll: 0,
     /** Bonus damage against a target still at full health */
     firstStrike: 0,
+    /** 1 = one lethal blow this run is survived instead */
+    secondWind: 0,
+    /** Seconds added to the periodic stasis (0 = the perk is not owned) */
+    timeStop: 0,
+    /** Volleys fired when the salvo goes off */
+    salvo: 0,
 };
 
 /** Has this stat been moved off its starting value? */

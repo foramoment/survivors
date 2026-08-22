@@ -4,7 +4,7 @@
  * The powerup pool used to be fourteen flat multipliers. Picking one never
  * changed a decision: +8% might and +9% area are the same card wearing
  * different hats, and one of them (projectile speed) was not even perceptible.
- * These four have a behaviour attached, so a build starts to have a shape.
+ * These have a behaviour attached, so a build starts to have a shape.
  *
  *   Static Discharge — contact damage charges a capacitor that detonates
  *                      around you. The one perk that turns being surrounded
@@ -12,6 +12,17 @@
  *   Kill Echo        — kills sometimes detonate. Rewards clearing fast.
  *   Vital Siphon     — kills sometimes drop a repair pickup. Healing you have
  *                      to walk to, so it can never turn into standing still.
+ *   Second Wind      — one lethal blow a run is survived, and the save clears
+ *                      the ground you died on.
+ *   Stasis           — the arena periodically stops. Hands you time, which is
+ *                      the resource nothing else in the pool gives.
+ *   Salvo            — every weapon you own fires at once. The only perk that
+ *                      makes your WEAPON picks matter more instead of less.
+ *
+ * The last three deal no damage at all, and that is a rule rather than an
+ * accident: a measured 17-minute clear had two perks holding 89% of the run's
+ * damage while five weapons split 11%, so a fourth source of perk damage was
+ * exactly the wrong medicine.
  *
  * The numbers live here rather than in GameData so the balance of a mechanic
  * sits next to the rule it drives.
@@ -46,8 +57,14 @@ export const DISCHARGE_BURN_AT = 3;
 /** How long the caught pack is held, and how long it burns */
 export const DISCHARGE_STUN = 0.9;
 export const DISCHARGE_BURN_TIME = 3;
-/** Burn strength, as a share of the target's own max HP per second */
-export const DISCHARGE_BURN_SHARE = 0.06;
+/**
+ * Burn strength, as a share of the target's own max HP per second.
+ *
+ * Cut 0.06 -> 0.02 for the same reason as KILL_ECHO_BURN_SHARE — see there for
+ * the measurement and the shape argument. This one still runs for
+ * DISCHARGE_BURN_TIME, so a proc is 6% of every body it caught.
+ */
+export const DISCHARGE_BURN_SHARE = 0.02;
 
 /**
  * HP that must be absorbed before the capacitor fires. **Flat**, not per stack.
@@ -150,8 +167,26 @@ export const KILL_ECHO_BOSS_RESIST = 0.25;
  * is most of what makes it readable.
  */
 export const KILL_ECHO_RADIUS = 84;
-/** Burn left on survivors, as a share of their own max HP per second */
-export const KILL_ECHO_BURN_SHARE = 0.09;
+/**
+ * Burn left on survivors, as a share of their own max HP per second.
+ *
+ * **Cut 0.09 -> 0.03** once the run summary started naming who dealt what. A
+ * measured 17-minute clear: five weapons held 11% of the damage and 17% of the
+ * killing blows between them, and this burn plus Static Discharge's had the
+ * rest.
+ *
+ * The arithmetic behind that is not a tuning miss, it is a shape mismatch. A
+ * late Void Nexus body carries ~57,000 HP, so 9% a second for 2.5 seconds is
+ * ~12,800 damage — against a maxed weapon hit of a few hundred. **A percentage
+ * does not care how big the enemy got; a weapon's number does.** Enemy health
+ * multiplies by 2 per tier and again with the clock, while a weapon grows about
+ * x15 across a whole run, so any percent-of-max-HP effect eventually becomes
+ * the only thing in the build that is still killing anything.
+ *
+ * 3% for 2.5s is 7.5% of a body per proc, which is a real dent in a pack and
+ * not a replacement for the weapons that are supposed to finish it.
+ */
+export const KILL_ECHO_BURN_SHARE = 0.03;
 
 /**
  * Minimum seconds between echoes, however fast you are killing.
@@ -272,9 +307,111 @@ export function killEchoBurnDps(corpseMaxHp: number, targetMaxHp: number): numbe
  */
 export const KILL_ECHO_PUNCH_GAP = 0.18;
 
-/** HP restored by one repair pickup, and how long it stays on the ground */
-export const REPAIR_HEAL = 6;
+/**
+ * ## Second Wind — one death per run, and it costs you the pile
+ *
+ * A single pick, no stacks. The play report asked for perks that are *moments*
+ * rather than multipliers ("it was nice when it went off"), and a perk you can
+ * only ever own one of is the purest form of that: it fires once, you remember
+ * where it happened.
+ *
+ * Guardian Angel from League, with the arena's own problem attached — coming
+ * back at full health inside the crowd that just killed you is not a rescue, it
+ * is a two-frame delay. So the save **clears the ground**: everything nearby is
+ * thrown out and stunned, and `contactRampTime` resets, because the ramp is a
+ * measure of how long you chose to stand there and you did not choose this.
+ *
+ * It deals no damage at all, which is deliberate — the run summary just showed
+ * what happens when perks start doing the killing.
+ */
+export const SECOND_WIND_HP_SHARE = 0.35;
+export const SECOND_WIND_RADIUS = 300;
+export const SECOND_WIND_STUN = 1.8;
+export const SECOND_WIND_KNOCKBACK = 700;
+
+/**
+ * ## Stasis — the arena stops, you do not
+ *
+ * Every TIME_STOP_INTERVAL seconds everything on screen freezes. No damage, no
+ * knockback: it hands you *time*, which is the resource a survivors game is
+ * actually about and the only one no other perk in the pool gives.
+ *
+ * Stacks buy **length, never frequency** — the rule DISCHARGE_CHARGE_COST
+ * argues for one file over. A rarer, longer stop stays an event you look up at;
+ * a more frequent one becomes weather.
+ *
+ * It rides `status.stun`, so it inherits the recovery rule from StatusEffects
+ * for free: a frozen enemy is immune for twice the freeze afterwards, which is
+ * what stops this from combining with Mind Blast or Absolute Zero into a
+ * permanently parked arena.
+ */
+export const TIME_STOP_INTERVAL = 24;
+/** How far the stasis reaches — comfortably past the edge of the screen */
+export const TIME_STOP_RADIUS = 900;
+export const TIME_STOP_BASE = 0.5;
+
+/** Seconds the arena stands still, for a player holding `stacks` of the perk */
+export function timeStopDuration(stacks: number): number {
+    return stacks > 0 ? TIME_STOP_BASE + stacks : 0;
+}
+
+/**
+ * ## Salvo — every weapon you own fires at once
+ *
+ * The perk that answers a measured problem directly. In a 17-minute clear the
+ * five weapons held **11% of the damage between them** and two perks had the
+ * rest; a build's weapon picks had stopped mattering. Every other tactic in
+ * this file adds a new source of damage, which is precisely the wrong medicine.
+ *
+ * This one adds none. It reaches into the weapons already in the build and
+ * fires them, so the damage lands on their own numbers, is credited to them in
+ * the summary, and gets better the better your weapons are.
+ *
+ * Weapons that hold fire for their own reasons keep holding — Frost Nova with a
+ * field still on the ground, Spore Cloud at its mat cap. A volley cannot
+ * override a rule; it only skips the wait.
+ */
+export const SALVO_INTERVAL = 14;
+/** Gap between volleys when the perk is stacked, so they read as a burst */
+export const SALVO_SPACING = 0.35;
+
+/** How long a repair cell stays on the ground */
 export const REPAIR_LIFETIME = 12;
+
+/**
+ * A repair cell restores a share of the health you are **missing**, not a flat
+ * amount.
+ *
+ * Measured: a 17-minute clear healed 2,603 against 2,652 taken — healing
+ * refunded **98%** of everything the run did to the player, and the stage the
+ * user remembered as the hard one "put up no resistance at all".
+ *
+ * The flat version could not have done anything else. Drops scale with kills
+ * (`siphon` is a per-kill chance), kills scale with how strong the build is, so
+ * the healing supply grew with exactly the thing it was supposed to be a
+ * counterweight to: 10,023 kills dropped roughly 1,250 cells, and walking over
+ * them at nearly full health still banked 6 HP a time. Chip damage was free.
+ *
+ * A share of what is missing breaks that link, because it does not care how
+ * many kills produced the cell — only how much trouble you are in:
+ *
+ *     at 20% of a 255 HP pool -> 24 HP     (a real recovery)
+ *     at 50%                  -> 15 HP
+ *     at 90%                  -> 3 HP      (topping off is not worth a detour)
+ *
+ * So a cell is worth diving for when you are hurt, which is the decision the
+ * player said they liked, and worth nothing when you are fine — which is when
+ * they were quietly cancelling the whole run's damage.
+ */
+export const REPAIR_MISSING_SHARE = 0.12;
+/** Floor, so a cell picked up at full health is not literally nothing */
+export const REPAIR_MIN_HEAL = 2;
+
+/** What one repair cell is worth to a player at `hp` of `maxHp` */
+export function repairHeal(hp: number, maxHp: number): number {
+    const missing = Math.max(0, maxHp - hp);
+    return Math.max(REPAIR_MIN_HEAL, missing * REPAIR_MISSING_SHARE);
+}
 
 /**
  * Seconds without taking damage before regeneration starts again.

@@ -396,8 +396,11 @@ describe('Player XP curve', () => {
         // picks in the entire game (30 weapon levels + 90 perk stacks). The run
         // had taken 110 of them. Whatever the curve does, the end of a run must
         // still be a build rather than a full set.
-        const TOTAL_PICKS_IN_GAME = 120;
-        expect(levelFor(816346)).toBeLessThan(TOTAL_PICKS_IN_GAME * 0.85);
+        // Counted, not hardcoded: adding perks must not quietly buy the curve
+        // room it did not earn.
+        const totalPicks = 6 * WEAPON_SLOT_CAP
+            + POWERUPS.reduce((n, p) => n + (p.maxStacks ?? POWERUP_STACK_CAP), 0);
+        expect(levelFor(816346)).toBeLessThan(totalPicks * 0.85);
     });
 
     it('turns a won Void Nexus run into more picks, and a lost one into none', () => {

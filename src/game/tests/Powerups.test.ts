@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { POWERUPS, WEAPONS } from '../data/GameData';
 import { VALID_PLAYER_STATS } from '../core/PlayerStats';
+import { formatPowerupBonus, formatStatPreview } from '../core/UpgradePool';
 
 describe('Icons', () => {
     it('no two things you can own share an icon', () => {
@@ -66,6 +67,20 @@ describe('POWERUPS Validation', () => {
             expect(powerup.type, `${powerup.name}: missing type`).toBeDefined();
             expect(powerup.value, `${powerup.name}: missing value`).toBeDefined();
             expect(powerup.emoji, `${powerup.name}: missing emoji`).toBeDefined();
+        }
+    });
+
+    it('every powerup can render a card', () => {
+        // The level-up card is `formatPowerupBonus` over the stat's unit plus a
+        // before -> after preview. A stat with no `bonus.<type>` string renders
+        // its raw key, which reaches the player as "+1 bonus.timeStop".
+        for (const powerup of POWERUPS) {
+            const bonus = formatPowerupBonus(powerup.type, powerup.value);
+            expect(bonus, powerup.id).not.toContain('bonus.');
+            expect(bonus, powerup.id).toMatch(/[0-9]/);
+
+            const preview = formatStatPreview(powerup.type, 0, powerup.value);
+            expect(preview, powerup.id).toContain('→');
         }
     });
 

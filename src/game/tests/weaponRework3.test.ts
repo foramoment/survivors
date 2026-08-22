@@ -492,6 +492,25 @@ describe('Spore Cloud is a colony with a size limit', () => {
         expect(alive.length).toBeGreaterThan(2);
     });
 
+    it('a salvo cannot push it past its own hold rule', () => {
+        // Salvo fires the whole build by zeroing every weapon's cooldown (see
+        // GameManager.fireSalvo). A weapon that is holding fire for a reason of
+        // its own has to keep holding, or the perk quietly deletes the cap this
+        // whole class was rebuilt around.
+        const player = maxedBuild();
+        const weapon = new SporeCloudWeapon(player);
+        const spawned: Entity[] = [];
+        weapon.onSpawn = e => spawned.push(e);
+
+        runFor(weapon, 20, spawned);
+        const atCap = spawned.filter(e => !e.isDead).length;
+        expect(atCap).toBe(2);
+
+        weapon.cooldown = 0;          // what a salvo does
+        weapon.update(0.016);
+        expect(spawned.filter(e => !e.isDead).length).toBe(atCap);
+    });
+
     it('levelling buys seconds of held ground, and the ceiling is flat', () => {
         // What a level buys now that the radius bonus is gone. Flat seconds, so
         // the ceiling does not move when duration powerups do — the old form

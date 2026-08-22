@@ -102,6 +102,9 @@ export const EN: Record<string, string> = {
     // see DISCHARGE_MAX_STACKS in core/Tactics
     'bonus.discharge': 'tier',
     'bonus.reroll': 'reroll',
+    'bonus.secondWind': 'save',
+    'bonus.timeStop': 's of stasis',
+    'bonus.salvo': 'volley',
     // Suffix for percentages that are a probability rather than a size
     'bonus.chance': 'chance',
 

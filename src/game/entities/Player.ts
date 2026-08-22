@@ -170,6 +170,12 @@ export class Player extends Entity {
         reroll: 0,
         /** Bonus damage against a target still at full health */
         firstStrike: 0,
+        /** 1 = one lethal blow this run is survived instead */
+        secondWind: 0,
+        /** Seconds added to the periodic stasis (0 = the perk is not owned) */
+        timeStop: 0,
+        /** Volleys fired when the salvo goes off */
+        salvo: 0,
     };
 
     classId: string = 'void_walker';

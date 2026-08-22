@@ -146,7 +146,8 @@ export function getPowerupValue(
 }
 
 /** Stat types shown as a flat amount with a unit instead of a percentage */
-const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'discharge', 'reroll', 'shield'];
+const FLAT_TYPES = ['magnet', 'maxHp', 'armor', 'discharge', 'reroll', 'shield',
+    'secondWind', 'timeStop', 'salvo'];
 
 /**
  * Percentages that are a **probability of the effect firing**, not a size.

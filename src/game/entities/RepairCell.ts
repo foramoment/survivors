@@ -1,6 +1,6 @@
 import { Entity } from '../../engine/Entity';
 import { type Vector2, normalize, distance } from '../../engine/Utils';
-import { REPAIR_HEAL, REPAIR_LIFETIME } from '../core/Tactics';
+import { REPAIR_LIFETIME } from '../core/Tactics';
 
 /**
  * A repair cell dropped by Vital Siphon.
@@ -21,7 +21,8 @@ const PULL_RADIUS = 95;
 const PULL_SPEED = 150;
 
 export class RepairCell extends Entity {
-    heal: number = REPAIR_HEAL;
+    // What it is worth is decided when it is picked up, not when it drops —
+    // see `repairHeal` in core/Tactics
     lifetime: number = REPAIR_LIFETIME;
     private pulse: number = Math.random() * Math.PI * 2;
 

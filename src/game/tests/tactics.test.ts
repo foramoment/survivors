@@ -14,8 +14,11 @@ import {
     dischargeThreshold, dischargeRadius, DISCHARGE_COOLDOWN, REPAIR_LIFETIME,
     DISCHARGE_MAX_STACKS, DISCHARGE_STUN_AT, DISCHARGE_BURN_AT,
     KILL_ECHO_ICD, KILL_ECHO_DAMAGE_SHARE, KILL_ECHO_BURN_SHARE,
-    killEchoDamage, killEchoBurnDps,
+    DISCHARGE_BURN_SHARE, DISCHARGE_BURN_TIME,
+    killEchoDamage, killEchoBurnDps, repairHeal, REPAIR_MIN_HEAL,
+    timeStopDuration, TIME_STOP_INTERVAL,
 } from '../core/Tactics';
+import { STUN_RECOVERY_RATIO } from '../core/StatusEffects';
 import { POWERUPS } from '../data/GameData';
 import { VALID_PLAYER_STATS } from '../core/PlayerStats';
 import { RU } from '../data/locales/ru';
@@ -89,6 +92,21 @@ describe('Static Discharge', () => {
     });
 });
 
+describe('percent-of-max-HP damage is bounded', () => {
+    it('one burn proc cannot be worth a big fraction of a body', () => {
+        // The shape problem, as a number. A late Void Nexus enemy carries
+        // ~57,000 HP against a maxed weapon hit of a few hundred, so a burn
+        // measured as a percentage of that pool is worth fifty weapon hits and
+        // the weapons stop mattering. Enemy health grows x2 per tier and again
+        // with the clock; a weapon grows about x15 across an entire run.
+        const echoProc = KILL_ECHO_BURN_SHARE * 2.5;
+        const dischargeProc = DISCHARGE_BURN_SHARE * DISCHARGE_BURN_TIME;
+
+        expect(echoProc).toBeLessThan(0.1);
+        expect(dischargeProc).toBeLessThan(0.1);
+    });
+});
+
 describe('Kill Echo', () => {
     it('trades frequency for size — fewer stacks, harder blast', () => {
         // Play report: it proc'd often enough to be background and hit softly
@@ -146,7 +164,67 @@ describe('Kill Echo', () => {
     });
 });
 
+describe('the three event tactics', () => {
+    // Asked for by name: "it was nice when the discharge went off, I want more
+    // of that". The constraint they are all built under is that NONE of them
+    // deals damage — the run summary had just shown two perks holding 89% of a
+    // run's damage and the weapons holding 11%.
+    it('exist, and none of them is a damage stat', () => {
+        for (const id of ['second_wind', 'time_stop', 'salvo']) {
+            const perk = POWERUPS.find(p => p.id === id);
+            expect(perk, id).toBeDefined();
+            expect(VALID_PLAYER_STATS as readonly string[]).toContain(perk!.type);
+        }
+    });
+
+    it('Second Wind is a moment, so it cannot be stacked', () => {
+        expect(POWERUPS.find(p => p.id === 'second_wind')!.maxStacks).toBe(1);
+    });
+
+    it('stasis stacks buy length, never frequency', () => {
+        // The rule DISCHARGE_CHARGE_COST argues for one file over: a rarer,
+        // longer stop stays an event you look up at; a more frequent one is
+        // weather. TIME_STOP_INTERVAL is a constant, so the only thing a stack
+        // can move is the duration.
+        expect(timeStopDuration(0)).toBe(0);
+        expect(timeStopDuration(2)).toBeGreaterThan(timeStopDuration(1));
+        expect(timeStopDuration(3)).toBeGreaterThan(timeStopDuration(2));
+        // ...and it stays short enough to be a window, not a nap
+        expect(timeStopDuration(3)).toBeLessThan(4);
+    });
+
+    it('a stasis long enough to matter is still bounded by stun recovery', () => {
+        // It rides status.stun, which hands out immunity worth
+        // STUN_RECOVERY_RATIO times the freeze — that is what stops this from
+        // combining with Mind Blast or Absolute Zero into a parked arena.
+        const frozen = timeStopDuration(3);
+        expect(frozen * STUN_RECOVERY_RATIO).toBeLessThan(TIME_STOP_INTERVAL);
+    });
+});
+
 describe('Repair cell', () => {
+    it('is worth a share of what you are missing, not a flat top-up', () => {
+        // Measured: a 17-minute clear healed 2603 against 2652 taken, so
+        // healing refunded 98% of everything the run did to the player. Drops
+        // scale with kills and kills scale with build strength, so a FLAT cell
+        // made the healing supply grow with the very thing it was meant to
+        // counterweight.
+        const MAX = 255;
+        const hurt = repairHeal(MAX * 0.2, MAX);
+        const scratched = repairHeal(MAX * 0.9, MAX);
+
+        // Diving for one has to pay when you are actually in trouble...
+        expect(hurt).toBeGreaterThan(20);
+        // ...and not be worth the detour when you are fine
+        expect(scratched).toBeLessThan(5);
+        expect(hurt).toBeGreaterThan(scratched * 4);
+    });
+
+    it('never heals literally nothing', () => {
+        expect(repairHeal(100, 100)).toBe(REPAIR_MIN_HEAL);
+        expect(repairHeal(120, 100)).toBe(REPAIR_MIN_HEAL);
+    });
+
     it('expires so healing cannot be banked', () => {
         const cell = new RepairCell(0, 0);
         cell.update(REPAIR_LIFETIME + 0.1);

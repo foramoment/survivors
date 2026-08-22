@@ -31,7 +31,10 @@ import {
     dischargeThreshold, dischargeRadius, DISCHARGE_DAMAGE, DISCHARGE_KNOCKBACK,
     DISCHARGE_COOLDOWN, DISCHARGE_CHARGE_CAP,
     DISCHARGE_STUN_AT, DISCHARGE_BURN_AT, DISCHARGE_STUN,
-    DISCHARGE_BURN_SHARE, DISCHARGE_BURN_TIME,
+    DISCHARGE_BURN_SHARE, DISCHARGE_BURN_TIME, repairHeal,
+    SECOND_WIND_HP_SHARE, SECOND_WIND_RADIUS, SECOND_WIND_STUN, SECOND_WIND_KNOCKBACK,
+    TIME_STOP_INTERVAL, TIME_STOP_RADIUS, timeStopDuration,
+    SALVO_INTERVAL, SALVO_SPACING,
     KILL_ECHO_RADIUS, killEchoDamage, killEchoBurnDps,
     KILL_ECHO_SOURCE, DISCHARGE_SOURCE,
     KILL_ECHO_KNOCKBACK, KILL_ECHO_PUNCH_GAP, KILL_ECHO_ICD,
@@ -65,8 +68,8 @@ const CONTACT_NUMBER_INTERVAL = 0.4;
 const HEAL_NUMBER_INTERVAL = 0.5;
 /**
  * A single heal at least this big prints immediately instead of waiting.
- * Sized under one repair cell (REPAIR_HEAL) so a pickup always jumps the queue,
- * and well above any one frame of regen so a trickle never does.
+ * Sized under the smallest useful repair cell so a pickup jumps the queue, and
+ * well above any one frame of regen so a trickle never does.
  */
 const HEAL_INSTANT_EVENT = 3;
 /** Pixels above the damage-taken number, so the two never overlap */
@@ -161,6 +164,14 @@ export class GameManager {
     private echoPunchTimer: number = 0;
     /** Internal cooldown on Kill Echo itself (see KILL_ECHO_ICD) */
     private echoIcdTimer: number = 0;
+    /** Seconds until the next stasis, and until the next salvo */
+    private timeStopTimer: number = TIME_STOP_INTERVAL;
+    private salvoTimer: number = SALVO_INTERVAL;
+    /** Volleys still owed by the current salvo, and the gap before the next */
+    private salvoPending: number = 0;
+    private salvoPulseTimer: number = 0;
+    /** Second Wind is once per run — see SECOND_WIND_HP_SHARE */
+    private secondWindUsed: boolean = false;
     /**
      * Contact damage banked since the last time a number was printed.
      *
@@ -271,6 +282,11 @@ export class GameManager {
         this.dischargeCooldown = 0;
         this.echoPunchTimer = 0;
         this.echoIcdTimer = 0;
+        this.timeStopTimer = TIME_STOP_INTERVAL;
+        this.salvoTimer = SALVO_INTERVAL;
+        this.salvoPending = 0;
+        this.salvoPulseTimer = 0;
+        this.secondWindUsed = false;
         this.contactPending = 0;
         this.contactPrintTimer = 0;
         this.healPending = 0;
@@ -685,6 +701,126 @@ export class GameManager {
     }
 
     /**
+     * The two tactics that run on a clock rather than on a trigger.
+     *
+     * Both are events, and both are deliberately *rare*: the play report that
+     * asked for them praised Static Discharge for the moment it makes, and a
+     * moment that happens every few seconds is weather. Neither deals damage of
+     * its own — see the comments in core/Tactics for why that matters right
+     * now.
+     */
+    private tickTimedTactics(dt: number) {
+        if (!this.player) return;
+
+        if (this.player.stats.timeStop > 0) {
+            this.timeStopTimer -= dt;
+            if (this.timeStopTimer <= 0) {
+                this.timeStopTimer = TIME_STOP_INTERVAL;
+                this.freezeArena(timeStopDuration(this.player.stats.timeStop));
+            }
+        }
+
+        const volleys = this.player.stats.salvo;
+        if (volleys > 0) {
+            this.salvoTimer -= dt;
+            if (this.salvoTimer <= 0) {
+                this.salvoTimer = SALVO_INTERVAL;
+                this.salvoPending = volleys;
+                this.salvoPulseTimer = 0;
+            }
+        }
+
+        if (this.salvoPending > 0) {
+            this.salvoPulseTimer -= dt;
+            if (this.salvoPulseTimer <= 0) {
+                this.salvoPending--;
+                this.salvoPulseTimer = SALVO_SPACING;
+                this.fireSalvo();
+            }
+        }
+    }
+
+    /**
+     * Stasis: everything on screen stops for a moment.
+     *
+     * Rides `status.stun`, which is the whole reason it is safe to hand out —
+     * the recovery rule in StatusEffects means a frozen enemy is immune for
+     * twice the freeze afterwards, so this cannot be stacked with Mind Blast or
+     * Absolute Zero into an arena that never moves again.
+     */
+    private freezeArena(duration: number) {
+        if (!this.player || duration <= 0) return;
+
+        // 'evolve' rather than a hit sound: nothing is being struck, the arena
+        // is changing state
+        audio.play('evolve');
+        juice.flash('#bfe9ff', 0.35, 0.22);
+        juice.pulseVignette(0.5);
+        juice.shockwave(this.player.pos.x, this.player.pos.y, TIME_STOP_RADIUS * 0.5, '#bfe9ff', 0.5, 8);
+
+        for (const enemy of levelSpatialHash.getWithinRadius(this.player.pos, TIME_STOP_RADIUS)) {
+            status.stun(enemy, duration);
+        }
+    }
+
+    /**
+     * Salvo: every weapon in the build fires now.
+     *
+     * Zeroing the cooldown rather than calling anything directly is the point.
+     * A weapon holding fire for a reason of its own keeps holding — Frost Nova
+     * with a field still on the ground, Spore Cloud at its mat cap — because
+     * those rules live in the weapon's own update and this never reaches past
+     * them. A volley skips the wait; it does not override a rule.
+     */
+    private fireSalvo() {
+        if (!this.player || this.player.weapons.length === 0) return;
+
+        audio.play('shoot');
+        juice.zoomPunch(0.25);
+        for (const weapon of this.player.weapons) {
+            weapon.cooldown = 0;
+        }
+    }
+
+    /**
+     * Second Wind: the run does not end, once.
+     *
+     * Coming back at full health in the middle of the crowd that just killed
+     * you is a two-frame delay, not a rescue — so the save is mostly about
+     * *space*: everything nearby is thrown out and stunned, and the contact
+     * ramp resets, because the ramp measures how long you chose to stand there
+     * and this was not a choice.
+     */
+    private secondWind(): boolean {
+        if (!this.player) return false;
+        if (this.secondWindUsed || this.player.stats.secondWind <= 0) return false;
+
+        this.secondWindUsed = true;
+        this.player.isDead = false;
+        this.player.hp = this.player.maxHp * SECOND_WIND_HP_SHARE;
+        this.player.contactRampTime = 0;
+
+        audio.play('levelup');
+        juice.hitStop(0.16);
+        juice.slowMo(0.35, 0.9);
+        juice.flash('#ffd166', 0.5, 0.5);
+        juice.addTrauma(0.8);
+        juice.zoomPunch(0.9);
+        juice.shockwave(this.player.pos.x, this.player.pos.y, SECOND_WIND_RADIUS, '#ffd166', 0.5, 10);
+        particles.emitExplosion(this.player.pos.x, this.player.pos.y, SECOND_WIND_RADIUS * 0.6,
+            ['#ffd166', '#ff6b35', '#ffffff']);
+
+        for (const enemy of levelSpatialHash.getWithinRadius(this.player.pos, SECOND_WIND_RADIUS)) {
+            const dx = enemy.pos.x - this.player.pos.x;
+            const dy = enemy.pos.y - this.player.pos.y;
+            const len = Math.hypot(dx, dy) || 1;
+            enemy.applyKnockback(dx / len, dy / len, SECOND_WIND_KNOCKBACK);
+            status.stun(enemy, SECOND_WIND_STUN);
+        }
+        return true;
+    }
+
+    /**
      * Kill Echo: a dead enemy sometimes takes its neighbours with it.
      *
      * Scaled off the corpse's max HP so it stays relevant as enemies get
@@ -858,6 +994,7 @@ export class GameManager {
         if (this.echoPunchTimer > 0) this.echoPunchTimer -= dt;
         if (this.echoIcdTimer > 0) this.echoIcdTimer -= dt;
         if (this.contactFxTimer > 0) this.contactFxTimer -= dt;
+        this.tickTimedTactics(dt);
         this.flushHealNumber(dt);
         this.waveTimer += dt;
 
@@ -1065,7 +1202,9 @@ export class GameManager {
             cell.update(dt, this.player.pos);
 
             if (checkCollision(cell, this.player)) {
-                this.player.heal(cell.heal);
+                // Worth a share of what you are MISSING, so healing cannot
+                // quietly refund a whole run of chip damage — see repairHeal
+                this.player.heal(repairHeal(this.player.hp, this.player.maxHp));
                 audio.play('pickup');
                 particles.emitHit(cell.pos.x, cell.pos.y, '#ff6b8a');
                 this.repairCells.splice(i, 1);
@@ -1083,7 +1222,7 @@ export class GameManager {
         }
         this.crystals.update(dt, this.player, this.canvas.width, this.canvas.height, attractors);
 
-        if (this.player.isDead) {
+        if (this.player.isDead && !this.secondWind()) {
             this.state = 'GAME_OVER';
             this.showGameOver();
         } else if (this.finalBoss?.isDead) {
