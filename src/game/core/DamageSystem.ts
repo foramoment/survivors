@@ -16,6 +16,7 @@
  */
 import type { Vector2 } from '../../engine/Utils';
 import { events } from '../../engine/EventBus';
+import { armorMultiplierFor } from './BossArmor';
 
 export interface DamageParams {
     baseDamage: number;
@@ -130,7 +131,13 @@ class DamageSystemClass {
         // environmental hazards — applied here rather than in dealDamage so a
         // `skipModifiers` hit still benefits. That is what makes acid a setup
         // tool instead of just another damage-over-time.
-        const finalDamage = damage * (1 + (target.corrosion?.amp ?? 0));
+        //
+        // Boss armour divides in the same place and for the same reason: a
+        // boss is armoured against *everything* until its escort has been
+        // cleared, and no weapon, perk or hazard should have to know that.
+        const finalDamage = damage
+            * (1 + (target.corrosion?.amp ?? 0))
+            * armorMultiplierFor(target);
 
         // Stamped on every hit, so whatever is here when the target dies is the
         // weapon that landed the killing blow. This is the only place that sees

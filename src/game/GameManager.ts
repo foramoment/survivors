@@ -39,6 +39,9 @@ import {
     KILL_ECHO_SOURCE, DISCHARGE_SOURCE,
     KILL_ECHO_KNOCKBACK, KILL_ECHO_PUNCH_GAP, KILL_ECHO_ICD,
 } from './core/Tactics';
+import {
+    BOSS_ESCORT_RADIUS, BOSS_PLATE_KILLS, BOSS_VULNERABLE_TIME, BOSS_PLATE_TIMEOUT,
+} from './core/BossArmor';
 import { screenManager } from '../engine/ui/ScreenManager';
 import { LevelUpOverlay } from './ui/screens/LevelUpOverlay';
 import { showRunSummary } from './ui/screens/RunSummaryOverlay';
@@ -821,6 +824,59 @@ export class GameManager {
     }
 
     /**
+     * An escort died near a boss, so a plate comes off.
+     *
+     * This is the bounded version of a pattern that had to be killed twice —
+     * "melt the boss by farming its escort". The crowd deals the boss no damage
+     * at all here; it buys a **window**, and what happens inside the window is
+     * the player's own weapons at their own numbers. A window has a length, so
+     * no kill rate converts into more than one per cycle. The whole argument is
+     * in core/BossArmor.
+     */
+    private chipBossArmor(dead: Enemy) {
+        if (dead.isBoss) return;
+
+        for (const boss of this.enemies) {
+            if (!boss.armored || boss.isDead) continue;
+            if (boss.vulnerableFor > 0) continue;
+            if (distance(dead.pos, boss.pos) > BOSS_ESCORT_RADIUS) continue;
+
+            boss.armorKills++;
+            if (boss.armorKills >= BOSS_PLATE_KILLS) this.exposeBoss(boss);
+            else particles.emitHit(boss.pos.x, boss.pos.y, '#8ce8ff');
+        }
+    }
+
+    /**
+     * The armour comes off on a clock as well as on kills.
+     *
+     * Without this the rule can be refused: kite the boss away from the crowd,
+     * clear the crowd elsewhere, and nothing ever opens — a boss taking 15% of
+     * your damage forever is worse than the sponge it replaces. Fighting beside
+     * it is still worth about four times the windows. See BOSS_PLATE_TIMEOUT.
+     */
+    private tickBossArmor(dt: number) {
+        for (const boss of this.enemies) {
+            if (!boss.armored || boss.isDead || boss.vulnerableFor > 0) continue;
+            boss.armorTimer += dt;
+            if (boss.armorTimer >= BOSS_PLATE_TIMEOUT) this.exposeBoss(boss);
+        }
+    }
+
+    /** The plates blow off and the boss takes full damage for a few seconds */
+    private exposeBoss(boss: Enemy) {
+        boss.armorKills = 0;
+        boss.armorTimer = 0;
+        boss.vulnerableFor = BOSS_VULNERABLE_TIME;
+
+        audio.play('evolve');
+        juice.addTrauma(0.35);
+        juice.shockwave(boss.pos.x, boss.pos.y, boss.radius * 4, '#8ce8ff', 0.4, 7);
+        particles.emitExplosion(boss.pos.x, boss.pos.y, boss.radius * 2,
+            ['#8ce8ff', '#ffffff', '#3a7fa0']);
+    }
+
+    /**
      * Kill Echo: a dead enemy sometimes takes its neighbours with it.
      *
      * Scaled off the corpse's max HP so it stays relevant as enemies get
@@ -995,6 +1051,7 @@ export class GameManager {
         if (this.echoIcdTimer > 0) this.echoIcdTimer -= dt;
         if (this.contactFxTimer > 0) this.contactFxTimer -= dt;
         this.tickTimedTactics(dt);
+        this.tickBossArmor(dt);
         this.flushHealNumber(dt);
         this.waveTimer += dt;
 
@@ -1182,6 +1239,7 @@ export class GameManager {
                 // Tactics that trigger on death (see core/Tactics)
                 this.killEcho(enemy);
                 this.feedFungus(enemy);
+                this.chipBossArmor(enemy);
                 if (Math.random() < this.player.stats.siphon) {
                     this.repairCells.push(new RepairCell(enemy.pos.x, enemy.pos.y));
                 }
@@ -1438,9 +1496,14 @@ export class GameManager {
         if (options.boss) {
             enemy.makeBoss();
             if (options.final) {
-                // Final boss: considerably tougher than wave minibosses
-                enemy.hp *= 3;
-                enemy.maxHp *= 3;
+                // Final boss: tougher than a wave miniboss, but nothing like
+                // the x3 it used to be. Net of makeBoss that was x36 of a late
+                // enemy against a build landing 4,000 a second on one target —
+                // a ten-minute fight. See core/BossArmor.
+                enemy.hp *= 1.5;
+                enemy.maxHp *= 1.5;
+                // Only the final boss wears armour — see core/BossArmor
+                enemy.armored = true;
                 enemy.radius *= 1.3;
                 enemy.xpValue *= 3;
                 this.finalBoss = enemy;

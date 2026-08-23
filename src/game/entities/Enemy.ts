@@ -2,6 +2,7 @@ import { Entity } from '../../engine/Entity';
 import { type Vector2, normalize, distance } from '../../engine/Utils';
 import { sprites, type EnemyTint } from '../core/SpriteFactory';
 import type { Infection, Corrosion, InfectionKind } from '../core/StatusEffects';
+import { BOSS_PLATE_KILLS, armorProgress } from '../core/BossArmor';
 
 /** Mote colour per DoT flavour: [plain, contagious] */
 const INFECTION_COLORS: Record<InfectionKind, [string, string]> = {
@@ -24,6 +25,16 @@ export class Enemy extends Entity {
     facingLeft: boolean = false;
     isElite: boolean = false;
     isBoss: boolean = false;
+    /**
+     * Boss armour — see core/BossArmor for why a boss needs one at all.
+     * `armorKills` counts escort deaths banked toward the next plate;
+     * `vulnerableFor` is seconds of full damage left once they all fall.
+     */
+    armored: boolean = false;
+    armorKills: number = 0;
+    vulnerableFor: number = 0;
+    /** Seconds since the armour last opened (see BOSS_PLATE_TIMEOUT) */
+    armorTimer: number = 0;
     /**
      * Weapon id of the last thing that hit this enemy — i.e. who gets the kill.
      * Written by DamageSystem on every hit; null means the arena did it.
@@ -81,11 +92,19 @@ export class Enemy extends Entity {
      * Promote this enemy to a wave miniboss. Call after time scaling so the
      * multipliers stack on the already-scaled stats.
      */
+    /**
+     * **Health cut 12 -> 6**, and the final boss's own multiplier with it, when
+     * the armour rule arrived. The old number had never been sized against
+     * single-target damage: the measured build was dealing a million a second
+     * across the arena and four thousand of it to the boss, so twelve times a
+     * late enemy's health was a ten-minute fight. See core/BossArmor.
+     */
     makeBoss() {
         this.isBoss = true;
-        this.hp *= 12;
-        this.maxHp *= 12;
-        this.baseHp *= 12;
+        this.armorKills = 0;
+        this.hp *= 6;
+        this.maxHp *= 6;
+        this.baseHp *= 6;
         this.damage *= 1.5;
         this.xpValue *= 10;
         this.radius *= 2;
@@ -135,6 +154,9 @@ export class Enemy extends Entity {
     update(dt: number, playerPos?: Vector2) {
         this.animTimer += dt;
         if (this.hitFlash > 0) this.hitFlash -= dt;
+        // Ticks even while stunned: the window is a promise about time, and a
+        // boss that gets frozen mid-window would otherwise bank it
+        if (this.vulnerableFor > 0) this.vulnerableFor -= dt;
 
         // Stunned: still animates and takes damage, but goes nowhere. Knockback
         // already in flight is allowed to finish playing out.
@@ -185,22 +207,61 @@ export class Enemy extends Entity {
         if (Math.abs(this.knockback.y) < 1) this.knockback.y = 0;
     }
 
+    /**
+     * The armour, as armour — a ring of plates around the boss that loses one
+     * segment for every escort that dies near it, and is gone entirely while
+     * the boss is exposed.
+     *
+     * Drawn on the body rather than as a gauge over its head on purpose. A bar
+     * that fills up is a HUD element painted into the arena (see the VFX rules
+     * in CLAUDE.md); plates falling off a boss are the boss. The player reads
+     * the same number either way — how much longer until it opens — but one of
+     * them belongs on screen and the other does not.
+     */
+    private drawArmor(ctx: CanvasRenderingContext2D) {
+        if (this.vulnerableFor > 0) return;
+
+        const stripped = armorProgress(this.armorKills, this.armorTimer);
+        const plates = Math.max(0, Math.ceil(BOSS_PLATE_KILLS * (1 - stripped)));
+        if (plates <= 0) return;
+
+        const r = this.radius * 1.28;
+        const step = (Math.PI * 2) / BOSS_PLATE_KILLS;
+        // Slow drift so the shell reads as a moving shield rather than a decal
+        const spin = this.animTimer * 0.5;
+
+        ctx.lineWidth = Math.max(2, this.radius * 0.16);
+        ctx.strokeStyle = '#8ce8ff';
+        ctx.globalAlpha = 0.75;
+        for (let i = 0; i < plates; i++) {
+            const from = spin + i * step;
+            ctx.beginPath();
+            ctx.arc(0, 0, r, from, from + step * 0.62);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+    }
+
     draw(ctx: CanvasRenderingContext2D, camera: Vector2) {
         ctx.save();
         ctx.translate(this.pos.x - camera.x, this.pos.y - camera.y);
 
         if (this.isElite || this.isBoss) {
-            const pulse = 0.8 + 0.2 * Math.sin(Date.now() / 200);
+            const exposed = this.vulnerableFor > 0;
+            const pulse = 0.8 + 0.2 * Math.sin(Date.now() / (exposed ? 90 : 200));
             const glowSize = this.radius * pulse * 2;
 
             const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, glowSize);
-            gradient.addColorStop(0, this.eliteOutlineColor + '99');
-            gradient.addColorStop(1, this.eliteOutlineColor + '00');
+            const glowColor = exposed ? '#ffdd55' : this.eliteOutlineColor;
+            gradient.addColorStop(0, glowColor + '99');
+            gradient.addColorStop(1, glowColor + '00');
             ctx.fillStyle = gradient;
             ctx.beginPath();
             ctx.arc(0, 0, glowSize, 0, Math.PI * 2);
             ctx.fill();
         }
+
+        if (this.armored) this.drawArmor(ctx);
 
         // Procedural pixel sprite with walk animation and hit flash
         const frame = Math.floor(this.animTimer * 6) % 2;
